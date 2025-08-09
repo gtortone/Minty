@@ -122,7 +122,7 @@ char path[256];
 unsigned char files[256 * 64] = {0};
 unsigned char nomefiles[32 * 25] = {0};
 
-int fileda = 0, filea = 0;
+int filefrom = 0, fileto = 0;
 volatile char cmd = 0;
 bool cmd_executing = false;
 
@@ -144,9 +144,9 @@ extern unsigned int page[80];          // page number
 extern int slot;
 extern int hacks;
 
-char substr[100];
-
 int base = 0x17f;
+
+FATFS FatFs;
 
 void resetCart() {
    gpio_init(MSYNC_PIN);
@@ -484,19 +484,16 @@ int search_directory(char *path, char *search) {
    strcpy(pathBuf, path);
    num_dir_entries = 0;
    int i;
-   FATFS FatFs;
 
-   if (f_mount(&FatFs, "", 1) == FR_OK) {
-      if (scan_files(pathBuf, search) == FR_OK) {
-         // sort by score, name
-         qsort((DIR_ENTRY *) & files[0], num_dir_entries, sizeof(DIR_ENTRY), entry_compare);
-         DIR_ENTRY *dst = (DIR_ENTRY *) & files[0];
+   if (scan_files(pathBuf, search) == FR_OK) {
+      // sort by score, name
+      qsort((DIR_ENTRY *) & files[0], num_dir_entries, sizeof(DIR_ENTRY), entry_compare);
+      DIR_ENTRY *dst = (DIR_ENTRY *) & files[0];
 
-         // re-set the pointer back to 0
-         for (i = 0; i < num_dir_entries; i++)
-            dst[i].isDir = 0;
-         return 1;
-      }
+      // re-set the pointer back to 0
+      for (i = 0; i < num_dir_entries; i++)
+         dst[i].isDir = 0;
+      return 1;
    }
    return 0;
 }
@@ -507,63 +504,49 @@ int read_directory(char *path) {
    num_dir_entries = 0;
    DIR_ENTRY *dst = (DIR_ENTRY *) & files[0];
 
-   if (!fatfs_is_mounted())
-      mount_fatfs_disk();
+   DIR dir;
 
-   FATFS FatFs;
-
-   if (f_mount(&FatFs, "", 1) == FR_OK) {
-      DIR dir;
-
-      if (f_opendir(&dir, path) == FR_OK) {
-         while (num_dir_entries < 64) {
-            if (f_readdir(&dir, &fno) != FR_OK || fno.fname[0] == 0)
-               break;
-            if (fno.fattrib & (AM_HID | AM_SYS))
+   if (f_opendir(&dir, path) == FR_OK) {
+      while (num_dir_entries < 64) {
+         if (f_readdir(&dir, &fno) != FR_OK || fno.fname[0] == 0)
+            break;
+         if (fno.fattrib & (AM_HID | AM_SYS))
+            continue;
+         dst->isDir = fno.fattrib & AM_DIR ? 1 : 0;
+         if (!dst->isDir)
+            if (!is_valid_file(fno.fname))
                continue;
-            dst->isDir = fno.fattrib & AM_DIR ? 1 : 0;
-            if (!dst->isDir)
-               if (!is_valid_file(fno.fname))
-                  continue;
-            // copy file record to first ram block
-            // long file name
-            strncpy(dst->long_filename, fno.fname, 31);
-            dst->long_filename[31] = 0;
-            // 8.3 name
-            if (fno.altname[0])
-               strcpy(dst->filename, fno.altname);
-            else {              // no altname when lfn is 8.3
-               strncpy(dst->filename, fno.fname, 12);
-               dst->filename[12] = 0;
-            }
-            dst->full_path[0] = 0;      // path only for search results
-            dst++;
-            num_dir_entries++;
+         // copy file record to first ram block
+         // long file name
+         strncpy(dst->long_filename, fno.fname, 31);
+         dst->long_filename[31] = 0;
+         // 8.3 name
+         if (fno.altname[0])
+            strcpy(dst->filename, fno.altname);
+         else {              // no altname when lfn is 8.3
+            strncpy(dst->filename, fno.fname, 12);
+            dst->filename[12] = 0;
          }
-         f_closedir(&dir);
-      } 
-      f_mount(0, "", 1);
-      qsort((DIR_ENTRY *) & files[0], num_dir_entries, sizeof(DIR_ENTRY), entry_compare);
-      ret = 1;
-   }
+         dst->full_path[0] = 0;      // path only for search results
+         dst++;
+         num_dir_entries++;
+      }
+      f_closedir(&dir);
+   } 
+   qsort((DIR_ENTRY *) & files[0], num_dir_entries, sizeof(DIR_ENTRY), entry_compare);
+   ret = 1;
+   
    return ret;
 }
 
 int load_file(char *filename) {
-   FATFS FatFs;
    UINT br, size = 0;
    unsigned char byteread[2];
-
-   if (f_mount(&FatFs, "", 1) != FR_OK) {
-      error(1);
-      return 0;
-   }
    FIL fil;
-
 
    if (f_open(&fil, filename, FA_READ) != FR_OK) {
       error(2);
-      goto cleanup;
+      return 0;
    }
 
    int bytes_to_read = 2;
@@ -587,40 +570,28 @@ int load_file(char *filename) {
    RAM[base + 202] = romLen;
    f_close(&fil);
 
- cleanup:
-   f_mount(0, "", 1);
-
    return br;
 }
 
 void load_cfg(char *filename) {
-   FATFS FatFs;
    char riga[80];
    char tmp[80] = {0};
    char cfgfile[80] = {0};
    int linepos;
+   FIL fil;
 
    char *dot = strchr(filename, '.');
    strncpy(cfgfile, filename, (dot - filename));
    strcat(cfgfile, ".cfg");
 
-   if (f_mount(&FatFs, "", 1) != FR_OK) {
-      error(8);
-      return;
-   }
-
-   FIL fil;
-
    // config file not available, try to config memory using fingerprint
    if (f_open(&fil, cfgfile, FA_READ) != FR_OK) {
-      f_close(&fil);
-      f_mount(0, "", 1);
       int fp = 0;
 
       for (int i = 0; i < 128; i++)
          fp += ((ROM[i] & 0xFF00) >> 8) + (ROM[i] & 0x00FF);
 
-      //printf("filename: %s, fp: %d\n", filename, fp);
+      printf("filename: %s, fp: %d\n", filename, fp);
 
       for (int i=0; i<sizeof(fingerprints)/sizeof(int); i += 2) {
          if (fp == fingerprints[i]) {
@@ -734,7 +705,6 @@ void load_cfg(char *filename) {
    slot = slot - 1;
 
    f_close(&fil);
-   f_mount(0, "", 1);
 
    return;
 }
@@ -749,27 +719,17 @@ void filelist(DIR_ENTRY *en, int da, int a) {
       RAM[base + i * 2] = 0;
    for (int n = 0; n < (a - da); n++) {
       memset(longfilename, 0, 32);
-
+      memset(tmp, 0, 32);
       if (en[n + da].isDir) {
-         //strcpy(longfilename,"DIR->");
          RAM[0x1000 + n] = 1;
          strcat(longfilename, en[n + da].long_filename);
       } else {
          RAM[0x1000 + n] = 0;
          strcpy(longfilename, en[n + da].long_filename);
-         /// rimuovo il .bin
-         memset(tmp, 0, sizeof(tmp));
-         int j = 32;
-         int dot = 0;
-
-         while ((longfilename[j] != '.') && (j > 0)) {
-            dot = j;
-            j--;
-         }
-         for (int i = 0; i < j; i++)
-            tmp[i] = longfilename[i];
-         tmp[j] = 0;
-         memcpy(longfilename, tmp, sizeof(tmp));
+         char *dot = strchr(longfilename, '.');
+         strncpy(tmp, longfilename, (dot - longfilename));
+         memset(longfilename, 0, 32);
+         strcpy(longfilename, tmp);
       }
 
       for (int i = 0; i < 20; i++) {
@@ -787,6 +747,12 @@ void filelist(DIR_ENTRY *en, int da, int a) {
 void IntyMenu(int type) {       // 1=start, 2=next page, 3=prev page, 4=dir up
    int maxfile = 0;
    int ret = 0;
+   
+   // mount flash
+   mount_fatfs_disk();
+   if (f_mount(&FatFs, "", 1) != FR_OK) {
+      // handle error
+   }
 
    switch (type) {
       case 1:
@@ -794,31 +760,29 @@ void IntyMenu(int type) {       // 1=start, 2=next page, 3=prev page, 4=dir up
          if (!(ret))
             error(1);
          maxfile = 10;
-         fileda = 0;
+         filefrom = 0;
          if (maxfile > num_dir_entries)
             maxfile = num_dir_entries;
-         filea = fileda + maxfile;
-         filelist((DIR_ENTRY *) & files[0], fileda, filea);
-         //sleep_ms(1400);
+         fileto = filefrom + maxfile;
          break;
       case 2:
-         if (filea < num_dir_entries) {
+         if (fileto < num_dir_entries) {
             maxfile = 10;
-            if ((filea + maxfile) > num_dir_entries)
-               maxfile = num_dir_entries - filea;
-            fileda = filea;
-            filea = fileda + maxfile;
-            filelist((DIR_ENTRY *) & files[0], fileda, filea);
+            if ((fileto + maxfile) > num_dir_entries)
+               maxfile = num_dir_entries - fileto;
+            filefrom = fileto;
+            fileto = filefrom + maxfile;
          }
          break;
       case 3:
-         if (fileda >= 10) {
-            fileda = fileda - 10;
-            filea = fileda + 10;
-            filelist((DIR_ENTRY *) & files[0], fileda, filea);
+         if (filefrom >= 10) {
+            filefrom = filefrom - 10;
+            fileto = filefrom + 10;
          }
          break;
    }
+
+   filelist((DIR_ENTRY *) & files[0], filefrom, fileto);
 }
 
 void DirUp() {
@@ -836,7 +800,9 @@ void LoadGame() {
    int numfile = 0;
    char longfilename[32];
 
-   numfile = RAM[0x899] + fileda - 1;
+   printf("start LoadGame()\n");
+
+   numfile = RAM[0x899] + filefrom - 1;
 
    DIR_ENTRY *entry = (DIR_ENTRY *) & files[0];
 
@@ -862,9 +828,7 @@ void LoadGame() {
       gpio_put(LED_PIN, false);
 
       sleep_ms(200);
-      resetCart();              // inizia con il gioco!
-      sleep_ms(200);
-      resetCart();              // inizia con il gioco!
+      resetCart();              // start game !
       memset(RAM, 0, sizeof(RAM));
       while (1) {
          gpio_put(LED_PIN, true);
@@ -907,13 +871,13 @@ void Inty_cart_main() {
    resetHigh();
    sleep_ms(30);
    resetLow();
-   printf("Inty Pow-ON");
+   printf("Inty Pow-ON\n");
 
    gpio_put(LED_PIN, true);
    memset(ROM, 0, BINLENGTH);
 
-   for (int i = 0; i < (sizeof(_acpirtoII) / 2); i++) {
-      ROM[i] = _acpirtoII[(i * 2) + 1] | (_acpirtoII[i * 2] << 8);
+   for (int i = 0; i < (sizeof(mintyfw) / 2); i++) {
+      ROM[i] = mintyfw[(i * 2) + 1] | (mintyfw[i * 2] << 8);
    }
    memset(RAM, 0, sizeof(RAM));
 
@@ -922,16 +886,14 @@ void Inty_cart_main() {
       HACK_CODE[i] = 0;
    }
 
-   slot = 1;   // 2 slots per splash
-
    //  [mapping]
-   //$0000 - $0dFF = $5000
+   //$0000 - $0FFF = $5000
    mapfrom[0] = 0x0;
-   mapto[0] = 0xdff;
+   mapto[0] = 0xfff;
    maprom[0] = 0x5000;
    type[0] = 0;
    page[0] = 0;
-   addrto[0] = 0x5dff;
+   addrto[0] = 0x5fff;
    mapdelta[0] = maprom[0] - mapfrom[0];
    mapsize[0] = mapto[0] - mapfrom[0];
 
@@ -947,6 +909,8 @@ void Inty_cart_main() {
    addrto[1] = 0x9fff;
    mapdelta[1] = maprom[1] - mapfrom[1];
    mapsize[1] = mapto[1] - mapfrom[1];
+
+   slot = 1;
 
    sleep_ms(200);
    resetCart();
@@ -970,44 +934,28 @@ void Inty_cart_main() {
       RAM[0x119] = 0;
 
       if ((cmd > 0) && !(cmd_executing)) {
+         cmd_executing = true;
+         RAM[0x889] = 0;
          switch (cmd) {
             case 1:            // read file list
-               cmd_executing = true;
-               RAM[0x889] = 0;
                IntyMenu(1);
-               RAM[0x119] = 1;
-               sleep_ms(800);
                break;
             case 2:            // run file list
-               cmd_executing = true;
-               RAM[0x889] = 0;
                LoadGame();
-               RAM[0x119] = 1;
-               sleep_ms(800);
                break;
             case 3:            // next page
-               cmd_executing = true;
-               RAM[0x889] = 0;
                IntyMenu(2);
-               RAM[0x119] = 1;
-               sleep_ms(800);
                break;
             case 4:            // prev page
-               cmd_executing = true;
-               RAM[0x889] = 0;
                IntyMenu(3);
-               RAM[0x119] = 1;
-               sleep_ms(800);
                break;
             case 5:            // up dir
-               cmd_executing = true;
-               RAM[0x889] = 0;
                DirUp();
                IntyMenu(1);
-               RAM[0x119] = 1;
-               sleep_ms(800);
                break;
          }
+         RAM[0x119] = 1;
+         sleep_ms(250);
       }
    }
 }
