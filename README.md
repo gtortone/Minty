@@ -40,9 +40,11 @@ picotool load -f Minty.bin; picotool reboot
 
 ## Getting started
 
-To simply program Pi Pico connect it to your PC/laptop using an USB-C cable
-while pressing Pico on-board button (boot MODE). Drag and drop `Minty.uf2` inside
-root directory.
+To simply program Pi Pico:
+- connect it to your PC/laptop using an USB-C cable while pressing Pico on-board button (boot MODE)
+- drag and drop `Minty.uf2` inside root directory
+
+
 
 
 
