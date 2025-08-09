@@ -26,6 +26,8 @@ Setup ROMs:
 
 ## User interface
 
+### Controller keys
+
 <div align="center">
    <img src="images/controller.png"/>
 </div>
