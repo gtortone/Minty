@@ -26,9 +26,9 @@ Setup ROMs:
 
 ## User interface
 
-![controller](images/controller.png)
-
-### 
+<div align="center">
+   <img src="images/controller.png"/>
+</div>
 
 ## Build (TL;DR)
 
