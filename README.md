@@ -20,6 +20,7 @@ To simply program Pi Pico:
 - drag and drop `Minty.uf2` inside root directory
 - copy your ITV ROM to root directory (rename ROM file names to 8 character + .bin extension)
 - if ROM name is included in ![cfg/0game-maps.csv](cfg/0game-maps.csv) you do not need to add CFG file
+- enjoy your PiRTOII cart with Minty firmware !
 
 ## User interface
 
