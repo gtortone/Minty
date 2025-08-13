@@ -12,6 +12,7 @@ Multi-cart based on Raspberry Pi Pico hardware and PiRTOII firmware (https://git
 - no more config files for "official" ITV titles
 - new navigation keys for UI ROM
 - new color schema for UI ROM
+- SD support
 
 ## Getting started
 
@@ -23,6 +24,9 @@ Setup ROMs:
 - copy your ITV ROM to root directory (rename ROM file names to 8 character + .bin extension)
 - if ROM name is included in [cfg/0game-maps.csv](cfg/0game-maps.csv) you do not need to add config (.cfg) file
 - enjoy your PiRTOII cart with Minty firmware !
+
+Minty supports microSD slot on free pins (see [board.h](include/board.h)). User can switch flash/SD storage device
+using controller key.
 
 ## User interface
 
