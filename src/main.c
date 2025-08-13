@@ -13,6 +13,7 @@
 #include "tusb.h"
 #include "inty_cart.h"
 #include "fatfs_disk.h"
+#include "board.h"
 
 //--------------------------------------------------------------------+
 // USB CDC
@@ -94,12 +95,11 @@ int main(void) {
    gpio_set_dir(RST_PIN, true);
 
    // debug UART
-   gpio_set_function(28, UART_FUNCSEL_NUM(uart0, 28));
-   gpio_set_function(29, UART_FUNCSEL_NUM(uart0, 29));
-   uart_init(uart0, 115200);
+   stdio_uart_init_full(uart1, 115200, UART_TX, UART_RX);
 
-   stdio_init_all();
    tud_init(BOARD_TUD_RHPORT);
+
+   printf("START\n");
 
    // reset interval in ms
    int t = 100;

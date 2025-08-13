@@ -25,87 +25,9 @@
 #include "ff.h"
 #include "fatfs_disk.h"
 #include "fingerprints.h"
-
-// Pico pin usage definitions
-#define B0_PIN    0
-#define B1_PIN    1
-#define B2_PIN    2
-#define B3_PIN    3
-#define B4_PIN    4
-#define B5_PIN    5
-#define B6_PIN    6
-#define B7_PIN    7
-#define F0_PIN    8
-#define F1_PIN    9
-#define F2_PIN    10
-#define F3_PIN    11
-#define F4_PIN    12
-#define F5_PIN    13
-#define F6_PIN    14
-#define F7_PIN    15
-#define BDIR_PIN  16
-#define BC2_PIN   17
-#define BC1_PIN   18
-#define MSYNC_PIN 19
-#define RST_PIN   20
-#define LED_PIN   25
-
-// Pico pin usage masks
-#define B0_PIN_MASK     0x00000001L     // gpio 0
-#define B1_PIN_MASK     0x00000002L
-#define B2_PIN_MASK     0x00000004L
-#define B3_PIN_MASK     0x00000008L
-#define B4_PIN_MASK     0x00000010L
-#define B5_PIN_MASK     0x00000020L
-#define B6_PIN_MASK     0x00000040L
-#define B7_PIN_MASK     0x00000080L
-
-#define F0_PIN_MASK     0x00000100L
-#define F1_PIN_MASK     0x00000200L
-#define F2_PIN_MASK     0x00000400L
-#define F3_PIN_MASK     0x00000800L
-#define F4_PIN_MASK     0x00001000L
-#define F5_PIN_MASK     0x00002000L
-#define F6_PIN_MASK     0x00004000L
-#define F7_PIN_MASK     0x00008000L     // gpio 15
-
-#define BDIR_PIN_MASK   0x00010000L     // gpio 16
-#define BC2_PIN_MASK    0x00020000L     // gpio 17
-#define BC1_PIN_MASK    0x00040000L     // gpio 18
-#define MSYNC_PIN_MASK  0x00080000L     // gpio 19
-#define RST_PIN_MASK    0x00100000L     // gpio 20
-#define LED_PIN_MASK    0x02000000L     // gpio 25
-
-// Aggregate Pico pin usage masks
-#define BC1e2_PIN_MASK  0x00060000L
-#define BX_PIN_MASK     0x000000FFL
-#define FX_PIN_MASK     0x0000FF00L
-#define DATA_PIN_MASK   0x0000FFFFL
-#define BUS_STATE_MASK  0x00070000L
-#define ALL_GPIO_MASK  	0x021FFFFFL
-#define ALWAYS_IN_MASK  (BUS_STATE_MASK)
-#define ALWAYS_OUT_MASK (LED_PIN_MASK)
-
-#define SET_DATA_MODE_OUT   gpio_set_dir_out_masked(DATA_PIN_MASK)
-#define SET_DATA_MODE_IN    gpio_set_dir_in_masked(DATA_PIN_MASK)
-
-#define resetLow()  gpio_set_dir(RST_PIN,true); gpio_put(RST_PIN,true);    // Minty to INTV BUS ; RST Output set to 0
-#define resetHigh() gpio_set_dir(RST_PIN,true); gpio_put(RST_PIN,false);   // RST is INPUT; B->A, INTV BUS to TEENSY
-
-// Inty bus values (BC1+BC2+BDIR) GPIO 18-17-16
-
-#define BUS_NACT  0b000         //0
-#define BUS_BAR   0b001         //1
-#define BUS_IAB   0b010         //2
-#define BUS_DWS   0b011         //3
-#define BUS_ADAR  0b100         //4
-#define BUS_DW    0b101         //5
-#define BUS_DTB   0b110         //6
-#define BUS_INTAK 0b111         //7
+#include "board.h"
 
 unsigned char busLookup[8];
-
-char RBLo, RBHi;
 
 #define BINLENGTH 1024*64
 #define RAMSIZE   0x2000
@@ -119,12 +41,13 @@ uint16_t HACK_CODE[maxHacks];
 
 char curPath[256] = "";
 char path[256];
+
+int volumeId = 0;    // flash
 unsigned char files[256 * 64] = {0};
 unsigned char nomefiles[32 * 25] = {0};
 
 int filefrom = 0, fileto = 0;
 volatile char cmd = 0;
-bool cmd_executing = false;
 
 unsigned int parallelBus2;
 
@@ -505,8 +428,9 @@ int read_directory(char *path) {
    DIR_ENTRY *dst = (DIR_ENTRY *) & files[0];
 
    DIR dir;
+   FRESULT fr;
 
-   if (f_opendir(&dir, path) == FR_OK) {
+   if ((fr = f_opendir(&dir, path)) == FR_OK) {
       while (num_dir_entries < 64) {
          if (f_readdir(&dir, &fno) != FR_OK || fno.fname[0] == 0)
             break;
@@ -533,6 +457,7 @@ int read_directory(char *path) {
       }
       f_closedir(&dir);
    } 
+
    qsort((DIR_ENTRY *) & files[0], num_dir_entries, sizeof(DIR_ENTRY), entry_compare);
    ret = 1;
    
@@ -545,30 +470,30 @@ int load_file(char *filename) {
    FIL fil;
 
    if (f_open(&fil, filename, FA_READ) != FR_OK) {
+      printf("load_file %s error !\n", filename);
       error(2);
       return 0;
    }
 
    int bytes_to_read = 2;
 
+   // clean ROM space
+   memset(ROM, 0, BINLENGTH);
+
    // read the file to SRAM
    size = 0;
    while (!(f_eof(&fil))) {
-
       f_read(&fil, byteread, bytes_to_read, &br);
-      RBHi = byteread[0];
-      //f_read(&fil, dst, bytes_to_read, &br);
-      RBLo = byteread[1];
-
-      ROM[size] = RBLo | (RBHi << 8);
+      ROM[size] = byteread[1] | (byteread[0] << 8);
       size++;
-
    }
 
  closefile:
    romLen = size;
    RAM[base + 202] = romLen;
    f_close(&fil);
+
+   printf("load_file: size: %d\n", romLen);
 
    return br;
 }
@@ -748,11 +673,14 @@ void IntyMenu(int type) {       // 1=start, 2=next page, 3=prev page, 4=dir up
    int maxfile = 0;
    int ret = 0;
    
-   // mount flash
-   mount_fatfs_disk();
-   if (f_mount(&FatFs, "", 1) != FR_OK) {
-      // handle error
-   }
+   if (volumeId == 0)
+      mount_fatfs_disk();
+
+   printf("Mounting %s...\n", curPath);
+
+   if (f_mount(&FatFs, curPath, 1) != FR_OK) {
+      printf("E: mount %s failed\n", curPath);
+   } else printf("I: mount %s ok\n", curPath);
 
    switch (type) {
       case 1:
@@ -788,6 +716,9 @@ void IntyMenu(int type) {       // 1=start, 2=next page, 3=prev page, 4=dir up
 void DirUp() {
    int len = strlen(curPath);
 
+   if(len == 3)      // e.g. "0:/"
+      return;
+
    if (len > 0) {
       while (len && curPath[--len] != '/') ;
       curPath[len] = 0;
@@ -799,8 +730,6 @@ void DirUp() {
 void LoadGame() {
    int numfile = 0;
    char longfilename[32];
-
-   printf("start LoadGame()\n");
 
    numfile = RAM[0x899] + filefrom - 1;
 
@@ -842,8 +771,6 @@ void LoadGame() {
 void Inty_cart_main() {
    printf("Inty_cart_main\n");
 
-   multicore_launch_core1(core1_main);
-
    // Initialize the bus state variables
    busLookup[BUS_NACT] = 4;     // 100
    busLookup[BUS_BAR] = 1;      // 001
@@ -853,6 +780,8 @@ void Inty_cart_main() {
    busLookup[BUS_DW] = 4;       // 100
    busLookup[BUS_DTB] = 0;      // 000
    busLookup[BUS_INTAK] = 4;    // 100
+
+   multicore_launch_core1(core1_main);
 
    gpio_init_mask(ALWAYS_OUT_MASK);
    gpio_init_mask(DATA_PIN_MASK);
@@ -897,45 +826,58 @@ void Inty_cart_main() {
    mapdelta[0] = maprom[0] - mapfrom[0];
    mapsize[0] = mapto[0] - mapfrom[0];
 
+   //$1000 - $10B8 = $6000
+   mapfrom[1] = 0x1000;
+   mapto[1] = 0x1fff;
+   maprom[1] = 0x6000;
+   type[1] = 0;
+   page[1] = 0;
+   addrto[1] = 0x6fff;
+   mapdelta[1] = maprom[1] - mapfrom[1];
+   mapsize[1] = mapto[1] - mapfrom[1];
+
    //[memattr]
    //$8000 - $9FFF = RAM 16
    RAMused = 1;
    ramfrom = 0x8000;
-   mapfrom[1] = 0x8000;
-   mapto[1] = 0x9fff;
-   maprom[1] = 0x8000;
-   type[1] = 2;
-   page[1] = 0;
-   addrto[1] = 0x9fff;
-   mapdelta[1] = maprom[1] - mapfrom[1];
-   mapsize[1] = mapto[1] - mapfrom[1];
+   mapfrom[2] = 0x8000;
+   mapto[2] = 0x9fff;
+   maprom[2] = 0x8000;
+   type[2] = 2;
+   page[2] = 0;
+   addrto[2] = 0x9fff;
+   mapdelta[2] = maprom[2] - mapfrom[2];
+   mapsize[2] = mapto[2] - mapfrom[2];
 
-   slot = 1;
+   slot = 2;
 
    sleep_ms(200);
    resetCart();
    sleep_ms(1200);
 
-   RAM[0x889] = 0;
+   RAM[CMD_ADDR] = 0;
    IntyMenu(1);
-   RAM[0x119] = 1;
    sleep_ms(800);
+   
+   // initial conditions 
+   sprintf(curPath, "%d:/", volumeId);
+   RAM[DEV_ADDR] = volumeId;
 
-   RAM[0x119] = 123;
+   RAM[DONE_ADDR] = 123;
    gpio_put(LED_PIN, true);
 
-   // initial conditions 
-   curPath[0] = 0;
    IntyMenu(1);
+   
+   bool cmd_executing = false;
 
    while (1) {
-      cmd_executing = false;
-      cmd = RAM[0x889];
-      RAM[0x119] = 0;
+      cmd = RAM[CMD_ADDR];
 
       if ((cmd > 0) && !(cmd_executing)) {
          cmd_executing = true;
-         RAM[0x889] = 0;
+         RAM[DONE_ADDR] = 0;
+         RAM[CMD_ADDR] = 0;
+         printf("cmd: %d\n", cmd);
          switch (cmd) {
             case 1:            // read file list
                IntyMenu(1);
@@ -953,11 +895,15 @@ void Inty_cart_main() {
                DirUp();
                IntyMenu(1);
                break;
+            case 6:            // change storage device
+               volumeId = RAM[DEV_ADDR];
+               sprintf(curPath, "%d:/", volumeId);
+               IntyMenu(1);
+               break;
          }
-         RAM[0x119] = 1;
-         sleep_ms(250);
+         cmd_executing = false;
+         RAM[DONE_ADDR] = 1;
       }
    }
 }
-
 #pragma GCC pop_options
