@@ -26,6 +26,8 @@ target_compile_options(${PROJECT} PRIVATE "-O1")
 target_compile_options(${PROJECT} PRIVATE "-Wunused-variable")
 target_compile_options(${PROJECT} PRIVATE "-DCFG_TUSB_RHPORT0_MODE")
 
+set_property(TARGET ${PROJECT} APPEND_STRING PROPERTY LINK_FLAGS "-Wl,--print-memory-usage")
+
 target_sources(${PROJECT} PUBLIC
     ${CMAKE_CURRENT_LIST_DIR}/src/main.c
     ${CMAKE_CURRENT_LIST_DIR}/src/inty_cart.c

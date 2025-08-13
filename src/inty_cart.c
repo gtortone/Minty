@@ -31,8 +31,8 @@ unsigned char busLookup[8];
 
 #define BINLENGTH 1024*64
 #define RAMSIZE   0x2000
-uint16_t ROM[BINLENGTH];
 
+uint16_t ROM[BINLENGTH];
 uint16_t RAM[RAMSIZE];
 
 #define maxHacks 32
@@ -40,11 +40,10 @@ uint16_t HACK[maxHacks];
 uint16_t HACK_CODE[maxHacks];
 
 char curPath[256] = "";
-char path[256];
+char path[512];
 
 int volumeId = 0;    // flash
 unsigned char files[256 * 64] = {0};
-unsigned char nomefiles[32 * 25] = {0};
 
 int filefrom = 0, fileto = 0;
 volatile char cmd = 0;
@@ -275,25 +274,11 @@ void error(int numblink) {
    }
 }
 
-void printInty(char *temp) {
-   for (int i = 0; i < 120; i++)
-      RAM[0x17f + i] = 0;
-   for (int i = 0; i < 60; i++) {
-      RAM[0x17f + i * 2] = temp[i];
-      if (temp[i] == 0) {
-         RAM[0x17f + i * 2] = '*';
-         break;
-      }
-   }
-   sleep_ms(1000);
-}
-
 typedef struct {
    char isDir;
    char filename[13];
-   char long_filename[32];
-   char full_path[210];
-} DIR_ENTRY;                    // 256 bytes = 256 entries in 64k
+   char long_filename[255];
+} DIR_ENTRY;                    // 269 bytes = 256 entries in ~68k
 
 int num_dir_entries = 0;        // how many entries in the current directory
 
@@ -320,106 +305,12 @@ char *get_filename_ext(char *filename) {
 int is_valid_file(char *filename) {
    char *ext = get_filename_ext(filename);
 
-   if (strcasecmp(ext, "BIN") == 0)
+   if (strcasecmp(ext, "BIN") == 0 || strcasecmp(ext, "INT") == 0)
       return 1;
    return 0;
 }
 
 FILINFO fno;
-char search_fname[FF_LFN_BUF + 1];
-
-char *stristr(const char *str, const char *strSearch) {
-   char *sors, *subs, *res = NULL;
-
-   if ((sors = strdup(str)) != NULL) {
-      if ((subs = strdup(strSearch)) != NULL) {
-         res = strstr(strlwr(sors), strlwr(subs));
-         if (res != NULL)
-            res = (char *) str + (res - sors);
-         free(subs);
-      }
-      free(sors);
-   }
-   return res;
-}
-
-int scan_files(char *path, char *search) {
-   FRESULT res;
-   DIR dir;
-   UINT i;
-
-   res = f_opendir(&dir, path);
-   if (res == FR_OK) {
-      for (;;) {
-         if (num_dir_entries == 63)
-            break;
-         res = f_readdir(&dir, &fno);
-         if (res != FR_OK || fno.fname[0] == 0)
-            break;
-         if (fno.fattrib & (AM_HID | AM_SYS))
-            continue;
-         if (fno.fattrib & AM_DIR) {
-            i = strlen(path);
-            strcat(path, "/");
-            if (fno.altname[0]) // no altname when lfn is 8.3
-               strcat(path, fno.altname);
-            else
-               strcat(path, fno.fname);
-            if (strlen(path) >= 210)
-               continue;        // no more room for path in DIR_ENTRY
-            res = scan_files(path, search);
-            if (res != FR_OK)
-               break;
-            path[i] = 0;
-         } else if (is_valid_file(fno.fname)) {
-            char *match = stristr(fno.fname, search);
-
-            if (match) {
-               DIR_ENTRY *dst = (DIR_ENTRY *) & files[0];
-
-               dst += num_dir_entries;
-               // fill out a record
-               dst->isDir = (match == fno.fname) ? 1 : 0;       // use this for a "score"
-               strncpy(dst->long_filename, fno.fname, 31);
-               dst->long_filename[31] = 0;
-               // 8.3 name
-               if (fno.altname[0])
-                  strcpy(dst->filename, fno.altname);
-               else {           // no altname when lfn is 8.3
-                  strncpy(dst->filename, fno.fname, 12);
-                  dst->filename[12] = 0;
-               }
-               // full path for search results
-               strcpy(dst->full_path, path);
-
-               num_dir_entries++;
-            }
-         }
-      }
-      f_closedir(&dir);
-   }
-   return res;
-}
-
-int search_directory(char *path, char *search) {
-   char pathBuf[256];
-
-   strcpy(pathBuf, path);
-   num_dir_entries = 0;
-   int i;
-
-   if (scan_files(pathBuf, search) == FR_OK) {
-      // sort by score, name
-      qsort((DIR_ENTRY *) & files[0], num_dir_entries, sizeof(DIR_ENTRY), entry_compare);
-      DIR_ENTRY *dst = (DIR_ENTRY *) & files[0];
-
-      // re-set the pointer back to 0
-      for (i = 0; i < num_dir_entries; i++)
-         dst[i].isDir = 0;
-      return 1;
-   }
-   return 0;
-}
 
 int read_directory(char *path) {
    int ret = 0;
@@ -442,8 +333,8 @@ int read_directory(char *path) {
                continue;
          // copy file record to first ram block
          // long file name
-         strncpy(dst->long_filename, fno.fname, 31);
-         dst->long_filename[31] = 0;
+         strcpy(dst->long_filename, fno.fname);
+         dst->long_filename[strlen(fno.fname)] = 0;
          // 8.3 name
          if (fno.altname[0])
             strcpy(dst->filename, fno.altname);
@@ -451,7 +342,6 @@ int read_directory(char *path) {
             strncpy(dst->filename, fno.fname, 12);
             dst->filename[12] = 0;
          }
-         dst->full_path[0] = 0;      // path only for search results
          dst++;
          num_dir_entries++;
       }
@@ -635,7 +525,7 @@ void load_cfg(char *filename) {
 }
 
 void filelist(DIR_ENTRY *en, int da, int a) {
-   char longfilename[32];
+   char longfilename[255];
    char tmp[32];
 
    int base = 0x17f;
@@ -652,9 +542,14 @@ void filelist(DIR_ENTRY *en, int da, int a) {
          RAM[0x1000 + n] = 0;
          strcpy(longfilename, en[n + da].long_filename);
          char *dot = strchr(longfilename, '.');
-         strncpy(tmp, longfilename, (dot - longfilename));
-         memset(longfilename, 0, 32);
-         strcpy(longfilename, tmp);
+         if((dot != NULL) && (dot-longfilename <= 27)) {
+            strncpy(tmp, longfilename, (dot - longfilename));
+            memset(longfilename, 0, 32);
+            strcpy(longfilename, tmp);
+         } else {
+            strncpy(longfilename, en[n + da].long_filename, 32);
+            longfilename[31] = 0;
+         }
       }
 
       for (int i = 0; i < 20; i++) {
@@ -662,7 +557,6 @@ void filelist(DIR_ENTRY *en, int da, int a) {
          if ((RAM[base + i * 2 + (n * 40)]) <= 20)
             RAM[base + i * 2 + (n * 40)] = 32;
       }
-      strcpy((char *) &nomefiles[40 * n], longfilename);
    }
    RAM[0x1030] = da;
    RAM[0x1031] = a;
@@ -729,7 +623,7 @@ void DirUp() {
 #pragma GCC optimize ("O0")
 void LoadGame() {
    int numfile = 0;
-   char longfilename[32];
+   char longfilename[255];
 
    numfile = RAM[0x899] + filefrom - 1;
 
@@ -747,11 +641,7 @@ void LoadGame() {
       strcat(path, "/");
       strcat(path, longfilename);
 
-      char savepath[256];
-
-      memcpy(savepath, path, sizeof(path));     // preserve path
-
-      load_file(savepath);      // load rom in files[]
+      load_file(path);      // load rom in files[]
       load_cfg(path);
 
       gpio_put(LED_PIN, false);
