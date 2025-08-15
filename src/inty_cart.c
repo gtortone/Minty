@@ -558,9 +558,12 @@ void filelist(DIR_ENTRY *en, int da, int a) {
             RAM[pos] = 32;
       }
    }
-   RAM[0x1030] = da;
-   RAM[0x1031] = a;
-   RAM[0x1032] = num_dir_entries;
+   RAM[0x1028] = (da & 0xFF00) >> 8;   // MSB
+   RAM[0x1029] = (da & 0x00FF);        // LSB
+   RAM[0x1030] = (a & 0xFF00) >> 8;    // MSB
+   RAM[0x1031] = (a & 0x00FF);         // LSB
+   RAM[0x1032] = (num_dir_entries & 0xFF00) >> 8;  // MSB
+   RAM[0x1033] = (num_dir_entries & 0x00FF);       // LSB
 }
 
 void IntyMenu(int type) {       // 1=start, 2=next page, 3=prev page, 4=dir up

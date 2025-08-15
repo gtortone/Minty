@@ -49,22 +49,22 @@ avanti:
     cls
 
     PRINT AT SCREENPOS(7, 0) COLOR CS_GREEN, " Minty"
-    from=0
-    f_from=peek($9030)
-    f_to=peek($9031)
+    #from=0
+    #f_from=(peek($9028) * 256) + peek($9029)
+    #f_to=(peek($9030) * 256) + peek($9031)
     #f_total=(peek($9032) * 256) + peek($9033)
     if peek(dev)=0 then
        PRINT AT SCREENPOS(0, 11) COLOR CS_WHITE, "FL:"
     else
        PRINT AT SCREENPOS(0, 11) COLOR CS_WHITE, "SD:"
     end if
-    if f_from = f_to then ' empty list
-       from=0
+    if #f_from = #f_to then ' empty list
+      #from=0
     else
-       from=f_from+1
+      #from=#f_from+1
     end if
 
-    PRINT AT SCREENPOS(3, 11) COLOR CS_WHITE, <3>from, "-", <3>f_to, "/", <3>#f_total, " 1:HLP"
+    PRINT AT SCREENPOS(3, 11) COLOR CS_WHITE, <3>#from, "-", <3>#f_to, "/", <3>#f_total, " 1:HLP"
       
 menu:
     GOSUB leggimenu
@@ -74,7 +74,7 @@ menu:
 
     'SELECT
     if (c=40) then   'ENTER
-        if f_from < f_to then
+        if #f_from < #f_to then
            k=0
            CLS
            print at screenpos(3,2) color CS_TAN," Loading" ' root
@@ -157,7 +157,7 @@ menu:
     
     'UP
     if ((c=68 or c=4 or c=12 or c=28 or c=24 or c=20 or c=22 or c=6) and curriga>=0) then    'KEYPAD_8 or N/NNW/NNE
-       if (curriga=0 and f_from>0) then 
+       if (curriga=0 and #f_from>0) then 
           pgup_state = 1
           goto prevpage
        end if
@@ -173,7 +173,7 @@ menu:
     'PGDOWN
     if c=96 or c=192 or c=36 then     'b-left or b-right or KEYPAD_9
 nextpage:
-      if f_to < #f_total then
+      if #f_to < #f_total then
         sound 0,140,15
         sound 0,0,0 
         k=0
@@ -198,7 +198,7 @@ nextpage:
     'PGUP
     if c=160 or c=132 then    'b-top or KEYPAD_7
 prevpage:
-      if f_from > 0 then
+      if #f_from > 0 then
         sound 0,120,15
         for p=0 to 9:next p
         wait
