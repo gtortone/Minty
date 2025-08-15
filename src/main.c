@@ -7,9 +7,7 @@
 
 #include <stdio.h>
 #include <string.h>
-#include "myboard.h"
 #include "pico/stdlib.h"
-#include "pico/time.h"
 #include "tusb.h"
 #include "inty_cart.h"
 #include "fatfs_disk.h"

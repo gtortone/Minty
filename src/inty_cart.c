@@ -9,19 +9,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include "pico/multicore.h"
-#include "hardware/gpio.h"
 #include "pico/platform.h"
 #include "pico/stdlib.h"
-#include "hardware/clocks.h"
-#include "hardware/vreg.h"
-#include "pico/divider.h"
-#include "hardware/flash.h"
-#include "hardware/sync.h"
 
 #include "rom.h"
 #include "memory.h"
 
-#include "tusb.h"
 #include "ff.h"
 #include "f_util.h"
 #include "fatfs_disk.h"
@@ -48,6 +41,15 @@ unsigned char files[512 * 24] = {0};
 
 int filefrom = 0, fileto = 0;
 volatile char cmd = 0;
+
+typedef struct {
+   UINT id;
+   char isDir;
+   char long_filename[21];       // limit filename to 20 chars for Inty display
+} DIR_ENTRY;                     // 24 bytes = 256 entries in ~6kb
+
+int num_dir_entries = 0;         // how many entries in the current directory
+char fullpath[512];              // full path of current file
 
 unsigned int parallelBus2;
 
@@ -275,15 +277,6 @@ void error(int numblink) {
    }
 }
 
-typedef struct {
-   UINT id;
-   char isDir;
-   char long_filename[21];       // limit filename to 20 chars for Inty display
-} DIR_ENTRY;                     // 24 bytes = 256 entries in ~6kb
-
-int num_dir_entries = 0;         // how many entries in the current directory
-char fullpath[512];              // full path of current file
-
 int entry_compare(const void *p1, const void *p2) {
    DIR_ENTRY *e1 = (DIR_ENTRY *) p1;
    DIR_ENTRY *e2 = (DIR_ENTRY *) p2;
@@ -311,7 +304,6 @@ int is_valid_file(char *filename) {
       return 1;
    return 0;
 }
-
 
 int read_directory(char *path) {
    int ret = 0;
