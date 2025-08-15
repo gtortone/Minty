@@ -52,7 +52,7 @@ avanti:
     from=0
     f_from=peek($9030)
     f_to=peek($9031)
-    f_total=peek($9032)
+    #f_total=(peek($9032) * 256) + peek($9033)
     if peek(dev)=0 then
        PRINT AT SCREENPOS(0, 11) COLOR CS_WHITE, "FL:"
     else
@@ -64,7 +64,7 @@ avanti:
        from=f_from+1
     end if
 
-    PRINT AT SCREENPOS(3, 11) COLOR CS_WHITE, <3>from, "-", <3>f_to, "/", <3>f_total, " 1:HLP"
+    PRINT AT SCREENPOS(3, 11) COLOR CS_WHITE, <3>from, "-", <3>f_to, "/", <3>#f_total, " 1:HLP"
       
 menu:
     GOSUB leggimenu
@@ -173,7 +173,7 @@ menu:
     'PGDOWN
     if c=96 or c=192 or c=36 then     'b-left or b-right or KEYPAD_9
 nextpage:
-      if f_to < f_total then
+      if f_to < #f_total then
         sound 0,140,15
         sound 0,0,0 
         k=0
