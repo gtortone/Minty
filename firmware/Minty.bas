@@ -54,9 +54,9 @@ avanti:
     f_to=peek($9031)
     f_total=peek($9032)
     if peek(dev)=0 then
-       PRINT AT SCREENPOS(1, 11) COLOR CS_WHITE, "[FL] "
+       PRINT AT SCREENPOS(0, 11) COLOR CS_WHITE, "FL:"
     else
-       PRINT AT SCREENPOS(1, 11) COLOR CS_WHITE, "[SD] "
+       PRINT AT SCREENPOS(0, 11) COLOR CS_WHITE, "SD:"
     end if
     if f_from = f_to then ' empty list
        from=0
@@ -64,7 +64,7 @@ avanti:
        from=f_from+1
     end if
 
-    PRINT AT SCREENPOS(6, 11) COLOR CS_WHITE, <2>from, "-", <2>f_to, "/", <2>f_total, " 1:HLP"
+    PRINT AT SCREENPOS(3, 11) COLOR CS_WHITE, <3>from, "-", <3>f_to, "/", <3>f_total, " 1:HLP"
       
 menu:
     GOSUB leggimenu

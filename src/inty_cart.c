@@ -23,6 +23,7 @@
 
 #include "tusb.h"
 #include "ff.h"
+#include "f_util.h"
 #include "fatfs_disk.h"
 #include "fingerprints.h"
 #include "board.h"
@@ -43,7 +44,7 @@ char curPath[256] = "";
 char path[512];
 
 int volumeId = 0;    // flash
-unsigned char files[256 * 64] = {0};
+unsigned char files[512 * 24] = {0};
 
 int filefrom = 0, fileto = 0;
 volatile char cmd = 0;
@@ -275,12 +276,13 @@ void error(int numblink) {
 }
 
 typedef struct {
+   UINT id;
    char isDir;
-   char filename[13];
-   char long_filename[255];
-} DIR_ENTRY;                    // 269 bytes = 256 entries in ~68k
+   char long_filename[21];       // limit filename to 20 chars for Inty display
+} DIR_ENTRY;                     // 24 bytes = 256 entries in ~6kb
 
-int num_dir_entries = 0;        // how many entries in the current directory
+int num_dir_entries = 0;         // how many entries in the current directory
+char fullpath[512];              // full path of current file
 
 int entry_compare(const void *p1, const void *p2) {
    DIR_ENTRY *e1 = (DIR_ENTRY *) p1;
@@ -310,10 +312,11 @@ int is_valid_file(char *filename) {
    return 0;
 }
 
-FILINFO fno;
 
 int read_directory(char *path) {
    int ret = 0;
+   UINT id = 0;
+   FILINFO fno;
 
    num_dir_entries = 0;
    DIR_ENTRY *dst = (DIR_ENTRY *) & files[0];
@@ -322,7 +325,7 @@ int read_directory(char *path) {
    FRESULT fr;
 
    if ((fr = f_opendir(&dir, path)) == FR_OK) {
-      while (num_dir_entries < 64) {
+      while (1) {
          if (f_readdir(&dir, &fno) != FR_OK || fno.fname[0] == 0)
             break;
          if (fno.fattrib & (AM_HID | AM_SYS))
@@ -331,17 +334,10 @@ int read_directory(char *path) {
          if (!dst->isDir)
             if (!is_valid_file(fno.fname))
                continue;
-         // copy file record to first ram block
-         // long file name
-         strcpy(dst->long_filename, fno.fname);
-         dst->long_filename[strlen(fno.fname)] = 0;
-         // 8.3 name
-         if (fno.altname[0])
-            strcpy(dst->filename, fno.altname);
-         else {              // no altname when lfn is 8.3
-            strncpy(dst->filename, fno.fname, 12);
-            dst->filename[12] = 0;
-         }
+         dst->id = id++;
+         strncpy(dst->long_filename, fno.fname, 20);
+         dst->long_filename[20] = 0;
+         //printf("%d) entry: %s\n", dst->id, dst->long_filename);
          dst++;
          num_dir_entries++;
       }
@@ -354,15 +350,15 @@ int read_directory(char *path) {
    return ret;
 }
 
-int load_file(char *filename) {
+void load_file(char *filename) {
    UINT br, size = 0;
    unsigned char byteread[2];
    FIL fil;
+   FRESULT fr;
 
-   if (f_open(&fil, filename, FA_READ) != FR_OK) {
-      printf("load_file %s error !\n", filename);
+   if (fr = f_open(&fil, filename, FA_READ) != FR_OK) {
+      printf("load_file %s error (%s)!\n", filename, FRESULT_str(fr));
       error(2);
-      return 0;
    }
 
    int bytes_to_read = 2;
@@ -384,18 +380,46 @@ int load_file(char *filename) {
    f_close(&fil);
 
    printf("load_file: size: %d\n", romLen);
+}
 
-   return br;
+void load_file_by_id(UINT id) {
+   DIR dir;
+   FRESULT fr;
+   UINT i = 0;
+   FILINFO fno;
+
+   if ((fr = f_opendir(&dir, curPath)) == FR_OK) {
+      while (1) {
+         if (f_readdir(&dir, &fno) != FR_OK || fno.fname[0] == 0)
+            break;
+         if (fno.fattrib & (AM_HID | AM_SYS))
+            continue;
+         if (!(fno.fattrib & AM_DIR))
+            if (!is_valid_file(fno.fname))
+               continue;
+         if (i++ == id) {
+            f_closedir(&dir);
+            memset(fullpath, 0, sizeof(fullpath));
+            strcat(fullpath, curPath);
+            strcat(fullpath, "/");
+            strcat(fullpath, fno.fname);
+            printf("load_file_by_id: id %d, opening %s\n", id, fullpath);
+            load_file(fullpath); 
+            return;
+         }
+      }
+      f_closedir(&dir);
+   } 
 }
 
 void load_cfg(char *filename) {
    char riga[80];
    char tmp[80] = {0};
-   char cfgfile[80] = {0};
+   char cfgfile[512] = {0};
    int linepos;
    FIL fil;
 
-   char *dot = strchr(filename, '.');
+   char *dot = strrchr(filename, '.');
    strncpy(cfgfile, filename, (dot - filename));
    strcat(cfgfile, ".cfg");
 
@@ -525,37 +549,21 @@ void load_cfg(char *filename) {
 }
 
 void filelist(DIR_ENTRY *en, int da, int a) {
-   char longfilename[255];
-   char tmp[32];
-
    int base = 0x17f;
 
    for (int i = 0; i < 20 * 20; i++)
       RAM[base + i * 2] = 0;
    for (int n = 0; n < (a - da); n++) {
-      memset(longfilename, 0, 32);
-      memset(tmp, 0, 32);
-      if (en[n + da].isDir) {
+      if (en[n + da].isDir)
          RAM[0x1000 + n] = 1;
-         strcat(longfilename, en[n + da].long_filename);
-      } else {
+      else
          RAM[0x1000 + n] = 0;
-         strcpy(longfilename, en[n + da].long_filename);
-         char *dot = strchr(longfilename, '.');
-         if((dot != NULL) && (dot-longfilename <= 27)) {
-            strncpy(tmp, longfilename, (dot - longfilename));
-            memset(longfilename, 0, 32);
-            strcpy(longfilename, tmp);
-         } else {
-            strncpy(longfilename, en[n + da].long_filename, 32);
-            longfilename[31] = 0;
-         }
-      }
-
+      
       for (int i = 0; i < 20; i++) {
-         RAM[base + i * 2 + (n * 40)] = longfilename[i];
-         if ((RAM[base + i * 2 + (n * 40)]) <= 20)
-            RAM[base + i * 2 + (n * 40)] = 32;
+         int pos = base + i * 2 + (n * 40);
+         RAM[pos] = en[n + da].long_filename[i];
+         if (RAM[pos] <= 20)
+            RAM[pos] = 32;
       }
    }
    RAM[0x1030] = da;
@@ -579,8 +587,6 @@ void IntyMenu(int type) {       // 1=start, 2=next page, 3=prev page, 4=dir up
    switch (type) {
       case 1:
          ret = read_directory(curPath);
-         if (!(ret))
-            error(1);
          maxfile = 10;
          filefrom = 0;
          if (maxfile > num_dir_entries)
@@ -623,26 +629,24 @@ void DirUp() {
 #pragma GCC optimize ("O0")
 void LoadGame() {
    int numfile = 0;
-   char longfilename[255];
 
    numfile = RAM[0x899] + filefrom - 1;
 
    DIR_ENTRY *entry = (DIR_ENTRY *) & files[0];
 
-   strcpy(longfilename, entry[numfile].long_filename);
-
    if (entry[numfile].isDir) {  // directory
       strcat(curPath, "/");
-      strcat(curPath, entry[numfile].filename);
+      strcat(curPath, entry[numfile].long_filename);
       IntyMenu(1);
-   } else {
+   } else { 
       memset(path, 0, sizeof(path));
       strcat(path, curPath);
       strcat(path, "/");
-      strcat(path, longfilename);
+      strcat(path, entry[numfile].long_filename);
 
-      load_file(path);      // load rom in files[]
-      load_cfg(path);
+      //load_file(path);      // load rom in files[]
+      load_file_by_id(entry[numfile].id);
+      load_cfg(fullpath);
 
       gpio_put(LED_PIN, false);
 
