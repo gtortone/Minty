@@ -13,6 +13,7 @@ Multi-cart based on Raspberry Pi Pico hardware and PiRTOII firmware (https://git
 - new navigation keys for UI ROM
 - new color schema for UI ROM
 - support for long filenames (up to 255 chars)
+- move from 64 to 512 max number of files for directory
 - SD support
 
 ## Getting started
