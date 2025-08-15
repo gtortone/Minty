@@ -75,8 +75,31 @@ menu:
     'SELECT
     if (c=40) then   'ENTER
         if f_from < f_to then
-           poke(cmd),0
-           goto select
+           k=0
+           CLS
+           print at screenpos(3,2) color CS_TAN," Loading" ' root
+           print at screenpos(3,5),"Please wait..."
+           
+           poke(riga),curriga+1      
+           'poke(done),0
+           poke(cmd),2
+           
+           while peek(done)<>1
+               if k=0 then print at screenpos(10,8),BG28 + CS_BLUE
+               if k=1 then print at screenpos(10,8),BG29 + CS_BLUE
+               if k=2 then print at screenpos(10,8),BG30 + CS_BLUE
+               if k=3 then print at screenpos(10,8),BG31 + CS_BLUE
+               k=k+1
+               if k>3 then k=0
+           wend
+
+           poke(cmd),0  
+           if tipo(curriga)=2 then goto avanti
+           ' game
+           cls
+           print at screenpos(3,2) color CS_TAN," Loading game" ' root
+           print at screenpos(3,5),"Please wait..."
+           goto fine
         end if
     end if
 
@@ -229,33 +252,6 @@ prevpage:
 
     goto menu
    
-select:
-    k=0
-    CLS
-    print at screenpos(3,2) color CS_TAN," Loading" ' root
-    print at screenpos(3,5),"Please wait..."
-    
-    poke(riga),curriga+1      
-    poke(cmd),2
-
-    ' wait for 500 iteration done = 1
-    while peek(done)<>1 and #cnt<500
-        if k=0 then print at screenpos(10,8),BG28 + CS_BLUE
-        if k=1 then print at screenpos(10,8),BG29 + CS_BLUE
-        if k=2 then print at screenpos(10,8),BG30 + CS_BLUE
-        if k=3 then print at screenpos(10,8),BG31 + CS_BLUE
-    
-        k=k+1:#cnt=#cnt+1
-        if k>3 then k=0
-    wend
-
-    poke(cmd),0  
-    if tipo(curriga)=2 then goto avanti
-    ' game
-    cls
-    print at screenpos(3,2) color CS_TAN," Loading game" ' root
-    print at screenpos(3,5),"Please wait..."
-
 fine:
     goto fine
 
