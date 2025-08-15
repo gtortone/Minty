@@ -130,12 +130,13 @@ menu:
     if (c=129) then     'KEYPAD_1
       cls
       PRINT at SCREENPOS(8,0) COLOR CS_GREEN, "HELP"
-      PRINT AT SCREENPOS(0,2) COLOR CS_WHITE, "8 or up:     go up"
-      PRINT AT SCREENPOS(0,3) COLOR CS_WHITE, "0 or down:   go dn"
-      PRINT AT SCREENPOS(0,4) COLOR CS_WHITE, "7 or btn-up: page up"
-      PRINT AT SCREENPOS(0,5) COLOR CS_WHITE, "9 or btn-dn: page dn"
-      PRINT AT SCREENPOS(0,7) COLOR CS_WHITE, "CLEAR:       dir up"
-      PRINT AT SCREENPOS(0,8) COLOR CS_WHITE, "ENTER:       select"
+      PRINT AT SCREENPOS(0,2) COLOR CS_WHITE, "8 or up:   go up"
+      PRINT AT SCREENPOS(0,3) COLOR CS_WHITE, "0 or down: go dn"
+      PRINT AT SCREENPOS(0,4) COLOR CS_WHITE, "7 or b-up: page up"
+      PRINT AT SCREENPOS(0,5) COLOR CS_WHITE, "9 or b-dn: page dn"
+      PRINT AT SCREENPOS(0,7) COLOR CS_WHITE, "3:         sw FL/SD"
+      PRINT AT SCREENPOS(0,8) COLOR CS_WHITE, "CLEAR:     dir up"
+      PRINT AT SCREENPOS(0,9) COLOR CS_WHITE, "ENTER:     select"
       PRINT AT SCREENPOS(0,11) COLOR CS_YELLOW, "  <CLEAR> to exit"
 
       WAIT
