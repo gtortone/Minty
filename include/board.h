@@ -37,35 +37,13 @@
 #define UART_RX   24
 
 // Pico pin usage masks
-#define B0_PIN_MASK     0x00000001L     // gpio 0
-#define B1_PIN_MASK     0x00000002L
-#define B2_PIN_MASK     0x00000004L
-#define B3_PIN_MASK     0x00000008L
-#define B4_PIN_MASK     0x00000010L
-#define B5_PIN_MASK     0x00000020L
-#define B6_PIN_MASK     0x00000040L
-#define B7_PIN_MASK     0x00000080L
-
-#define F0_PIN_MASK     0x00000100L
-#define F1_PIN_MASK     0x00000200L
-#define F2_PIN_MASK     0x00000400L
-#define F3_PIN_MASK     0x00000800L
-#define F4_PIN_MASK     0x00001000L
-#define F5_PIN_MASK     0x00002000L
-#define F6_PIN_MASK     0x00004000L
-#define F7_PIN_MASK     0x00008000L     // gpio 15
-
 #define BDIR_PIN_MASK   0x00010000L     // gpio 16
 #define BC2_PIN_MASK    0x00020000L     // gpio 17
 #define BC1_PIN_MASK    0x00040000L     // gpio 18
-#define MSYNC_PIN_MASK  0x00080000L     // gpio 19
-#define RST_PIN_MASK    0x00100000L     // gpio 20
 #define LED_PIN_MASK    0x02000000L     // gpio 25
 
 // Aggregate Pico pin usage masks
 #define BC1e2_PIN_MASK  0x00060000L
-#define BX_PIN_MASK     0x000000FFL
-#define FX_PIN_MASK     0x0000FF00L
 #define DATA_PIN_MASK   0x0000FFFFL
 #define BUS_STATE_MASK  0x00070000L
 #define ALL_GPIO_MASK  	0x021FFFFFL
@@ -76,10 +54,9 @@
 #define SET_DATA_MODE_IN    gpio_set_dir_in_masked(DATA_PIN_MASK)
 
 #define resetLow()  gpio_set_dir(RST_PIN,true); gpio_put(RST_PIN,true);    // Minty to INTV BUS ; RST Output set to 0
-#define resetHigh() gpio_set_dir(RST_PIN,true); gpio_put(RST_PIN,false);   // RST is INPUT; B->A, INTV BUS to TEENSY
+#define resetHigh() gpio_set_dir(RST_PIN,true); gpio_put(RST_PIN,false);   // RST is INPUT; B->A, INTV BUS to Pico
 
 // Inty bus values (BC1+BC2+BDIR) GPIO 18-17-16
-
 #define BUS_NACT  0b000         //0
 #define BUS_BAR   0b001         //1
 #define BUS_IAB   0b010         //2
