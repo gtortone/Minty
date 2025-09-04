@@ -439,6 +439,10 @@ void load_cfg(char *filename) {
             return;
          }
       }
+
+      // if this line is reached no config file and no fingerprint so use default config
+      config_memory(0);
+      return;
    }
 
    // read config file to SRAM
