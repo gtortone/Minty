@@ -25,7 +25,7 @@ https://github.com/carlk3/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico/tree/main#customizing
 
 /* Configuration of hardware SPI object */
 static spi_t spi = {
-   .hw_inst = spi1,  // SPI component
+   .hw_inst = spi0,  // SPI component
    .sck_gpio = SD_SCK,    // GPIO number (not Pico pin number)
    .mosi_gpio = SD_MOSI,
    .miso_gpio = SD_MISO,

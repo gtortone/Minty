@@ -8,9 +8,6 @@
 #ifndef __INTY_CART_H__
 #define __INTY_CART_H__
 
-#define MSYNC_PIN 19
-#define RST_PIN   20
-
 void Inty_cart_main();
 void resetCart();
 

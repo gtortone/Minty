@@ -7,11 +7,14 @@
 
 #include <stdio.h>
 #include <string.h>
+#include "board.h"
 #include "pico/stdlib.h"
 #include "tusb.h"
 #include "inty_cart.h"
 #include "fatfs_disk.h"
-#include "board.h"
+// FIXME
+#include "hardware/clocks.h"
+#include "hardware/vreg.h"
 
 //--------------------------------------------------------------------+
 // USB CDC
@@ -92,8 +95,14 @@ int main(void) {
    gpio_init(RST_PIN);
    gpio_set_dir(RST_PIN, true);
 
+   // FIXME
+   //set_sys_clock_khz(250000, true);
+   //vreg_set_voltage(VREG_VOLTAGE_1_10);
+
+#ifdef DEFAULT_BOARD
    // debug UART
    stdio_uart_init_full(uart1, 115200, UART_TX, UART_RX);
+#endif
 
    tud_init(BOARD_TUD_RHPORT);
 

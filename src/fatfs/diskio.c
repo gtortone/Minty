@@ -10,17 +10,20 @@
 #include "ff.h"                 /* Obtains integer types */
 #include "diskio.h"             /* Declarations of disk functions */
 
-// SD
-#include "hw_config.h"
-#include "my_debug.h"
-#include "sd_card.h"
+#ifdef SD_SUPPORT
+   #include "hw_config.h"
+   #include "my_debug.h"
+   #include "sd_card.h"
+#endif
 
 #define TRACE_PRINTF(fmt, args...)
 //#define TRACE_PRINTF printf
 
 /* Definitions of physical drive number for each drive */
 #define DEV_FLASH    0       /* internal flash */
-#define DEV_SD       1       /* SD card */
+#ifdef SD_SUPPORT
+   #define DEV_SD       1       /* SD card */
+#endif
 
 #include "fatfs_disk.h"
 
@@ -32,13 +35,16 @@ DSTATUS disk_status(BYTE pdrv   /* Physical drive number to identify the drive *
    ) {
    if (pdrv == DEV_FLASH) {
       return 0;
-   } else if(pdrv == DEV_SD) {
+   } 
+#ifdef SD_SUPPORT
+   if(pdrv == DEV_SD) {
       TRACE_PRINTF(">>> %s\n", __FUNCTION__);
       sd_card_t *sd_card_p = sd_get_by_num(0);
       if (!sd_card_p) return RES_PARERR;
       sd_card_detect(sd_card_p);   // Fast: just a GPIO read
       return sd_card_p->state.m_Status;  // See http://elm-chan.org/fsw/ff/doc/dstat.html
    }
+#endif
 
    return STA_NOINIT;
 }
@@ -51,7 +57,9 @@ DSTATUS disk_initialize(BYTE pdrv       /* Physical drive number to identify the
    ) {
    if (pdrv == DEV_FLASH) {
       return 0;
-   } else if(pdrv == DEV_SD) {
+   } 
+#ifdef SD_SUPPORT
+   if(pdrv == DEV_SD) {
       TRACE_PRINTF(">>> %s\n", __FUNCTION__);
       
       bool ok = sd_init_driver();
@@ -65,31 +73,34 @@ DSTATUS disk_initialize(BYTE pdrv       /* Physical drive number to identify the
       // See http://elm-chan.org/fsw/ff/doc/dstat.html
       return sd_card_p->init(sd_card_p);  
    }
+#endif
    return STA_NOINIT;
 }
 
-static int sdrc2dresult(int sd_rc) {
-   switch (sd_rc) {
-        case SD_BLOCK_DEVICE_ERROR_NONE:
-            return RES_OK;
-        case SD_BLOCK_DEVICE_ERROR_UNUSABLE:
-        case SD_BLOCK_DEVICE_ERROR_NO_RESPONSE:
-        case SD_BLOCK_DEVICE_ERROR_NO_INIT:
-        case SD_BLOCK_DEVICE_ERROR_NO_DEVICE:
-            return RES_NOTRDY;
-        case SD_BLOCK_DEVICE_ERROR_PARAMETER:
-        case SD_BLOCK_DEVICE_ERROR_UNSUPPORTED:
-            return RES_PARERR;
-        case SD_BLOCK_DEVICE_ERROR_WRITE_PROTECTED:
-            return RES_WRPRT;
-        case SD_BLOCK_DEVICE_ERROR_CRC:
-        case SD_BLOCK_DEVICE_ERROR_WOULD_BLOCK:
-        case SD_BLOCK_DEVICE_ERROR_ERASE:
-        case SD_BLOCK_DEVICE_ERROR_WRITE:
-        default:
-            return RES_ERROR;
+#ifdef SD_SUPPORT
+   static int sdrc2dresult(int sd_rc) {
+      switch (sd_rc) {
+           case SD_BLOCK_DEVICE_ERROR_NONE:
+               return RES_OK;
+           case SD_BLOCK_DEVICE_ERROR_UNUSABLE:
+           case SD_BLOCK_DEVICE_ERROR_NO_RESPONSE:
+           case SD_BLOCK_DEVICE_ERROR_NO_INIT:
+           case SD_BLOCK_DEVICE_ERROR_NO_DEVICE:
+               return RES_NOTRDY;
+           case SD_BLOCK_DEVICE_ERROR_PARAMETER:
+           case SD_BLOCK_DEVICE_ERROR_UNSUPPORTED:
+               return RES_PARERR;
+           case SD_BLOCK_DEVICE_ERROR_WRITE_PROTECTED:
+               return RES_WRPRT;
+           case SD_BLOCK_DEVICE_ERROR_CRC:
+           case SD_BLOCK_DEVICE_ERROR_WOULD_BLOCK:
+           case SD_BLOCK_DEVICE_ERROR_ERASE:
+           case SD_BLOCK_DEVICE_ERROR_WRITE:
+           default:
+               return RES_ERROR;
+      }
    }
-}
+#endif
 
 /*-----------------------------------------------------------------------*/
 /* Read Sector(s)                                                        */
@@ -105,13 +116,16 @@ DRESULT disk_read(BYTE pdrv,    /* Physical drive number to identify the drive *
    if (pdrv == DEV_FLASH) {
       res = fatfs_disk_read((uint8_t *) buff, sector, count);
       return res;
-   } else if(pdrv == DEV_SD) {
+   } 
+#ifdef SD_SUPPORT
+   if(pdrv == DEV_SD) {
       TRACE_PRINTF(">>> %s\n", __FUNCTION__);
       sd_card_t *sd_card_p = sd_get_by_num(0);
       if (!sd_card_p) return RES_PARERR;
       int rc = sd_card_p->read_blocks(sd_card_p, buff, sector, count);
       return sdrc2dresult(rc);
    }
+#endif
 
    return RES_PARERR;
 }
@@ -132,13 +146,16 @@ DRESULT disk_write(BYTE pdrv,   /* Physical drive number to identify the drive *
    if (pdrv == DEV_FLASH) {
       res = fatfs_disk_write((const uint8_t *) buff, sector, count);
       return res;
-   } else if(pdrv == DEV_SD) {
+   } 
+#ifdef SD_SUPPORT
+   if(pdrv == DEV_SD) {
       TRACE_PRINTF(">>> %s\n", __FUNCTION__);
       sd_card_t *sd_card_p = sd_get_by_num(0);
       if (!sd_card_p) return RES_PARERR;
       int rc = sd_card_p->write_blocks(sd_card_p, buff, sector, count);
       return sdrc2dresult(rc);
    }
+#endif
 
    return RES_PARERR;
 }
@@ -172,7 +189,9 @@ DRESULT disk_ioctl(BYTE pdrv,   /* Physical drive number (0..) */
          default:
             return RES_PARERR;
       }
-   } else if(pdrv == DEV_SD) {
+   } 
+#ifdef SD_SUPPORT
+   if(pdrv == DEV_SD) {
 
       TRACE_PRINTF(">>> %s\n", __FUNCTION__);
       sd_card_t *sd_card_p = sd_get_by_num(0);
@@ -211,6 +230,7 @@ DRESULT disk_ioctl(BYTE pdrv,   /* Physical drive number (0..) */
               return RES_PARERR;
       }
    }
+#endif
 
    return RES_PARERR;
 }

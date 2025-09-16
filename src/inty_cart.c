@@ -681,6 +681,8 @@ void Inty_cart_main() {
    gpio_init_mask(BUS_STATE_MASK);
    gpio_set_dir_in_masked(ALWAYS_IN_MASK);
    gpio_set_dir_out_masked(ALWAYS_OUT_MASK);
+   // FIXME
+   SET_DATA_MODE_IN;
    gpio_init(LED_PIN);
    gpio_put(LED_PIN, true);
    gpio_init(RST_PIN);
