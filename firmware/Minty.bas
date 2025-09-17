@@ -11,6 +11,7 @@
     const dirfile=$8651
     const chk=$815e
     const dev=$8120
+    const has_sd=$8121
 
     dim tipo(10)
     poke(mst),0
@@ -134,7 +135,9 @@ menu:
       PRINT AT SCREENPOS(0,3) COLOR CS_WHITE, "0 or down: go dn"
       PRINT AT SCREENPOS(0,4) COLOR CS_WHITE, "7 or b-up: page up"
       PRINT AT SCREENPOS(0,5) COLOR CS_WHITE, "9 or b-dn: page dn"
-      PRINT AT SCREENPOS(0,7) COLOR CS_WHITE, "3:         sw FL/SD"
+      if peek(has_sd)=1 then
+         PRINT AT SCREENPOS(0,7) COLOR CS_WHITE, "3:         sw FL/SD"
+      end if
       PRINT AT SCREENPOS(0,8) COLOR CS_WHITE, "CLEAR:     dir up"
       PRINT AT SCREENPOS(0,9) COLOR CS_WHITE, "ENTER:     select"
       PRINT AT SCREENPOS(0,11) COLOR CS_YELLOW, "  <CLEAR> to exit"
@@ -224,7 +227,7 @@ prevpage:
     end if
 
     'CHANGE STORAGE DEVICE
-    if c=33 then     ' KEYPAD_3
+    if c=33 and peek(has_sd)=1 then     ' KEYPAD_3
       sound 0,120,15
       for p=0 to 9:next p
       wait

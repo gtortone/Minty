@@ -721,7 +721,7 @@ void Inty_cart_main() {
    mapdelta[0] = maprom[0] - mapfrom[0];
    mapsize[0] = mapto[0] - mapfrom[0];
 
-   //$1000 - $10B8 = $6000
+   //$1000 - $1137 = $6000
    mapfrom[1] = 0x1000;
    mapto[1] = 0x1fff;
    maprom[1] = 0x6000;
@@ -755,6 +755,12 @@ void Inty_cart_main() {
    sleep_ms(800);
    
    // initial conditions 
+#ifdef SD_SUPPORT
+   RAM[HAS_SD_ADDR] = 1;
+#else
+   RAM[HAS_SD_ADDR] = 0;
+#endif
+
    sprintf(curPath, "%d:/", volumeId);
    RAM[DEV_ADDR] = volumeId;
 
@@ -790,11 +796,13 @@ void Inty_cart_main() {
                DirUp();
                IntyMenu(1);
                break;
+#ifdef SD_SUPPORT
             case 6:            // change storage device
                volumeId = RAM[DEV_ADDR];
                sprintf(curPath, "%d:/", volumeId);
                IntyMenu(1);
                break;
+#endif
          }
          cmd_executing = false;
          RAM[DONE_ADDR] = 1;
