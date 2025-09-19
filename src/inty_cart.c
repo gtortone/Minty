@@ -314,13 +314,18 @@ char *get_filename_ext(char *filename) {
    return dot + 1;
 }
 
+int is_rom_file(char *filename) {
+   char *ext = get_filename_ext(filename);
+
+   return (strcasecmp(ext, "ROM") == 0);
+}
+
 int is_valid_file(char *filename) {
    char *ext = get_filename_ext(filename);
 
-   if (strcasecmp(ext, "BIN") == 0 || strcasecmp(ext, "INT") == 0)
-      return 1;
-   return 0;
+   return (strcasecmp(ext, "BIN") == 0 || strcasecmp(ext, "INT") || is_rom_file(filename));
 }
+
 
 int read_directory(char *path) {
    int ret = 0;
@@ -370,20 +375,26 @@ void load_file(char *filename) {
       error(2);
    }
 
-   int bytes_to_read = 2;
+   if(is_rom_file(filename)) {
 
-   // clean ROM space
-   memset(ROM, 0, BINLENGTH);
+         //
 
-   // read the file to SRAM
-   size = 0;
-   while (!(f_eof(&fil))) {
-      f_read(&fil, byteread, bytes_to_read, &br);
-      ROM[size] = byteread[1] | (byteread[0] << 8);
-      size++;
+   } else {
+
+      int bytes_to_read = 2;
+
+      // clean ROM space
+      memset(ROM, 0, BINLENGTH);
+
+      // read the file to SRAM
+      size = 0;
+      while (!(f_eof(&fil))) {
+         f_read(&fil, byteread, bytes_to_read, &br);
+         ROM[size] = byteread[1] | (byteread[0] << 8);
+         size++;
+      }
    }
 
- closefile:
    romLen = size;
    RAM[base + 202] = romLen;
    f_close(&fil);
@@ -660,9 +671,10 @@ void LoadGame() {
       strcat(path, "/");
       strcat(path, entry[numfile].long_filename);
 
-      //load_file(path);      // load rom in files[]
       load_file_by_id(entry[numfile].id);
-      load_cfg(fullpath);
+      // ROM file has internal cfg info
+      if(!is_rom_file(fullpath))
+         load_cfg(fullpath);
 
       gpio_put(LED_PIN, false);
 
