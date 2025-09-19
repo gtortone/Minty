@@ -9,8 +9,9 @@
 
 #include "ff.h"                 /* Obtains integer types */
 #include "diskio.h"             /* Declarations of disk functions */
+#include "flash_fs.h"
 
-#ifdef SD_SUPPORT
+#ifdef SD_BOARD
    #include "hw_config.h"
    #include "my_debug.h"
    #include "sd_card.h"
@@ -21,7 +22,7 @@
 
 /* Definitions of physical drive number for each drive */
 #define DEV_FLASH    0       /* internal flash */
-#ifdef SD_SUPPORT
+#ifdef SD_BOARD
    #define DEV_SD       1       /* SD card */
 #endif
 
@@ -36,7 +37,7 @@ DSTATUS disk_status(BYTE pdrv   /* Physical drive number to identify the drive *
    if (pdrv == DEV_FLASH) {
       return 0;
    } 
-#ifdef SD_SUPPORT
+#ifdef SD_BOARD
    if(pdrv == DEV_SD) {
       TRACE_PRINTF(">>> %s\n", __FUNCTION__);
       sd_card_t *sd_card_p = sd_get_by_num(0);
@@ -58,7 +59,7 @@ DSTATUS disk_initialize(BYTE pdrv       /* Physical drive number to identify the
    if (pdrv == DEV_FLASH) {
       return 0;
    } 
-#ifdef SD_SUPPORT
+#ifdef SD_BOARD
    if(pdrv == DEV_SD) {
       TRACE_PRINTF(">>> %s\n", __FUNCTION__);
       
@@ -77,7 +78,7 @@ DSTATUS disk_initialize(BYTE pdrv       /* Physical drive number to identify the
    return STA_NOINIT;
 }
 
-#ifdef SD_SUPPORT
+#ifdef SD_BOARD
    static int sdrc2dresult(int sd_rc) {
       switch (sd_rc) {
            case SD_BLOCK_DEVICE_ERROR_NONE:
@@ -117,7 +118,7 @@ DRESULT disk_read(BYTE pdrv,    /* Physical drive number to identify the drive *
       res = fatfs_disk_read((uint8_t *) buff, sector, count);
       return res;
    } 
-#ifdef SD_SUPPORT
+#ifdef SD_BOARD
    if(pdrv == DEV_SD) {
       TRACE_PRINTF(">>> %s\n", __FUNCTION__);
       sd_card_t *sd_card_p = sd_get_by_num(0);
@@ -147,7 +148,7 @@ DRESULT disk_write(BYTE pdrv,   /* Physical drive number to identify the drive *
       res = fatfs_disk_write((const uint8_t *) buff, sector, count);
       return res;
    } 
-#ifdef SD_SUPPORT
+#ifdef SD_BOARD
    if(pdrv == DEV_SD) {
       TRACE_PRINTF(">>> %s\n", __FUNCTION__);
       sd_card_t *sd_card_p = sd_get_by_num(0);
@@ -176,7 +177,7 @@ DRESULT disk_ioctl(BYTE pdrv,   /* Physical drive number (0..) */
             fatfs_disk_sync();
             return RES_OK;
          case GET_SECTOR_COUNT:
-            *(LBA_t *) buff = SECTOR_NUM;
+            *(LBA_t *) buff = NUM_FAT_SECTORS;
             return RES_OK;
          case GET_SECTOR_SIZE:
             *(WORD *) buff = SECTOR_SIZE;
@@ -190,7 +191,7 @@ DRESULT disk_ioctl(BYTE pdrv,   /* Physical drive number (0..) */
             return RES_PARERR;
       }
    } 
-#ifdef SD_SUPPORT
+#ifdef SD_BOARD
    if(pdrv == DEV_SD) {
 
       TRACE_PRINTF(">>> %s\n", __FUNCTION__);

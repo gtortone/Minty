@@ -10,9 +10,6 @@
 
 #include "flash_fs.h"
 
-#define SECTOR_NUM 30716
-#define SECTOR_SIZE 512
-
 void create_fatfs_disk();
 bool mount_fatfs_disk();
 bool fatfs_is_mounted();

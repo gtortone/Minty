@@ -7,6 +7,7 @@
 
 #include "tusb.h"
 #include "fatfs_disk.h"
+#include "flash_fs.h"
 
 // whether host does safe-eject
 static bool ejected = false;
@@ -46,7 +47,7 @@ bool tud_msc_test_unit_ready_cb(uint8_t lun) {
 void tud_msc_capacity_cb(uint8_t lun, uint32_t *block_count, uint16_t *block_size) {
    (void) lun;
 
-   *block_count = SECTOR_NUM;
+   *block_count = NUM_FAT_SECTORS;
    *block_size = SECTOR_SIZE;
 }
 

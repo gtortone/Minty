@@ -18,11 +18,7 @@
 // Doesn't really implement wear levelling (e.g. the fs_map) so not for heavy use but should be
 // fine for the intended use case.
 
-#define HW_FLASH_STORAGE_BASE  (1024 * 1024)
 #define MAGIC_8_BYTES "RHE!FS30"
-
-#define NUM_FAT_SECTORS 30716   // 15megs / 512bytes = 30720, but we used 4 records for the header (8 bytes)
-#define NUM_FLASH_SECTORS 3840  // 15megs / 4096bytes = 3840
 
 typedef struct {
    uint8_t header[8];
@@ -57,7 +53,6 @@ void flash_write_sector(uint16_t sector, uint8_t offset, const void *buffer, uin
 void flash_erase_with_copy_sector(uint16_t sector, uint8_t preserve_bitmap);
 
 void debug_print_in_use() {
-   return;
    // just shows first 1meg
    printf("IN USE-----------------------------------\n");
    for (int i = 0; i < 16; i++) {
@@ -71,7 +66,7 @@ void debug_print_in_use() {
 }
 
 void write_fs_map() {
-   debug_print_in_use();
+   //debug_print_in_use();
    for (int i = 0; i < 15; i++) {
       if (fs_map_needs_written[i]) {
 //          printf("Writing FS Map %d\n", i);
@@ -137,20 +132,24 @@ int flash_fs_mount() {
    // read the first sector, with header
    flash_read_sector(0, 0, &fs_map, 4096);
    if (memcmp(fs_map.header, MAGIC_8_BYTES, 8) != 0) {
-      printf("mountFlashFS() - magic bytes not found\n");
+      printf("flash_fs_mount() - magic bytes not found\n");
       return 1;
    }
+
+   /*
    // read the remaining 14 sectors without headers
-   for (int i = 1; i < 15; i++)
+   for (int i = 1; i < 15; i++) {
+      printf("%d)\n", i);
       flash_read_sector(i, 0, (uint8_t *) & fs_map + (4096 * i), 4096);
+   }
+   */
 
    init_used_bitmap();
-   debug_print_in_use();
+   //debug_print_in_use();
    return 0;
 }
 
 void flash_fs_create() {
-   printf("flash_fs_create()\n");
    memset(&fs_map, 0, sizeof(fs_map));
    strcpy(fs_map.header, MAGIC_8_BYTES);
    for (int i = 0; i < 15; i++)
@@ -203,7 +202,7 @@ bool flash_fs_verify_FAT_sector(uint16_t fat_sector, const void *buffer) {
 /* Low level flash functions */
 
 void flash_read_sector(uint16_t sector, uint8_t offset, void *buffer, uint16_t size) {
-//  printf("[FS] READ: %d, %d (%d)\n", sector, offset, size);
+   //printf("[FS] READ: %d, %d (%d)\n", sector, offset, size);
    uint32_t fs_start = XIP_BASE + HW_FLASH_STORAGE_BASE;
    uint32_t addr = fs_start + (sector * FLASH_SECTOR_SIZE) + (offset * 512);
 

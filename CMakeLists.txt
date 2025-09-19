@@ -23,14 +23,13 @@ endif()
 
 if(PIRTOII_VARIANT STREQUAL DEFAULT_BOARD)
    # 16MB of flash on purple Pico clones
-   target_compile_definitions(${PROJECT} PRIVATE
-      PICO_FLASH_SIZE_BYTES=16777216
-   ) 
-   target_compile_options(${PROJECT} PRIVATE "-DDEFAULT_BOARD -DPICO_FLASH_SPI_CLKDIV=2")
+   target_compile_definitions(${PROJECT} PRIVATE PICO_FLASH_SIZE_BYTES=16777216) 
+   target_compile_options(${PROJECT} PRIVATE "-DDEFAULT_BOARD")
+   target_compile_options(${PROJECT} PRIVATE "-DPICO_FLASH_SPI_CLKDIV=2")
 elseif(PIRTOII_VARIANT STREQUAL SD_BOARD)
-   #pico_generate_pio_header(${PROJECT} ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/sd_driver/SDIO/rp2040_sdio.pio)
-   target_compile_options(${PROJECT} PRIVATE "-DSD_BOARD -DSD_SUPPORT -DPICO_FLASH_SPI_CLKDIV=4")
-   target_compile_definitions(${PROJECT} PUBLIC PICO_MAX_SHARED_IRQ_HANDLERS=8u)
+   target_compile_definitions(${PROJECT} PRIVATE PICO_FLASH_SIZE_BYTES=2097152) 
+   target_compile_options(${PROJECT} PRIVATE "-DSD_BOARD")
+   target_compile_options(${PROJECT} PRIVATE "-DPICO_FLASH_SPI_CLKDIV=4")
 else()
    message(FATAL_ERROR "NOTE: PirtoII variant ${PIRTOII_VARIANT} not valid")
 endif()
@@ -112,5 +111,4 @@ target_link_libraries(${PROJECT} PUBLIC
 
 # create map/bin/hex/uf2 file in addition to ELF.
 pico_add_extra_outputs(${PROJECT})
-
 

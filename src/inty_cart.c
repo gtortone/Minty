@@ -131,7 +131,17 @@ void __not_in_flash_func(core1_main()) {
       // We detected a change, but reread the bus state to make sure that all three pins have settled
       lastBusState = gpio_get_all();
 
+#ifdef DEFAULT_BOARD
+      //aotta
       busState1 = ((lastBusState & BUS_STATE_MASK) >> BDIR_PIN);        //if gpio9    
+#else
+#ifdef SD_BOARD
+      //sukkopera
+      busState1 = ((lastBusState & BC1_PIN_MASK) >> (BC1_PIN - 2)) |
+         ((lastBusState & BC2_PIN_MASK) >> (BC2_PIN - 1)) |
+         ((lastBusState & BDIR_PIN_MASK) >> BDIR_PIN);
+#endif
+#endif
 
       busBit = busLookup[busState1];
       // Avoiding switch statements here because timing is critical and needs to be deterministic
@@ -149,9 +159,16 @@ void __not_in_flash_func(core1_main()) {
             asm inline("nop;nop;nop;nop;");
 
             // while ((gpio_get_all() & BC1_PIN_MASK)); // wait while bc1 & bc2 are high... it's enough test BC1
+#ifdef DEFAULT_BOARD
+            //aotta
             while (((gpio_get_all() & BC1e2_PIN_MASK) >> BC2_PIN) == 3) ;
+#else
+#ifdef SD_BOARD
+            //sukkopera 
+            while((gpio_get_all() & BC1e2_PIN_MASK) == BC1e2_PIN_MASK) ;
+#endif
+#endif
             //asm inline (delWR); //150ns
-
 
             SET_DATA_MODE_IN;
          }
@@ -265,7 +282,7 @@ void __not_in_flash_func(core1_main()) {
 
 void error(int numblink) {
    while (1) {
-      gpio_set_dir(25, GPIO_OUT);
+      gpio_set_dir(LED_PIN, GPIO_OUT);
 
       for (int i = 0; i < numblink; i++) {
          gpio_put(25, true);
@@ -681,8 +698,6 @@ void Inty_cart_main() {
    gpio_init_mask(BUS_STATE_MASK);
    gpio_set_dir_in_masked(ALWAYS_IN_MASK);
    gpio_set_dir_out_masked(ALWAYS_OUT_MASK);
-   // FIXME
-   SET_DATA_MODE_IN;
    gpio_init(LED_PIN);
    gpio_put(LED_PIN, true);
    gpio_init(RST_PIN);
@@ -755,7 +770,7 @@ void Inty_cart_main() {
    sleep_ms(800);
    
    // initial conditions 
-#ifdef SD_SUPPORT
+#ifdef SD_BOARD
    RAM[HAS_SD_ADDR] = 1;
 #else
    RAM[HAS_SD_ADDR] = 0;
@@ -796,7 +811,7 @@ void Inty_cart_main() {
                DirUp();
                IntyMenu(1);
                break;
-#ifdef SD_SUPPORT
+#ifdef SD_BOARD
             case 6:            // change storage device
                volumeId = RAM[DEV_ADDR];
                sprintf(curPath, "%d:/", volumeId);

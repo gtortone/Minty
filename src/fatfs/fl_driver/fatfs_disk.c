@@ -55,7 +55,7 @@ uint32_t fatfs_disk_read(uint8_t *buff, uint32_t sector, uint32_t count) {
 //      printf("fatfs_disk_read sector=%d, count=%d\n", sector, count);
    if (!flashfs_is_mounted)
       return RES_ERROR;
-   if (sector < 0 || sector >= SECTOR_NUM)
+   if (sector < 0 || sector >= NUM_FAT_SECTORS)
       return RES_PARERR;
 
    /* copy data to buffer */
@@ -68,7 +68,7 @@ uint32_t fatfs_disk_write(const uint8_t *buff, uint32_t sector, uint32_t count) 
 //      printf("fatfs_disk_write sector=%d, count=%d\n", sector, count);
    if (!flashfs_is_mounted)
       return RES_ERROR;
-   if (sector < 0 || sector >= SECTOR_NUM)
+   if (sector < 0 || sector >= NUM_FAT_SECTORS)
       return RES_PARERR;
 
    /* copy data to buffer */

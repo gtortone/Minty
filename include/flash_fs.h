@@ -10,6 +10,11 @@
 
 #include <stdbool.h>
 
+#define SECTOR_SIZE  512
+#define HW_FLASH_STORAGE_BASE  (1 * 1024 * 1024)
+#define NUM_FAT_SECTORS ((PICO_FLASH_SIZE_BYTES - HW_FLASH_STORAGE_BASE) / 512) - 4
+#define NUM_FLASH_SECTORS ((PICO_FLASH_SIZE_BYTES - HW_FLASH_STORAGE_BASE) / 4096)
+
 int flash_fs_mount();
 void flash_fs_create();
 void flash_fs_sync();

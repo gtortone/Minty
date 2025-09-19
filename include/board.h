@@ -52,7 +52,7 @@
    #define BC2_PIN   27
    #define BC1_PIN   26
    #define MSYNC_PIN 21
-   #define DIR_PIN   28
+   #define DIR_PIN   28 // HIGH= A->B (INPUT 5V TO 3.3V, inty -> pico) LOW= B->A (OUTPUT 3.3 TO 5V, pico -> inty)
    // SD
    #define SD_MISO   16
    #define SD_CS     17
