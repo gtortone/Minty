@@ -14,21 +14,20 @@ Multi-cart based on Raspberry Pi Pico hardware and PiRTOII firmware (https://git
 - new color schema for UI ROM
 - support for long filenames (up to 255 chars)
 - move from 64 to 512 max number of files for directory
-- SD support
+- SD support (with sukkopera board: https://github.com/SukkoPera/PiRTOII)
 
 ## Getting started
 
 To simply program Pi Pico:
 - connect it to your PC/laptop using an USB-C cable while pressing Pico on-board button (boot MODE)
-- drag and drop `Minty.uf2` inside root directory
+- drag and drop inside root directory `Minty.default_board.uf2` (for PirtoII default board) or `Minty.sd_board.uf2` (for PirtoII board with microSD slot)
 
 Setup ROMs:
-- copy your ITV ROM to root directory
+- copy your ITV ROM to flash (or microSD) root directory
 - if ROM name is included in [cfg/0game-maps.csv](cfg/0game-maps.csv) you do not need to add config (.cfg) file
 - enjoy your PiRTOII cart with Minty firmware !
 
-Minty supports microSD slot on free pins (see [board.h](include/board.h)). User can switch flash/SD storage device
-using controller key.
+User can switch flash/SD storage device using controller key.
 
 ## User interface
 
@@ -50,7 +49,9 @@ using controller key.
 ```
 mkdir build
 cd build
-cmake ..
+cmake -DPIRTOII_VARIANT=DEFAULT_BOARD ..   # for default PirtoII board
+   or
+cmake -DPIRTOII_VARIANT=SD_BOARD ..       # for PirtoII board with microSD slot
 make
 ```
 
@@ -65,8 +66,9 @@ picotool load -f Minty.bin; picotool reboot
 
 ## Credits
 
-Thanks a lot to Andrea Ottaviani for his PiRTOII firmware (https://github.com/aotta/PiRTOII)
-and PCB files.
+Thanks a lot to Andrea Ottaviani for his PiRTOII firmware (https://github.com/aotta/PiRTOII) and PCB files.
+
+Thanks a lot to sukkopera for his PirtoII board with microSD card slot (https://github.com/SukkoPera/PiRTOII)
 
 
 
