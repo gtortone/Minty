@@ -34,8 +34,7 @@ else()
    message(FATAL_ERROR "NOTE: PirtoII variant ${PIRTOII_VARIANT} not valid")
 endif()
 
-# low optimization level due to timing issue with cart firmware
-target_compile_options(${PROJECT} PRIVATE "-O1")
+target_compile_options(${PROJECT} PRIVATE "-O3")
 target_compile_options(${PROJECT} PRIVATE "-Wunused-variable")
 target_compile_options(${PROJECT} PRIVATE "-DCFG_TUSB_RHPORT0_MODE")
 
@@ -45,13 +44,14 @@ target_sources(${PROJECT} PUBLIC
    ${CMAKE_CURRENT_LIST_DIR}/src/main.c
    ${CMAKE_CURRENT_LIST_DIR}/src/inty_cart.c
    ${CMAKE_CURRENT_LIST_DIR}/src/memory.c
+   ${CMAKE_CURRENT_LIST_DIR}/src/usb_tasks.c
+   ${CMAKE_CURRENT_LIST_DIR}/src/usb_descriptors.c
    ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/diskio.c
    ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/ff.c
    ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/ffunicode.c
    ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/ffsystem.c
    ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/f_util.c
    ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/fl_driver/msc_disk.c
-   ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/fl_driver/usb_descriptors.c
    ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/fl_driver/fatfs_disk.c
    ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/fl_driver/flash_fs.c
 )
@@ -88,17 +88,14 @@ if(PIRTOII_VARIANT STREQUAL SD_BOARD)
    )
 endif()
 
-# Disable usb output, enable uart output
-pico_enable_stdio_usb(${PROJECT} 0)
-pico_enable_stdio_uart(${PROJECT} 1)
+# Enable usb output, disable uart output
+pico_enable_stdio_usb(${PROJECT} 1)
+pico_enable_stdio_uart(${PROJECT} 0)
 
-# In addition to pico_stdlib required for common PicoSDK functionality, add dependency on tinyusb_device
-# for TinyUSB device support
 target_link_libraries(${PROJECT} PUBLIC 
    pico_stdlib
    hardware_flash 
    hardware_uart
-   pico_stdio_uart
    hardware_dma
    hardware_pio
    hardware_spi
