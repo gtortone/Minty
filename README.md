@@ -15,6 +15,7 @@ Multi-cart based on Raspberry Pi Pico hardware and PiRTOII firmware (https://git
 - support for long filenames (up to 255 chars)
 - move from 64 to 512 max number of files for directory
 - SD support (with sukkopera board: https://github.com/SukkoPera/PiRTOII)
+- Intellicart ROM support (.rom)
 
 ## Getting started
 
