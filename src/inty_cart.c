@@ -28,7 +28,7 @@ unsigned char busLookup[8];
 #define RAMSIZE   0x2000
 
 uint16_t ROM[BINLENGTH];
-uint16_t RAM[RAMSIZE];
+volatile uint16_t RAM[RAMSIZE];
 
 #define maxHacks 32
 uint16_t HACK[maxHacks];
@@ -573,6 +573,7 @@ void load_cfg(char *filename) {
       return;
    }
 
+   printf("load_cfg: use %s config file\n", cfgfile);
    // read config file to SRAM
    slot = 0;
 

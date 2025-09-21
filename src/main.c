@@ -12,7 +12,21 @@
 #include "inty_cart.h"
 #include "usb_tasks.h"
 
+#include "hardware/vreg.h"
+#include "hardware/clocks.h"
+
 int main(void) {
+
+#ifdef DEFAULT_BOARD
+   vreg_set_voltage(VREG_VOLTAGE_1_15);
+   // wait for the voltage to stabilize
+   sleep_ms(500);
+
+   // increase frequency due to low optimization level (-O1) required 
+   // to avoid timing issues with cart firmware
+   set_sys_clock_khz(230000, true);
+#endif
+
    gpio_init(MSYNC_PIN);
    gpio_set_dir(MSYNC_PIN, false);
    gpio_init(RST_PIN);

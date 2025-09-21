@@ -23,10 +23,12 @@ endif()
 
 if(PIRTOII_VARIANT STREQUAL DEFAULT_BOARD)
    # 16MB of flash on purple Pico clones
+   target_compile_options(${PROJECT} PRIVATE "-O1")
    target_compile_definitions(${PROJECT} PRIVATE PICO_FLASH_SIZE_BYTES=16777216) 
    target_compile_options(${PROJECT} PRIVATE "-DDEFAULT_BOARD")
    target_compile_options(${PROJECT} PRIVATE "-DPICO_FLASH_SPI_CLKDIV=2")
 elseif(PIRTOII_VARIANT STREQUAL SD_BOARD)
+   target_compile_options(${PROJECT} PRIVATE "-O2")
    target_compile_definitions(${PROJECT} PRIVATE PICO_FLASH_SIZE_BYTES=2097152) 
    target_compile_options(${PROJECT} PRIVATE "-DSD_BOARD")
    target_compile_options(${PROJECT} PRIVATE "-DPICO_FLASH_SPI_CLKDIV=4")
@@ -34,7 +36,6 @@ else()
    message(FATAL_ERROR "NOTE: PirtoII variant ${PIRTOII_VARIANT} not valid")
 endif()
 
-target_compile_options(${PROJECT} PRIVATE "-O3")
 target_compile_options(${PROJECT} PRIVATE "-Wunused-variable")
 target_compile_options(${PROJECT} PRIVATE "-DCFG_TUSB_RHPORT0_MODE")
 
