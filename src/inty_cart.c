@@ -781,7 +781,7 @@ void LoadGame() {
 
       sleep_ms(200);
       resetCart();              // start game !
-      memset(RAM, 0, sizeof(RAM));
+      memset((uint16_t *) RAM, 0, sizeof(RAM));
       while (1) {
          gpio_put(LED_PIN, true);
          sleep_ms(2000);
@@ -790,6 +790,7 @@ void LoadGame() {
       }
    }
 }
+#pragma GCC pop_options
 
 void Inty_cart_main() {
    printf("Inty_cart_main\n");
@@ -831,7 +832,7 @@ void Inty_cart_main() {
    for (int i = 0; i < (sizeof(mintyfw) / 2); i++) {
       ROM[i] = mintyfw[(i * 2) + 1] | (mintyfw[i * 2] << 8);
    }
-   memset(RAM, 0, sizeof(RAM));
+   memset((uint16_t *) RAM, 0, sizeof(RAM));
 
    for (int i = 0; i < maxHacks; i++) {
       HACK[i] = 0;
@@ -941,4 +942,3 @@ void Inty_cart_main() {
       cdc_task();
    }
 }
-#pragma GCC pop_options
