@@ -20,6 +20,7 @@
 #include "fatfs_disk.h"
 #include "fingerprints.h"
 #include "board.h"
+#include "usb_tasks.h"
 
 unsigned char busLookup[8];
 
@@ -315,17 +316,29 @@ char *get_filename_ext(char *filename) {
 }
 
 int is_rom_file(char *filename) {
-   char *ext = get_filename_ext(filename);
+   FIL fil;
+   FRESULT fr;
+   UINT br;
+   char inputBuffer[3];
 
-   return (strcasecmp(ext, "ROM") == 0);
+   if (fr = f_open(&fil, filename, FA_READ) != FR_OK) {
+      printf("load_file %s error (%s)!\n", filename, FRESULT_str(fr));
+      error(2);
+   }
+
+   f_read(&fil, inputBuffer, sizeof(inputBuffer), &br);
+
+   f_close(&fil);
+
+   return !((inputBuffer[0] != 0xA8 && (inputBuffer[0] & ~0x20) != 0x41) ||
+         (inputBuffer[1] ^ inputBuffer[2]) != 0xFF);
 }
 
 int is_valid_file(char *filename) {
    char *ext = get_filename_ext(filename);
 
-   return (strcasecmp(ext, "BIN") == 0 || strcasecmp(ext, "INT") || is_rom_file(filename));
+   return (strcasecmp(ext, "BIN") == 0 || strcasecmp(ext, "INT") == 0 || strcasecmp(ext, "ROM") == 0);
 }
-
 
 int read_directory(char *path) {
    int ret = 0;
@@ -367,6 +380,7 @@ int read_directory(char *path) {
 void load_file(char *filename) {
    UINT br, size = 0;
    unsigned char byteread[2];
+   int bytes_to_read = 2;
    FIL fil;
    FRESULT fr;
 
@@ -374,20 +388,99 @@ void load_file(char *filename) {
       printf("load_file %s error (%s)!\n", filename, FRESULT_str(fr));
       error(2);
    }
+  
+   // clean ROM space
+   memset(ROM, 0, BINLENGTH);
 
+   // handle Intellicart rom file
    if(is_rom_file(filename)) {
 
-         //
+      slot = 0;
+      char inputBuffer[3];
+
+      f_read(&fil, inputBuffer, sizeof(inputBuffer), &br);
+
+      // read number of segments
+      slot = inputBuffer[1] - 1;
+
+      for(int i=0; i<=slot; i++) {
+
+         f_read(&fil, byteread, bytes_to_read, &br);
+         int lo =  byteread[0] << 8;
+         int hi =  (byteread[1] << 8) + 0x100;
+
+         //printf("lo: 0x%X, hi: 0x%X\n", lo, hi);
+
+         maprom[i] = lo;
+         if(i == 0)
+            mapfrom[i] = 0x0000;
+         else
+            mapfrom[i] = mapfrom[i-1] + mapsize[i-1] + 1;
+         mapto[i] = mapfrom[i] + (hi - lo) - 1;
+         mapsize[i] = (hi - lo) - 1;
+         addrto[i] = maprom[i] + mapsize[i];
+         mapdelta[i] = maprom[i] - mapfrom[i];
+         type[i] = 0;
+         page[i] = 0;
+
+         for (int j = lo; j < hi; j++) {
+
+            f_read(&fil, byteread, bytes_to_read, &br);
+            ROM[size] = byteread[1] | (byteread[0] << 8);
+            size++;
+         }
+
+         // skip CRC (2 bytes)
+         f_read(&fil, byteread, bytes_to_read, &br);
+      }
+
+      // read memory block (2Kb) attributes
+      char memattr[50];
+
+      f_read(&fil, memattr, sizeof(memattr), &br);
+
+      for (int i = 0; i < 32; i++) {
+         
+         int attr = 0xF & (memattr[(i >> 1)] >> ((i & 1) * 4));
+         int lohi = memattr[16 + ((i >> 1) | ((i & 1) << 4))];
+         int lo   = (lohi >> 4) & 0x7;
+         int hi   = (lohi & 0x7) + 1;
+
+         //printf("%d) memattr: 0x%X, lohi: 0x%X, lo: 0x%X, hi: 0x%X\n",
+         //      i, attr, lohi, lo, hi);
+
+         // check if memory block has write attribute
+         if(attr & 0x02) { 
+
+            slot++;
+
+            RAMused = 1;
+            ramfrom = i * 0x800;
+            mapfrom[slot] = ramfrom;
+            mapto[slot] = mapfrom[slot] + ((hi - lo) * 0x100) - 1;
+            maprom[slot] = mapfrom[slot];
+            addrto[slot] = mapto[slot];
+            mapdelta[slot] = maprom[slot] - mapfrom[slot];
+            mapsize[slot] = mapto[slot] - mapfrom[slot];
+            type[slot] = 2;
+            page[slot] = 0;
+
+         }
+      }
+
+      /*
+      printf("slots: %d\n", slot);
+      for(int i=0; i<=slot; i++) {
+         printf("%d) block: 0x%X, mapfrom: 0x%X - mapto: 0x%X, mapsize: 0x%X, addrto: 0x%X, mapdelta: 0x%X, type: %d\n", 
+               i, maprom[i], mapfrom[i], mapto[i], mapsize[i], addrto[i], mapdelta[i], type[i]);
+      }
+      */
 
    } else {
 
-      int bytes_to_read = 2;
-
-      // clean ROM space
-      memset(ROM, 0, BINLENGTH);
+      // handle raw rom file
 
       // read the file to SRAM
-      size = 0;
       while (!(f_eof(&fil))) {
          f_read(&fil, byteread, bytes_to_read, &br);
          ROM[size] = byteread[1] | (byteread[0] << 8);
@@ -464,6 +557,13 @@ void load_cfg(char *filename) {
             }
 
             config_memory(fingerprints[i+1]);
+            /*
+            printf("slots: %d\n", slot);
+            for(int i=0; i<=slot; i++) {
+               printf("%d) maprom: 0x%X, mapfrom: 0x%X - mapto: 0x%X, mapsize: 0x%X, addrto: 0x%X, mapdelta: 0x%X\n", 
+                  i, maprom[i], mapfrom[i], mapto[i], mapsize[i], addrto[i], mapdelta[i]);
+            }
+            */
             return;
          }
       }
@@ -834,6 +934,10 @@ void Inty_cart_main() {
          cmd_executing = false;
          RAM[DONE_ADDR] = 1;
       }
+
+      // FIXME
+      tud_task();
+      cdc_task();
    }
 }
 #pragma GCC pop_options
