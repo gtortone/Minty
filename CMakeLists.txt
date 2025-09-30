@@ -1,6 +1,15 @@
 cmake_minimum_required(VERSION 3.13)
 
-set(PROJECT Minty)
+if(NOT DEFINED PIRTOII_VARIANT)
+   set(PIRTOII_VARIANT "DEFAULT_BOARD")
+   message(STATUS "NOTE: PirtoII variant not defined. Using DEFAULT_BOARD.")
+endif()
+
+if(PIRTOII_VARIANT STREQUAL DEFAULT_BOARD)
+   set(PROJECT Minty.default_board)
+elseif(PIRTOII_VARIANT STREQUAL SD_BOARD)
+   set(PROJECT Minty.sd_board)
+endif()
 
 include($ENV{PICO_SDK_PATH}/pico_sdk_init.cmake)
 
@@ -16,22 +25,20 @@ add_executable(${PROJECT})
 # DEFAULT_BOARD is PirtoII by aotta (https://github.com/aotta/PiRTOII)
 # SD_BOARD is PirtoII with microSD slot by sukkopera (https://github.com/SukkoPera/PiRTOII)
 
-if(NOT DEFINED PIRTOII_VARIANT)
-   set(PIRTOII_VARIANT "DEFAULT_BOARD")
-   message(STATUS "NOTE: PirtoII variant not defined. Using DEFAULT_BOARD.")
-endif()
-
 if(PIRTOII_VARIANT STREQUAL DEFAULT_BOARD)
    # 16MB of flash on purple Pico clones
-   target_compile_definitions(${PROJECT} PRIVATE PICO_FLASH_SIZE_BYTES=16777216) 
+   target_compile_definitions(${PROJECT} PRIVATE "-DPICO_FLASH_SIZE_BYTES=16777216") 
    target_compile_options(${PROJECT} PRIVATE "-DDEFAULT_BOARD")
    target_compile_options(${PROJECT} PRIVATE "-DPICO_FLASH_SPI_CLKDIV=2")
+   pico_set_linker_script(${PROJECT} ${CMAKE_CURRENT_SOURCE_DIR}/support/memmap_custom_16MB.ld)
 elseif(PIRTOII_VARIANT STREQUAL SD_BOARD)
-   target_compile_definitions(${PROJECT} PRIVATE PICO_FLASH_SIZE_BYTES=2097152) 
+   target_compile_definitions(${PROJECT} PRIVATE "-DPICO_FLASH_SIZE_BYTES=2097152") 
    target_compile_options(${PROJECT} PRIVATE "-DSD_BOARD")
    target_compile_options(${PROJECT} PRIVATE "-DPICO_FLASH_SPI_CLKDIV=4")
-else()
-   message(FATAL_ERROR "NOTE: PirtoII variant ${PIRTOII_VARIANT} not valid")
+endif()
+
+if(DEFINED DEBUG)
+   target_compile_definitions(${PROJECT} PRIVATE "-DDEBUG")
 endif()
 
 target_compile_options(${PROJECT} PRIVATE "-O2")
@@ -108,4 +115,3 @@ target_link_libraries(${PROJECT} PUBLIC
 
 # create map/bin/hex/uf2 file in addition to ELF.
 pico_add_extra_outputs(${PROJECT})
-

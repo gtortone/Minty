@@ -753,6 +753,9 @@ void DirUp() {
    }
 }
 
+#pragma GCC push_options
+#pragma GCC optimize ("O0")
+
 void LoadGame() {
    int numfile = 0;
 
@@ -934,8 +937,11 @@ void Inty_cart_main() {
          RAM[DONE_ADDR] = 1;
       }
 
-      // debug 
-      //tud_task();
-      //cdc_task();
+#ifdef DEBUG
+      tud_task();
+      cdc_task();
+#endif
    }
 }
+
+#pragma GCC pop_options
