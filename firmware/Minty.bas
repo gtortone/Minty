@@ -46,6 +46,8 @@
 
 avanti:
     
+    'debouncing key
+    prevc = c
     curriga=0
     cls
 
@@ -74,7 +76,7 @@ menu:
     c=cont
 
     'SELECT
-    if (c=40) then   'ENTER
+    if (c=40 and prevc<>c) then   'ENTER
         if #f_from < #f_to then
            k=0
            CLS
@@ -253,6 +255,9 @@ prevpage:
       poke(cmd),0
       goto avanti
     end if
+
+    'debouncing key
+    prevc=c
 
     goto menu
    
