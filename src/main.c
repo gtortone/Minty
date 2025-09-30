@@ -12,7 +12,14 @@
 #include "inty_cart.h"
 #include "usb_tasks.h"
 
+#include "hardware/vreg.h"
+#include "hardware/clocks.h"
+
 int main(void) {
+
+   vreg_set_voltage(VREG_VOLTAGE_1_15);
+   sleep_ms(200);
+   set_sys_clock_khz(200000, true);
 
    gpio_init(MSYNC_PIN);
    gpio_set_dir(MSYNC_PIN, false);
