@@ -26,7 +26,7 @@ typedef struct {
 } sector_map;
 
 sector_map fs_map;
-bool fs_map_needs_written[15];
+bool fs_map_needs_written[FS_MAP_ENTRIES];
 
 uint8_t used_bitmap[NUM_FLASH_SECTORS]; // we will use 256 flash sectors for 2048 fat sectors
 
@@ -67,7 +67,7 @@ void debug_print_in_use() {
 
 void write_fs_map() {
    //debug_print_in_use();
-   for (int i = 0; i < 15; i++) {
+   for (int i = 0; i < FS_MAP_ENTRIES; i++) {
       if (fs_map_needs_written[i]) {
 //          printf("Writing FS Map %d\n", i);
          flash_erase_sector(i);
@@ -113,8 +113,8 @@ uint16_t getNextWriteSector() {
 
 void init_used_bitmap() {
    memset(used_bitmap, 0, NUM_FLASH_SECTORS);
-   for (int i = 0; i < 15; i++)
-      used_bitmap[i] = 0xFF;    // first 15 flash sectors used by fs map
+   for (int i = 0; i < FS_MAP_ENTRIES; i++)
+      used_bitmap[i] = 0xFF;    // first FS_MAP_ENTRIES flash sectors used by fs map
 
    for (int i = 0; i < NUM_FAT_SECTORS; i++) {
       uint16_t mapEntry = fs_map.sectors[i];
@@ -126,7 +126,7 @@ void init_used_bitmap() {
 }
 
 int flash_fs_mount() {
-   for (int i = 0; i < 15; i++)
+   for (int i = 0; i < FS_MAP_ENTRIES; i++)
       fs_map_needs_written[i] = false;
 
    // read the first sector, with header
@@ -136,13 +136,12 @@ int flash_fs_mount() {
       return 1;
    }
 
-   /*
+   // for small flash (<=2MB) filesystem is FAT12 so skip this step
+#ifdef DEFAULT_BOARD
    // read the remaining 14 sectors without headers
-   for (int i = 1; i < 15; i++) {
-      printf("%d)\n", i);
+   for (int i = 1; i < FS_MAP_ENTRIES; i++)
       flash_read_sector(i, 0, (uint8_t *) & fs_map + (4096 * i), 4096);
-   }
-   */
+#endif
 
    init_used_bitmap();
    //debug_print_in_use();
@@ -152,7 +151,7 @@ int flash_fs_mount() {
 void flash_fs_create() {
    memset(&fs_map, 0, sizeof(fs_map));
    strcpy(fs_map.header, MAGIC_8_BYTES);
-   for (int i = 0; i < 15; i++)
+   for (int i = 0; i < FS_MAP_ENTRIES; i++)
       fs_map_needs_written[i] = true;
    write_fs_map();
    init_used_bitmap();

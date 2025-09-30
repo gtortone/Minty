@@ -33,15 +33,17 @@ void create_fatfs_disk() {
    flash_fs_create();
    flashfs_is_mounted = true;
 
-   // now create a fatfs on the flash_fs filesystem :-)
-
    FATFS fs;                    /* Filesystem object */
    FIL fil;                     /* File object */
    FRESULT res;                 /* API result code */
    BYTE work[FF_MAX_SS];        /* Work area (larger is better for processing time) */
+   
+   // set MKFS_PARM to change FAT parameters like max number of entries in root directory
+   // const MKFS_PARM opt = {FM_ANY, 0, 0, 1024, 0}; 
 
    /* Format the default drive with default parameters */
    printf("making fatfs\n");
+   //res = f_mkfs("", &opt, work, sizeof work);
    res = f_mkfs("", 0, work, sizeof work);
    f_mount(&fs, "", 0);
    f_setlabel("Minty");
