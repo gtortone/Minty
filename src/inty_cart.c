@@ -64,6 +64,7 @@ extern int mapdelta[80];
 extern unsigned int mapsize[80];
 extern unsigned int addrto[80];
 extern unsigned int RAMused;
+extern unsigned int RAMwidth;
 extern unsigned int type[80];          // 0-rom / 1-page / 2-ram
 extern unsigned int page[80];          // page number
 
@@ -259,7 +260,10 @@ void __not_in_flash_func(core1_main()) {
                   dataWrite = gpio_get_all() & 0xFFFF;
 
                   if (RAMused == 1) {
-                     RAM[parallelBus - ramfrom] = dataWrite & 0xFF;
+                     if(RAMwidth == 8)
+                        RAM[parallelBus - ramfrom] = dataWrite & 0xFF;
+                     else  // RAMwidth == 16
+                        RAM[parallelBus - ramfrom] = dataWrite;
                   }
                   if ((checpage == 1) && (((dataWrite >> 4) & 0xff) == 0xA5)) {
                      curPage = dataWrite & 0xf;
@@ -455,6 +459,10 @@ void load_file(char *filename) {
             slot++;
 
             RAMused = 1;
+            if(attr & 0x04)
+               RAMwidth = 8;     // narrow flag (8-bit)
+            else
+               RAMwidth = 16;
             ramfrom = i * 0x800;
             mapfrom[slot] = ramfrom;
             mapto[slot] = mapfrom[slot] + ((hi - lo) * 0x100) - 1;
@@ -605,6 +613,9 @@ void load_cfg(char *filename) {
             memset(tmp, 0, sizeof(tmp));
             memcpy(tmp, riga + 9, 5);
             ramto = strtoul(tmp, NULL, 16);
+            memset(tmp, 0, sizeof(tmp));
+            memcpy(tmp, riga + 20, 2);
+            RAMwidth = strtoul(tmp, NULL, 10);
             mapto[slot] = ramto;
             maprom[slot] = ramfrom;
             addrto[slot] = maprom[slot] + (mapto[slot] - mapfrom[slot]);
@@ -850,7 +861,7 @@ void Inty_cart_main() {
    mapdelta[0] = maprom[0] - mapfrom[0];
    mapsize[0] = mapto[0] - mapfrom[0];
 
-   //$1000 - $1137 = $6000
+   //$1000 - $114E = $6000
    mapfrom[1] = 0x1000;
    mapto[1] = 0x1fff;
    maprom[1] = 0x6000;
@@ -861,8 +872,9 @@ void Inty_cart_main() {
    mapsize[1] = mapto[1] - mapfrom[1];
 
    //[memattr]
-   //$8000 - $9FFF = RAM 16
+   //$8000 - $9FFF = RAM 8
    RAMused = 1;
+   RAMwidth = 8;
    ramfrom = 0x8000;
    mapfrom[2] = 0x8000;
    mapto[2] = 0x9fff;

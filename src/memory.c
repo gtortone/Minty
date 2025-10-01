@@ -10,6 +10,7 @@ int mapdelta[80];
 unsigned int mapsize[80];
 unsigned int addrto[80];
 unsigned int RAMused = 0;
+unsigned int RAMwidth = 0;
 unsigned int type[80];          // 0-rom / 1-page / 2-ram
 unsigned int page[80];          // page number
 
@@ -158,6 +159,7 @@ void config_memory(int cfg) {
          page[0] = 0;
 
          RAMused = 1;
+         RAMwidth = 8;
          ramfrom = 0xD000;
          mapfrom[1] = 0xD000;
          mapto[1] = 0xD3FF;
@@ -279,6 +281,7 @@ void config_memory(int cfg) {
          page[3] = 0;
 
          RAMused = 1;
+         RAMwidth = 8;
          ramfrom = 0x8800;
          mapfrom[4] = 0x8800;
          mapto[4] = 0x8FFF;
