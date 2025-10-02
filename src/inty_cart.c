@@ -341,7 +341,10 @@ int is_rom_file(char *filename) {
 int is_valid_file(char *filename) {
    char *ext = get_filename_ext(filename);
 
-   return (strcasecmp(ext, "BIN") == 0 || strcasecmp(ext, "INT") == 0 || strcasecmp(ext, "ROM") == 0);
+   // .BIN, .INT, .ITV files are raw image ROMs
+   // .ROM files are Intellicart ROMs
+   return (strcasecmp(ext, "BIN") == 0 || strcasecmp(ext, "INT") == 0 || 
+         strcasecmp(ext, "ITV") == 0 || strcasecmp(ext, "ROM"));
 }
 
 int read_directory(char *path) {
