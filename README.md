@@ -17,6 +17,10 @@ Multi-cart based on Raspberry Pi Pico hardware and PiRTOII firmware (https://git
 - SD support (with sukkopera board: https://github.com/SukkoPera/PiRTOII)
 - Intellicart ROM support (.rom)
 
+## Firmware
+
+Firmware files (.bin and .uf2) are available in [release](https://github.com/gtortone/Minty/releases) section.
+
 ## Getting started
 
 To simply program Pi Pico:
