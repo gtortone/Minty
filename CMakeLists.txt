@@ -96,13 +96,13 @@ if(PIRTOII_VARIANT STREQUAL SD_BOARD)
 endif()
 
 # Enable usb output, disable uart output
-pico_enable_stdio_usb(${PROJECT} 1)
-pico_enable_stdio_uart(${PROJECT} 0)
+pico_enable_stdio_usb(${PROJECT} 0)
+pico_enable_stdio_uart(${PROJECT} 1)
 
 target_link_libraries(${PROJECT} PUBLIC 
    pico_stdlib
    hardware_flash 
-   hardware_uart
+   pico_stdio_uart
    hardware_dma
    hardware_pio
    hardware_spi

@@ -108,7 +108,7 @@ void __not_in_flash_func(core1_main()) {
    unsigned char busBit;
    bool deviceAddress = false;
    unsigned int curPage = 0;
-   unsigned int checpage = 0;
+   unsigned int checkpage = 0;
 
    multicore_lockout_victim_init();
 
@@ -129,13 +129,14 @@ void __not_in_flash_func(core1_main()) {
       // Wait for the bus state to change
 
       do {
-      } while (!((gpio_get_all() ^ lastBusState) & BUS_STATE_MASK));
+      } while (!((sio_hw->gpio_in ^ lastBusState) & BUS_STATE_MASK));
+      
       // We detected a change, but reread the bus state to make sure that all three pins have settled
-      lastBusState = gpio_get_all();
+      lastBusState = sio_hw->gpio_in;
 
 #ifdef DEFAULT_BOARD
       //aotta
-      busState1 = ((lastBusState & BUS_STATE_MASK) >> BDIR_PIN);        //if gpio9    
+      busState1 = ((lastBusState & BUS_STATE_MASK) >> BDIR_PIN);
 #else
 #ifdef SD_BOARD
       //sukkopera
@@ -146,6 +147,7 @@ void __not_in_flash_func(core1_main()) {
 #endif
 
       busBit = busLookup[busState1];
+      
       // Avoiding switch statements here because timing is critical and needs to be deterministic
       if (!busBit) {
          // -----------------------
@@ -156,22 +158,19 @@ void __not_in_flash_func(core1_main()) {
          if (deviceAddress) {
             // The data was prefetched during BAR/ADAR.  There isn't nearly enough time to fetch it here.
             // We can just output it.
+            DATA_OUT(dataOut);
             SET_DATA_MODE_OUT;
-            gpio_put_masked(DATA_PIN_MASK, dataOut);
+            // wait 20ns (@200Mhz)
             asm inline("nop;nop;nop;nop;");
-
-            // while ((gpio_get_all() & BC1_PIN_MASK)); // wait while bc1 & bc2 are high... it's enough test BC1
 #ifdef DEFAULT_BOARD
             //aotta
-            while (((gpio_get_all() & BC1e2_PIN_MASK) >> BC2_PIN) == 3) ;
+            while (sio_hw->gpio_in & BC1_PIN_MASK) ;  //wait BC1 go down 
 #else
 #ifdef SD_BOARD
-            //sukkopera 
-            while((gpio_get_all() & BC1e2_PIN_MASK) == BC1e2_PIN_MASK) ;
+            //sukkopera
+            while((sio_hw->gpio_in & BC1e2_PIN_MASK) == BC1e2_PIN_MASK) ;
 #endif
 #endif
-            //asm inline (delWR); //150ns
-
             SET_DATA_MODE_IN;
          }
       } else {
@@ -182,14 +181,14 @@ void __not_in_flash_func(core1_main()) {
             // -----------------------
             if (busState1 == BUS_ADAR) {
                if (deviceAddress) {
-                  // The data was prefetched during BAR/ADAR.  There isn't nearly enough time to fetch it here.
+                  // The data was prefetched during BAR/ADAR.
+                  // There isn't nearly enough time to fetch it here.
                   // We can just output it.
+                  DATA_OUT(dataOut);
                   SET_DATA_MODE_OUT;
-                  gpio_put_masked(DATA_PIN_MASK, dataOut);
-
-                  while ((gpio_get_all() & BC1_PIN_MASK) >> BC1_PIN) ;  //wait BC1 go down 
-                  //asm inline (delWR); //150ns
-
+                  // wait 20ns (@200Mhz)
+                  asm inline("nop;nop;nop;nop;");
+                  while (sio_hw->gpio_in & BC1_PIN_MASK) ;  //wait BC1 go down 
                   SET_DATA_MODE_IN;
 
                }
@@ -198,14 +197,13 @@ void __not_in_flash_func(core1_main()) {
             // Prefetch data here because there won't be enough time to get it during DTB.
             // However, we can't take forever because of all the time we had to wait for
             // the address to appear on the bus.
-            SET_DATA_MODE_IN;
+            //
             // We have to wait until the address is stable on the bus
             // waiting bus is stable 66 nop at 200mhz is ok/85 at 240
 
-            while (((parallelBus = gpio_get_all()) & BDIR_PIN_MASK)) ;  // wait DIR go low for finish BAR cycle 
-            //asm inline (delRD); //150ns
-
-            parallelBus = gpio_get_all() & 0xFFFF;
+            // wait DIR go low for finish BAR cycle 
+            while (((parallelBus = sio_hw->gpio_in) & BDIR_PIN_MASK)) ; 
+            parallelBus = sio_hw->gpio_in & 0xFFFF;
 
             deviceAddress = false;
 
@@ -224,7 +222,7 @@ void __not_in_flash_func(core1_main()) {
                         break;
                      }
                      if ((parallelBus & 0xfff) == 0xfff) {
-                        checpage = 1;
+                        checkpage = 1;
                         deviceAddress = true;
                         break;
                      }
@@ -255,9 +253,7 @@ void __not_in_flash_func(core1_main()) {
 
                if (deviceAddress) {
 
-                  SET_DATA_MODE_IN;
-
-                  dataWrite = gpio_get_all() & 0xFFFF;
+                  dataWrite = sio_hw->gpio_in & 0xFFFF;
 
                   if (RAMused == 1) {
                      if(RAMwidth == 8)
@@ -265,9 +261,9 @@ void __not_in_flash_func(core1_main()) {
                      else  // RAMwidth == 16
                         RAM[parallelBus - ramfrom] = dataWrite;
                   }
-                  if ((checpage == 1) && (((dataWrite >> 4) & 0xff) == 0xA5)) {
+                  if ((checkpage == 1) && (((dataWrite >> 4) & 0xff) == 0xA5)) {
                      curPage = dataWrite & 0xf;
-                     checpage = 0;
+                     checkpage = 0;
                   }
 
                } else {
@@ -276,7 +272,6 @@ void __not_in_flash_func(core1_main()) {
                   // -----------------------
                   // reconnect to bus
                   parallelBus2 = parallelBus;
-                  SET_DATA_MODE_IN;
                }
 
             }
@@ -348,7 +343,6 @@ int is_valid_file(char *filename) {
 }
 
 int read_directory(char *path) {
-   int ret = 0;
    UINT id = 0;
    FILINFO fno;
 
@@ -379,9 +373,8 @@ int read_directory(char *path) {
    } 
 
    qsort((DIR_ENTRY *) & files[0], num_dir_entries, sizeof(DIR_ENTRY), entry_compare);
-   ret = 1;
    
-   return ret;
+   return 1;
 }
 
 void load_file(char *filename) {
@@ -568,13 +561,13 @@ void load_cfg(char *filename) {
             }
 
             config_memory(fingerprints[i+1]);
-            /*
+
             printf("slots: %d\n", slot);
             for(int i=0; i<=slot; i++) {
                printf("%d) maprom: 0x%X, mapfrom: 0x%X - mapto: 0x%X, mapsize: 0x%X, addrto: 0x%X, mapdelta: 0x%X\n", 
                   i, maprom[i], mapfrom[i], mapto[i], mapsize[i], addrto[i], mapdelta[i]);
             }
-            */
+
             return;
          }
       }
@@ -598,6 +591,7 @@ void load_cfg(char *filename) {
       if (riga[0] >= 32) {
          memset(tmp, 0, sizeof(tmp));
          memcpy(tmp, riga, 9);
+         // supported sections: [mapping], [memattr]
          if (slot == 0) {
             if (!(strcmp(tmp, "[mapping]"))) {
                memset(riga, 0, sizeof(riga));
@@ -715,7 +709,6 @@ void filelist(DIR_ENTRY *en, int da, int a) {
 
 void IntyMenu(int type) {       // 1=start, 2=next page, 3=prev page, 4=dir up
    int maxfile = 0;
-   int ret = 0;
    
    if (volumeId == 0)
       mount_fatfs_disk();
@@ -728,7 +721,7 @@ void IntyMenu(int type) {       // 1=start, 2=next page, 3=prev page, 4=dir up
 
    switch (type) {
       case 1:
-         ret = read_directory(curPath);
+         read_directory(curPath);
          maxfile = 10;
          filefrom = 0;
          if (maxfile > num_dir_entries)
@@ -919,15 +912,17 @@ void Inty_cart_main() {
       cmd = RAM[CMD_ADDR];
 
       if ((cmd > 0) && !(cmd_executing)) {
+
          cmd_executing = true;
          RAM[DONE_ADDR] = 0;
          RAM[CMD_ADDR] = 0;
          printf("cmd: %d\n", cmd);
+
          switch (cmd) {
             case 1:            // read file list
                IntyMenu(1);
                break;
-            case 2:            // run file list
+            case 2:            // run file
                LoadGame();
                break;
             case 3:            // next page

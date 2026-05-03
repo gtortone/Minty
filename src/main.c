@@ -26,7 +26,14 @@ int main(void) {
    gpio_init(RST_PIN);
    gpio_set_dir(RST_PIN, true);
 
+#ifdef UART_ID
+   gpio_set_function(UART_TX, UART_FUNCSEL_NUM(UART_ID, UART_TX));
+   gpio_set_function(UART_RX, UART_FUNCSEL_NUM(UART_ID, UART_RX));
+   uart_init(UART_ID, UART_BAUDRATE);
+   stdio_uart_init_full(UART_ID, 115200, UART_TX, UART_RX);
+#else
    stdio_init_all();
+#endif
 
    tud_init(BOARD_TUD_RHPORT);
 
