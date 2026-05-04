@@ -20,6 +20,23 @@ set(CMAKE_CXX_STANDARD 17)
 
 pico_sdk_init()
 
+include(FetchContent)
+
+set(PICO_FATFS_DIR ${CMAKE_SOURCE_DIR}/lib/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico)
+
+FetchContent_Declare(
+    pico_fatfs
+    GIT_REPOSITORY https://github.com/carlk3/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico
+    GIT_TAG main
+    SOURCE_DIR ${PICO_FATFS_DIR}
+)
+
+FetchContent_MakeAvailable(pico_fatfs)
+
+add_subdirectory(
+    lib/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico/src
+)
+
 add_executable(${PROJECT})
 
 # DEFAULT_BOARD is PirtoII by aotta (https://github.com/aotta/PiRTOII)
@@ -53,46 +70,43 @@ target_sources(${PROJECT} PUBLIC
    ${CMAKE_CURRENT_LIST_DIR}/src/memory.c
    ${CMAKE_CURRENT_LIST_DIR}/src/usb_tasks.c
    ${CMAKE_CURRENT_LIST_DIR}/src/usb_descriptors.c
-   ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/diskio.c
-   ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/ff.c
-   ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/ffunicode.c
-   ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/ffsystem.c
-   ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/f_util.c
+   #${CMAKE_CURRENT_LIST_DIR}/src/fatfs/diskio.c
    ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/fl_driver/msc_disk.c
    ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/fl_driver/fatfs_disk.c
    ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/fl_driver/flash_fs.c
 )
 
+get_target_property(SRCS ${PROJECT} SOURCES)
+list(REMOVE_ITEM SRCS
+   ${PICO_FATFS_DIR}/src/src/glue.c
+)
+set_target_properties(${PROJECT} PROPERTIES SOURCES "${SRCS}")
+
 target_include_directories(${PROJECT} PUBLIC
    ${CMAKE_CURRENT_LIST_DIR}/include
-   ${CMAKE_CURRENT_LIST_DIR}/src/fatfs
-   ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/fl_driver
+)
+add_custom_command(
+   TARGET ${PROJECT} PRE_BUILD
+   COMMAND ${CMAKE_COMMAND} -E rm -f
+      ${CMAKE_CURRENT_LIST_DIR}/lib/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico/src/include/ffconf.h
+)
+
+# NOTE: for this to work, ./lib/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico/src/include/ffconf.h must be removed
+target_include_directories(no-OS-FatFS-SD-SDIO-SPI-RPi-Pico BEFORE INTERFACE
+   ${CMAKE_CURRENT_LIST_DIR}/include
+)
+
+add_custom_command(
+   TARGET ${PROJECT} PRE_BUILD
+   COMMAND ${CMAKE_COMMAND} -E copy
+            ${CMAKE_SOURCE_DIR}/src/fatfs/diskio.c
+            ${CMAKE_CURRENT_LIST_DIR}/lib/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico/src/src/glue.c
 )
 
 if(PIRTOII_VARIANT STREQUAL SD_BOARD)
    target_sources(${PROJECT} PUBLIC
       ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/hw_config.c
-      ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/sd_driver/dma_interrupts.c
-      ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/sd_driver/sd_card.c
-      ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/sd_driver/sd_timeouts.c
-      ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/sd_driver/SDIO/rp2040_sdio.c
-      ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/sd_driver/SDIO/sd_card_sdio.c
-      ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/sd_driver/SPI/my_spi.c
-      ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/sd_driver/SPI/sd_card_spi.c
-      ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/sd_driver/SPI/sd_spi.c
-      ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/crash.c
-      ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/crc.c
-      ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/ff_stdio.c
-      ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/file_stream.c
-      ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/my_debug.c
-      ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/my_rtc.c
-      ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/util.c
    ) 
-
-   target_include_directories(${PROJECT} PUBLIC
-      ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/sd_driver
-      ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/sd_driver/SDIO
-   )
 endif()
 
 # Enable usb output, disable uart output
@@ -111,6 +125,7 @@ target_link_libraries(${PROJECT} PUBLIC
    pico_aon_timer
    tinyusb_device
    pico_multicore
+   no-OS-FatFS-SD-SDIO-SPI-RPi-Pico
 )
 
 # create map/bin/hex/uf2 file in addition to ELF.

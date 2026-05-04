@@ -23,6 +23,8 @@ https://github.com/carlk3/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico/tree/main#customizing
 #include "hw_config.h"
 #include "board.h"
 
+const char * VolumeStr[FF_VOLUMES] = {FF_VOLUME_STRS};	/* Pre-defined volume ID */
+
 /* Configuration of hardware SPI object */
 static spi_t spi = {
    .hw_inst = spi0,  // SPI component
