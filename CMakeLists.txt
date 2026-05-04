@@ -20,6 +20,9 @@ set(CMAKE_CXX_STANDARD 17)
 
 pico_sdk_init()
 
+#
+# fetch no-OS-FatFS-SD-SDIO-SPI-RPi-Pico library
+#
 include(FetchContent)
 
 set(PICO_FATFS_DIR ${CMAKE_SOURCE_DIR}/lib/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico)
@@ -32,6 +35,7 @@ FetchContent_Declare(
 )
 
 FetchContent_MakeAvailable(pico_fatfs)
+###
 
 add_subdirectory(
     lib/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico/src
@@ -76,31 +80,8 @@ target_sources(${PROJECT} PUBLIC
    ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/fl_driver/flash_fs.c
 )
 
-get_target_property(SRCS ${PROJECT} SOURCES)
-list(REMOVE_ITEM SRCS
-   ${PICO_FATFS_DIR}/src/src/glue.c
-)
-set_target_properties(${PROJECT} PROPERTIES SOURCES "${SRCS}")
-
 target_include_directories(${PROJECT} PUBLIC
    ${CMAKE_CURRENT_LIST_DIR}/include
-)
-add_custom_command(
-   TARGET ${PROJECT} PRE_BUILD
-   COMMAND ${CMAKE_COMMAND} -E rm -f
-      ${CMAKE_CURRENT_LIST_DIR}/lib/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico/src/include/ffconf.h
-)
-
-# NOTE: for this to work, ./lib/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico/src/include/ffconf.h must be removed
-target_include_directories(no-OS-FatFS-SD-SDIO-SPI-RPi-Pico BEFORE INTERFACE
-   ${CMAKE_CURRENT_LIST_DIR}/include
-)
-
-add_custom_command(
-   TARGET ${PROJECT} PRE_BUILD
-   COMMAND ${CMAKE_COMMAND} -E copy
-            ${CMAKE_SOURCE_DIR}/src/fatfs/diskio.c
-            ${CMAKE_CURRENT_LIST_DIR}/lib/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico/src/src/glue.c
 )
 
 if(PIRTOII_VARIANT STREQUAL SD_BOARD)
@@ -108,6 +89,27 @@ if(PIRTOII_VARIANT STREQUAL SD_BOARD)
       ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/hw_config.c
    ) 
 endif()
+
+#
+# overwrite ffconf.h and use custom flash/SD driver
+#
+target_include_directories(no-OS-FatFS-SD-SDIO-SPI-RPi-Pico BEFORE INTERFACE
+   ${CMAKE_CURRENT_LIST_DIR}/include
+)
+
+add_custom_target(glue.c
+   COMMAND ${CMAKE_COMMAND} -E copy
+            ${CMAKE_SOURCE_DIR}/src/fatfs/diskio.c
+            ${CMAKE_CURRENT_LIST_DIR}/lib/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico/src/src/glue.c
+)
+
+add_custom_target(ffconf.h
+   COMMAND ${CMAKE_COMMAND} -E rm -f
+      ${CMAKE_CURRENT_LIST_DIR}/lib/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico/src/include/ffconf.h
+)
+
+add_dependencies(${PROJECT} ffconf.h glue.c)
+###
 
 # Enable usb output, disable uart output
 pico_enable_stdio_usb(${PROJECT} 0)
@@ -117,12 +119,6 @@ target_link_libraries(${PROJECT} PUBLIC
    pico_stdlib
    hardware_flash 
    pico_stdio_uart
-   hardware_dma
-   hardware_pio
-   hardware_spi
-   hardware_sync
-   cmsis_core  ###
-   pico_aon_timer
    tinyusb_device
    pico_multicore
    no-OS-FatFS-SD-SDIO-SPI-RPi-Pico
