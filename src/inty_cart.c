@@ -24,7 +24,12 @@
 
 unsigned char busLookup[8];
 
-#define BINLENGTH 1024*64
+#if PICO_RP2040
+   #define BINLENGTH 1024*64     // 128 kb
+#elif PICO_RP2350
+   #define BINLENGTH 1024*200    // 400 kb
+#endif
+
 #define RAMSIZE   0x2000
 
 uint16_t ROM[BINLENGTH];
@@ -80,14 +85,13 @@ void resetCart() {
    gpio_set_dir(MSYNC_PIN, false);
    gpio_set_pulls(MSYNC_PIN, false, true);
    gpio_put(LED_PIN, false);
+
    resetHigh();
    sleep_ms(30);                // was 20 for Model II; 30 works for both
+
    resetLow();
-   //sleep_ms(3);  // was 2 for Model II; 3 works for both
-
-   //while ((gpio_get(MSYNC_PIN)==1)) ;
-
    sleep_ms(1);                 // was 1 for Model II; 
+
    resetHigh();
    gpio_put(LED_PIN, true);
 }

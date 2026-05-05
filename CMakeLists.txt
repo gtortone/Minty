@@ -14,11 +14,11 @@ set(CMAKE_CXX_STANDARD 17)
 
 pico_sdk_init()
 
+include(FetchContent)
+
 #
 # fetch no-OS-FatFS-SD-SDIO-SPI-RPi-Pico library
 #
-include(FetchContent)
-
 set(PICO_FATFS_DIR ${CMAKE_SOURCE_DIR}/lib/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico)
 
 FetchContent_Declare(
@@ -32,7 +32,7 @@ FetchContent_MakeAvailable(pico_fatfs)
 ###
 
 add_subdirectory(
-   lib/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico/src
+   ${PICO_FATFS_DIR}/src
 )
 
 add_executable(${PROJECT})
@@ -74,12 +74,12 @@ target_include_directories(${PROJECT} PUBLIC
 add_custom_target(glue.c
    COMMAND ${CMAKE_COMMAND} -E copy
             ${CMAKE_SOURCE_DIR}/src/diskio.c
-            ${CMAKE_CURRENT_LIST_DIR}/lib/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico/src/src/glue.c
+            ${PICO_FATFS_DIR}/src/src/glue.c
 )
 
 add_custom_target(ffconf.h
    COMMAND ${CMAKE_COMMAND} -E rm -f
-      ${CMAKE_CURRENT_LIST_DIR}/lib/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico/src/include/ffconf.h
+   ${PICO_FATFS_DIR}/src/include/ffconf.h
 )
 
 add_dependencies(${PROJECT} ffconf.h glue.c)

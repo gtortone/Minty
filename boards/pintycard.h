@@ -1,19 +1,11 @@
-#ifndef PIRTO_II_SD_H
-#define PIRTO_II_SD_H
+#ifndef PINTYCARD_H
+#define PINTYCARD_H
 
-// PirtoII with microSD slot by sukkopera (https://github.com/SukkoPera/PiRTOII)
-
-pico_board_cmake_set(PICO_PLATFORM, rp2040)
+pico_board_cmake_set(PICO_PLATFORM, rp2350)
 
 // for board detection
-#define PIRTO_II_SD 1
+#define PINTYCARD 1
 
-#define PICO_BOOT_STAGE2_CHOOSE_W25Q080 1
- 
-#ifndef PICO_FLASH_SPI_CLKDIV
-#define PICO_FLASH_SPI_CLKDIV 2
-#endif
- 
 pico_board_cmake_set_default(PICO_FLASH_SIZE_BYTES, (2 * 1024 * 1024))
 #ifndef PICO_FLASH_SIZE_BYTES
 #define PICO_FLASH_SIZE_BYTES (2 * 1024 * 1024)
@@ -44,14 +36,7 @@ pico_board_cmake_set_default(PICO_FLASH_SIZE_BYTES, (2 * 1024 * 1024))
 #define BDIR_PIN  22
 #define BC1_PIN   26
 #define BC2_PIN   27
-#define DIR_PIN   28 // HIGH= A->B (INPUT 5V TO 3.3V, inty -> pico) LOW= B->A (OUTPUT 3.3 TO 5V, pico -> inty)
                      
-// SD
-#define SD_MISO   16
-#define SD_CS     17
-#define SD_SCK    18
-#define SD_MOSI   19
-
 #define BDIR_PIN_MASK   ((uint32_t)1 << BDIR_PIN)
 #define BC1_PIN_MASK    ((uint32_t)1 << BC1_PIN)
 #define BC2_PIN_MASK    ((uint32_t)1 << BC2_PIN)
@@ -60,10 +45,10 @@ pico_board_cmake_set_default(PICO_FLASH_SIZE_BYTES, (2 * 1024 * 1024))
 #define DATA_PIN_MASK   0x0000FFFFL
 #define BUS_STATE_MASK  (BDIR_PIN_MASK | BC1_PIN_MASK | BC2_PIN_MASK)
 #define ALWAYS_IN_MASK  (BUS_STATE_MASK)
-#define ALWAYS_OUT_MASK (LED_PIN_MASK | DIR_PIN_MASK)
+#define ALWAYS_OUT_MASK (LED_PIN_MASK)
 
-#define SET_DATA_MODE_OUT   do {gpio_clr_mask(DIR_PIN_MASK); gpio_set_dir_out_masked(DATA_PIN_MASK);} while (0)
-#define SET_DATA_MODE_IN    do {gpio_set_dir_in_masked(DATA_PIN_MASK); gpio_set_mask(DIR_PIN_MASK);} while (0)
+#define SET_DATA_MODE_OUT     sio_hw->gpio_oe_set = DATA_PIN_MASK; 
+#define SET_DATA_MODE_IN      sio_hw->gpio_oe_clr = DATA_PIN_MASK;
 
 #define DATA_OUT(v) sio_hw->gpio_togl = (sio_hw->gpio_out ^ v) & 0xFFFF;
 
