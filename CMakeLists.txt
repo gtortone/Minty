@@ -74,10 +74,10 @@ target_sources(${PROJECT} PUBLIC
    ${CMAKE_CURRENT_LIST_DIR}/src/memory.c
    ${CMAKE_CURRENT_LIST_DIR}/src/usb_tasks.c
    ${CMAKE_CURRENT_LIST_DIR}/src/usb_descriptors.c
-   #${CMAKE_CURRENT_LIST_DIR}/src/fatfs/diskio.c
-   ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/fl_driver/msc_disk.c
-   ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/fl_driver/fatfs_disk.c
-   ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/fl_driver/flash_fs.c
+   #${CMAKE_CURRENT_LIST_DIR}/src/diskio.c
+   ${CMAKE_CURRENT_LIST_DIR}/src/msc_disk.c
+   ${CMAKE_CURRENT_LIST_DIR}/src/fatfs_disk.c
+   ${CMAKE_CURRENT_LIST_DIR}/src/flash_fs.c
 )
 
 target_include_directories(${PROJECT} PUBLIC
@@ -86,7 +86,7 @@ target_include_directories(${PROJECT} PUBLIC
 
 if(PIRTOII_VARIANT STREQUAL SD_BOARD)
    target_sources(${PROJECT} PUBLIC
-      ${CMAKE_CURRENT_LIST_DIR}/src/fatfs/hw_config.c
+      ${CMAKE_CURRENT_LIST_DIR}/src/hw_config.c
    ) 
 endif()
 
@@ -99,7 +99,7 @@ target_include_directories(no-OS-FatFS-SD-SDIO-SPI-RPi-Pico BEFORE INTERFACE
 
 add_custom_target(glue.c
    COMMAND ${CMAKE_COMMAND} -E copy
-            ${CMAKE_SOURCE_DIR}/src/fatfs/diskio.c
+            ${CMAKE_SOURCE_DIR}/src/diskio.c
             ${CMAKE_CURRENT_LIST_DIR}/lib/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico/src/src/glue.c
 )
 
