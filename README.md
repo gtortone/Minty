@@ -54,9 +54,11 @@ User can switch flash/SD storage device using controller key.
 ```
 mkdir build
 cd build
-cmake -DPIRTOII_VARIANT=DEFAULT_BOARD ..   # for default PirtoII board
+
+cmake -DPICO_BOARD=pirto_ii_default ..    # for default PirtoII board
    or
-cmake -DPIRTOII_VARIANT=SD_BOARD ..       # for PirtoII board with microSD slot
+cmake -DPICO_BOARD=pirto_ii_sd ..         # for PirtoII board with microSD slot
+
 make
 ```
 

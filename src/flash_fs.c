@@ -137,7 +137,7 @@ int flash_fs_mount() {
    }
 
    // for small flash (<=2MB) filesystem is FAT12 so skip this step
-#ifdef DEFAULT_BOARD
+#if PICO_FLASH_SIZE_BYTES > (2 * 1024 * 1024)
    // read the remaining 14 sectors without headers
    for (int i = 1; i < FS_MAP_ENTRIES; i++)
       flash_read_sector(i, 0, (uint8_t *) & fs_map + (4096 * i), 4096);

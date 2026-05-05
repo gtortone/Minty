@@ -1,15 +1,9 @@
 cmake_minimum_required(VERSION 3.13)
 
-if(NOT DEFINED PIRTOII_VARIANT)
-   set(PIRTOII_VARIANT "DEFAULT_BOARD")
-   message(STATUS "NOTE: PirtoII variant not defined. Using DEFAULT_BOARD.")
-endif()
+set(PROJECT Minty)
 
-if(PIRTOII_VARIANT STREQUAL DEFAULT_BOARD)
-   set(PROJECT Minty.default_board)
-elseif(PIRTOII_VARIANT STREQUAL SD_BOARD)
-   set(PROJECT Minty.sd_board)
-endif()
+# set boards directory
+set(PICO_BOARD_HEADER_DIRS ${CMAKE_CURRENT_LIST_DIR}/boards)
 
 include($ENV{PICO_SDK_PATH}/pico_sdk_init.cmake)
 
@@ -38,25 +32,14 @@ FetchContent_MakeAvailable(pico_fatfs)
 ###
 
 add_subdirectory(
-    lib/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico/src
+   lib/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico/src
 )
 
 add_executable(${PROJECT})
 
-# DEFAULT_BOARD is PirtoII by aotta (https://github.com/aotta/PiRTOII)
-# SD_BOARD is PirtoII with microSD slot by sukkopera (https://github.com/SukkoPera/PiRTOII)
-
-if(PIRTOII_VARIANT STREQUAL DEFAULT_BOARD)
-   # 16MB of flash on purple Pico clones
-   target_compile_definitions(${PROJECT} PRIVATE "-DPICO_FLASH_SIZE_BYTES=16777216") 
-   target_compile_options(${PROJECT} PRIVATE "-DDEFAULT_BOARD")
-   target_compile_options(${PROJECT} PRIVATE "-DPICO_FLASH_SPI_CLKDIV=2")
-   pico_set_linker_script(${PROJECT} ${CMAKE_CURRENT_SOURCE_DIR}/support/memmap_custom_16MB.ld)
-elseif(PIRTOII_VARIANT STREQUAL SD_BOARD)
-   target_compile_definitions(${PROJECT} PRIVATE "-DPICO_FLASH_SIZE_BYTES=2097152") 
-   target_compile_options(${PROJECT} PRIVATE "-DSD_BOARD")
-   target_compile_options(${PROJECT} PRIVATE "-DPICO_FLASH_SPI_CLKDIV=4")
-endif()
+target_compile_definitions(${PROJECT} PRIVATE "-DPICO_FLASH_SIZE_BYTES=${PICO_FLASH_SIZE_BYTES}")
+target_compile_options(${PROJECT} PRIVATE "-DPICO_FLASH_SPI_CLKDIV=${PICO_FLASH_SPI_CLKDIV}")
+#pico_set_linker_script(${PROJECT} ${CMAKE_CURRENT_SOURCE_DIR}/support/memmap_custom_16MB.ld)
 
 if(DEFINED DEBUG)
    target_compile_definitions(${PROJECT} PRIVATE "-DDEBUG")
@@ -78,25 +61,16 @@ target_sources(${PROJECT} PUBLIC
    ${CMAKE_CURRENT_LIST_DIR}/src/msc_disk.c
    ${CMAKE_CURRENT_LIST_DIR}/src/fatfs_disk.c
    ${CMAKE_CURRENT_LIST_DIR}/src/flash_fs.c
+   ${CMAKE_CURRENT_LIST_DIR}/src/hw_config.c
 )
 
 target_include_directories(${PROJECT} PUBLIC
    ${CMAKE_CURRENT_LIST_DIR}/include
 )
 
-if(PIRTOII_VARIANT STREQUAL SD_BOARD)
-   target_sources(${PROJECT} PUBLIC
-      ${CMAKE_CURRENT_LIST_DIR}/src/hw_config.c
-   ) 
-endif()
-
 #
 # overwrite ffconf.h and use custom flash/SD driver
 #
-target_include_directories(no-OS-FatFS-SD-SDIO-SPI-RPi-Pico BEFORE INTERFACE
-   ${CMAKE_CURRENT_LIST_DIR}/include
-)
-
 add_custom_target(glue.c
    COMMAND ${CMAKE_COMMAND} -E copy
             ${CMAKE_SOURCE_DIR}/src/diskio.c
@@ -109,7 +83,6 @@ add_custom_target(ffconf.h
 )
 
 add_dependencies(${PROJECT} ffconf.h glue.c)
-###
 
 # Enable usb output, disable uart output
 pico_enable_stdio_usb(${PROJECT} 0)

@@ -7,7 +7,6 @@
 
 #include <stdio.h>
 #include <string.h>
-#include "board.h"
 #include "pico/stdlib.h"
 #include "inty_cart.h"
 #include "usb_tasks.h"

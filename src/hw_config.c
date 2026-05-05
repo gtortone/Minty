@@ -21,9 +21,10 @@ https://github.com/carlk3/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico/tree/main#customizing
 */
 
 #include "hw_config.h"
-#include "board.h"
 
 const char * VolumeStr[FF_VOLUMES] = {FF_VOLUME_STRS};	/* Pre-defined volume ID */
+
+#ifdef PIRTO_II_SD
 
 /* Configuration of hardware SPI object */
 static spi_t spi = {
@@ -62,3 +63,13 @@ sd_card_t *sd_get_by_num(size_t num) {
         return NULL;
     }
 }
+
+#else
+
+size_t sd_get_num() { return 0; }
+
+sd_card_t *sd_get_by_num(size_t num) {
+   return NULL;
+}
+
+#endif

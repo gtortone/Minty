@@ -19,7 +19,7 @@
 #include "f_util.h"
 #include "fatfs_disk.h"
 #include "fingerprints.h"
-#include "board.h"
+#include "interface.h"
 #include "usb_tasks.h"
 
 unsigned char busLookup[8];
@@ -134,17 +134,9 @@ void __not_in_flash_func(core1_main()) {
       // We detected a change, but reread the bus state to make sure that all three pins have settled
       lastBusState = sio_hw->gpio_in;
 
-#ifdef DEFAULT_BOARD
-      //aotta
-      busState1 = ((lastBusState & BUS_STATE_MASK) >> BDIR_PIN);
-#else
-#ifdef SD_BOARD
-      //sukkopera
-      busState1 = ((lastBusState & BC1_PIN_MASK) >> (BC1_PIN - 2)) |
-         ((lastBusState & BC2_PIN_MASK) >> (BC2_PIN - 1)) |
-         ((lastBusState & BDIR_PIN_MASK) >> BDIR_PIN);
-#endif
-#endif
+      busState1 = (bool)(lastBusState & BC1_PIN_MASK) << 2 |
+                  (bool)(lastBusState & BC2_PIN_MASK) << 1 |
+                  (bool)(lastBusState & BDIR_PIN_MASK);
 
       busBit = busLookup[busState1];
       
@@ -162,15 +154,9 @@ void __not_in_flash_func(core1_main()) {
             SET_DATA_MODE_OUT;
             // wait 20ns (@200Mhz)
             asm inline("nop;nop;nop;nop;");
-#ifdef DEFAULT_BOARD
-            //aotta
-            while (sio_hw->gpio_in & BC1_PIN_MASK) ;  //wait BC1 go down 
-#else
-#ifdef SD_BOARD
-            //sukkopera
-            while((sio_hw->gpio_in & BC1e2_PIN_MASK) == BC1e2_PIN_MASK) ;
-#endif
-#endif
+
+            while (sio_hw->gpio_in & BC1_PIN_MASK) ;  //wait BC1 go down
+
             SET_DATA_MODE_IN;
          }
       } else {
@@ -715,9 +701,10 @@ void IntyMenu(int type) {       // 1=start, 2=next page, 3=prev page, 4=dir up
 
    printf("Mounting %s...\n", curPath);
 
-   if (f_mount(&FatFs, curPath, 1) != FR_OK) {
+   if (f_mount(&FatFs, curPath, 1) != FR_OK)
       printf("E: mount %s failed\n", curPath);
-   } else printf("I: mount %s ok\n", curPath);
+   else
+      printf("I: mount %s ok\n", curPath);
 
    switch (type) {
       case 1:
@@ -892,7 +879,7 @@ void Inty_cart_main() {
    sleep_ms(800);
    
    // initial conditions 
-#ifdef SD_BOARD
+#ifdef PIRTO_II_SD
    RAM[HAS_SD_ADDR] = 1;
 #else
    RAM[HAS_SD_ADDR] = 0;
@@ -935,7 +922,7 @@ void Inty_cart_main() {
                DirUp();
                IntyMenu(1);
                break;
-#ifdef SD_BOARD
+#ifdef PIRTO_II_SD
             case 6:            // change storage device
                volumeId = RAM[DEV_ADDR];
                sprintf(curPath, "%d:/", volumeId);
