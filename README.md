@@ -58,6 +58,8 @@ cd build
 cmake -DPICO_BOARD=pirto_ii_default ..    # for default PirtoII board
    or
 cmake -DPICO_BOARD=pirto_ii_sd ..         # for PirtoII board with microSD slot
+   or
+cmake -DPICO_BOARD=pintycard ..           # for PintyCard
 
 make
 ```
