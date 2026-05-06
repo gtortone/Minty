@@ -21,6 +21,7 @@
 #include "fingerprints.h"
 #include "interface.h"
 #include "usb_tasks.h"
+#include "utils.h"
 
 unsigned char busLookup[8];
 
@@ -59,19 +60,27 @@ char fullpath[512];              // full path of current file
 
 unsigned int parallelBus2;
 
-extern unsigned int romLen;
-extern unsigned int ramfrom;
-extern unsigned int ramto;
-extern unsigned int mapfrom[80];
-extern unsigned int mapto[80];
-extern unsigned int maprom[80];
-extern int mapdelta[80];
-extern unsigned int mapsize[80];
-extern unsigned int addrto[80];
-extern unsigned int RAMused;
-extern unsigned int RAMwidth;
-extern unsigned int type[80];          // 0-rom / 1-page / 2-ram
-extern unsigned int page[80];          // page number
+typedef enum {
+   NONE,
+   MAPPING,
+   MEMATTR,
+   VARS,
+   MACRO
+} cfgSection;
+
+extern uint32_t romLen;
+extern uint32_t ramfrom;
+extern uint32_t ramto;
+extern uint32_t mapfrom[80];
+extern uint32_t mapto[80];
+extern uint32_t maprom[80];
+extern int32_t mapdelta[80];  // signed
+extern uint32_t mapsize[80];
+extern uint32_t addrto[80];
+extern uint8_t RAMused;
+extern bool RAMwidth;
+extern uint8_t type[80];          // 0-rom / 1-page / 2-ram
+extern uint8_t page[80];          // page number
 
 extern int slot;
 extern int hacks;
@@ -198,7 +207,7 @@ void __not_in_flash_func(core1_main()) {
             deviceAddress = false;
 
             // Load data for DTB here to save time
-            for (int8_t i = 0; i <= slot; i++) {
+            for (int8_t i=0; i<slot; i++) {
                if ((parallelBus - maprom[i]) <= mapsize[i]) {
                   if (type[i] == 0) {
                      dataOut = ROM[(parallelBus - mapdelta[i])];
@@ -391,9 +400,9 @@ void load_file(char *filename) {
       f_read(&fil, inputBuffer, sizeof(inputBuffer), &br);
 
       // read number of segments
-      slot = inputBuffer[1] - 1;
+      slot = inputBuffer[1];
 
-      for(int i=0; i<=slot; i++) {
+      for(int i=0; i<slot; i++) {
 
          f_read(&fil, byteread, bytes_to_read, &br);
          int lo =  byteread[0] << 8;
@@ -464,7 +473,7 @@ void load_file(char *filename) {
 
       /*
       printf("slots: %d\n", slot);
-      for(int i=0; i<=slot; i++) {
+      for(int i=0; i<slot; i++) {
          printf("%d) block: 0x%X, mapfrom: 0x%X - mapto: 0x%X, mapsize: 0x%X, addrto: 0x%X, mapdelta: 0x%X, type: %d\n", 
                i, maprom[i], mapfrom[i], mapto[i], mapsize[i], addrto[i], mapdelta[i], type[i]);
       }
@@ -520,11 +529,11 @@ void load_file_by_id(UINT id) {
 }
 
 void load_cfg(char *filename) {
-   char riga[80];
-   char tmp[80] = {0};
+   char line[80];
    char cfgfile[512] = {0};
-   int linepos;
    FIL fil;
+   cfgSection cfgsec; 
+   int ret;
 
    char *dot = strrchr(filename, '.');
    strncpy(cfgfile, filename, (dot - filename));
@@ -552,12 +561,6 @@ void load_cfg(char *filename) {
 
             config_memory(fingerprints[i+1]);
 
-            printf("slots: %d\n", slot);
-            for(int i=0; i<=slot; i++) {
-               printf("%d) maprom: 0x%X, mapfrom: 0x%X - mapto: 0x%X, mapsize: 0x%X, addrto: 0x%X, mapdelta: 0x%X\n", 
-                  i, maprom[i], mapfrom[i], mapto[i], mapsize[i], addrto[i], mapdelta[i]);
-            }
-
             return;
          }
       }
@@ -574,97 +577,120 @@ void load_cfg(char *filename) {
    hacks = 0;
    RAMused = 0;
 
+   cfgsec = NONE;
+
    while (!(f_eof(&fil))) {
-      memset(riga, 0, sizeof(riga));
-      f_gets(riga, 79, &fil);
 
-      if (riga[0] >= 32) {
-         memset(tmp, 0, sizeof(tmp));
-         memcpy(tmp, riga, 9);
-         // supported sections: [mapping], [memattr]
-         if (slot == 0) {
-            if (!(strcmp(tmp, "[mapping]"))) {
-               memset(riga, 0, sizeof(riga));
-               f_gets(riga, 79, &fil);
-            } else {
-               error(4);        // 3 error [mapping] section not found
+      f_gets(line, sizeof(line), &fil);
+      strcpy(line, trim(line));
+
+      //printf("line: %s, len: %d\n", line, strlen(line));
+
+      // skip comments
+      if ( (line[0] == ';') || !(stralpha(line)) ) {
+         cfgsec = NONE;
+         continue;
+      }
+
+      if (strstr(line, "[mapping]") != NULL) {
+         cfgsec = MAPPING;
+         printf("[mapping] section\n");
+         continue;
+      } else if (strstr(line, "[memattr]") != NULL) {
+         cfgsec = MEMATTR;
+         printf("[memattr] section\n");
+         continue;
+      } else if (strstr(line, "[vars]") != NULL) {
+         cfgsec = VARS;
+         printf("[vars] section\n");
+         continue;
+      } else if (strstr(line, "[macro]") != NULL) {
+         cfgsec = MACRO;
+         printf("[macro] section\n");
+         continue;
+      }
+
+      if (cfgsec == MAPPING) {
+         // example:
+         // $2200 - $30FF = $7100
+
+         uint32_t a, b, c, p;
+
+         if(strstr(line, "PAGE") != NULL) {
+
+            ret = sscanf(line, "$%x - $%x = $%x%*[^P]PAGE %x", &a, &b, &c, &p);
+            if (ret != 4) {
+               printf("E: parsing error in line: \n\t %s\n", line);
+               return;
             }
-         }
-         if (!(strcmp(tmp, "[memattr]"))) {
-            memset(riga, 0, sizeof(riga));
-            f_gets(riga, 79, &fil);
-            memset(tmp, 0, sizeof(tmp));
-            memcpy(tmp, riga + 1, 5);
-            ramfrom = strtoul(tmp, NULL, 16);
-            mapfrom[slot] = ramfrom;
-            memset(tmp, 0, sizeof(tmp));
-            memcpy(tmp, riga + 9, 5);
-            ramto = strtoul(tmp, NULL, 16);
-            memset(tmp, 0, sizeof(tmp));
-            memcpy(tmp, riga + 20, 2);
-            RAMwidth = strtoul(tmp, NULL, 10);
-            mapto[slot] = ramto;
-            maprom[slot] = ramfrom;
-            addrto[slot] = maprom[slot] + (mapto[slot] - mapfrom[slot]);
-            type[slot] = 2;     // RAM
-            RAMused = 1;
-            mapdelta[slot] = maprom[slot] - mapfrom[slot];
-            mapsize[slot] = mapto[slot] - mapfrom[slot];
-            slot++;
+            type[slot] = 1;
+            page[slot] = p;
+
          } else {
-            memset(tmp, 0, sizeof(tmp));
-            memcpy(tmp, riga, 1);
-            if (!strcmp(tmp, "p")) {
-               // [MACRO]
-               memset(tmp, 0, sizeof(tmp));
-               memcpy(tmp, riga + 2, 4);
-               HACK[hacks] = strtoul(tmp, NULL, 16);
-               memset(tmp, 0, sizeof(tmp));
-               memcpy(tmp, riga + 7, 4);
-               HACK_CODE[hacks] = strtoul(tmp, NULL, 16);
-               hacks++;
-            } else {
-               //mapping
-               linepos = strcspn(riga, "-");
-               if ((linepos >= 0) && (riga[linepos] == '-')) {
-                  memset(tmp, 0, sizeof(tmp));
-                  memcpy(tmp, riga + 1, 4);
-                  mapfrom[slot] = strtoul(tmp, NULL, 16);
-                  if (linepos == 6) {
-                     memset(tmp, 0, sizeof(tmp));
-                     memcpy(tmp, riga + (linepos + 3), 4);
-                     mapto[slot] = strtoul(tmp, NULL, 16);
-                     memset(tmp, 0, sizeof(tmp));
-                     memcpy(tmp, riga + (linepos + 11), 4);
-                     maprom[slot] = strtoul(tmp, NULL, 16);
-                  } else {
-                     memset(tmp, 0, sizeof(tmp));
-                     memcpy(tmp, riga + (linepos + 3), 5);
-                     mapto[slot] = strtoul(tmp, NULL, 16);
-                     memset(tmp, 0, sizeof(tmp));
-                     memcpy(tmp, riga + (linepos + 12), 5);
-                     maprom[slot] = strtoul(tmp, NULL, 16);
-                  }
-                  addrto[slot] = maprom[slot] + (mapto[slot] - mapfrom[slot]);
-                  linepos = strcspn(riga, "P");
-                  if ((linepos > 0) && (riga[linepos] != 0)) {
-                     type[slot] = 1;
-                     memset(tmp, 0, sizeof(tmp));
-                     memcpy(tmp, riga + (linepos + 5), 2);
-                     page[slot] = strtoul(tmp, NULL, 16);
 
-                  } else {
-                     type[slot] = 0;
-                  }
-                  slot++;
-               }
+            ret = sscanf(line, "$%x - $%x = $%x", &a, &b, &c); 
+            if (ret != 3) {
+               printf("E: parsing error in line: \n\t %s\n", line);
+               return;
             }
+            type[slot] = 0;
+            page[slot] = 0;
          }
-         mapdelta[slot - 1] = maprom[slot - 1] - mapfrom[slot - 1];
-         mapsize[slot - 1] = mapto[slot - 1] - mapfrom[slot - 1];
+
+         mapfrom[slot] = a;
+         mapto[slot] = b;
+         maprom[slot] = c;
+
+         mapdelta[slot] = maprom[slot] - mapfrom[slot];
+         mapsize[slot] = mapto[slot] - mapfrom[slot];
+         addrto[slot] = maprom[slot] + (mapto[slot] - mapfrom[slot]);
+
+         slot++;
+         
+      } else if (cfgsec == MEMATTR) {
+         // example:
+         // $8800 - $8FFF = RAM 8
+         
+         uint32_t a, b;
+         uint8_t w;
+
+         ret = sscanf(line, "$%x - $%x =%*[^R]RAM %d", &a, &b, &w);
+         if (ret != 3) {
+            printf("E: parsing error in line: \n\t %s\n", line);
+            return;
+         }
+         type[slot] = 2;
+         RAMused = 1;
+         mapfrom[slot] = maprom[slot] = a;
+         mapto[slot] = b;
+         RAMwidth = w;
+
+         mapdelta[slot] = maprom[slot] - mapfrom[slot];
+         mapsize[slot] = mapto[slot] - mapfrom[slot];
+         addrto[slot] = maprom[slot] + (mapto[slot] - mapfrom[slot]);
+
+         slot++;
+          
+      } else if (cfgsec == VARS) {
+
+      } else if (cfgsec == MACRO) {
+         // example: 
+         // p 66fe 34
+
+         uint32_t a, b;
+
+         ret = sscanf(line, "p %x %x", &a, &b);
+         if (ret != 2) {
+            printf("E: parsing error in line: \n\t %s\n", line);
+            return;
+         }
+
+         HACK[hacks] = a;
+         HACK_CODE[hacks] = b;
+
+         hacks++;
       }
    }
-   slot = slot - 1;
 
    f_close(&fil);
 
@@ -776,6 +802,18 @@ void LoadGame() {
       if(!is_rom_file(fullpath))
          load_cfg(fullpath);
 
+      // debug
+      printf("slots: %d\n", slot);
+      for(int i=0; i<slot; i++) {
+         printf("%d) type: %d, maprom: 0x%X, mapfrom: 0x%X - mapto: 0x%X, mapsize: 0x%X, addrto: 0x%X, mapdelta: 0x%X", 
+            i, type[i], maprom[i], mapfrom[i], mapto[i], mapsize[i], addrto[i], mapdelta[i]);
+         
+         if (type[i] == 1)
+            printf(" page: 0x%X", page[i]);
+
+         printf("\n");
+      }
+
       gpio_put(LED_PIN, false);
 
       sleep_ms(200);
@@ -872,7 +910,7 @@ void Inty_cart_main() {
    mapdelta[2] = maprom[2] - mapfrom[2];
    mapsize[2] = mapto[2] - mapfrom[2];
 
-   slot = 2;
+   slot = 3;
 
    sleep_ms(200);
    resetCart();

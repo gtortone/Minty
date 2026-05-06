@@ -36,6 +36,12 @@ pico_board_cmake_set_default(PICO_FLASH_SIZE_BYTES, (2 * 1024 * 1024))
 #define BDIR_PIN  22
 #define BC1_PIN   26
 #define BC2_PIN   27
+
+// UART
+#define UART_ID   uart1
+#define UART_RX   -1    // TX only
+#define UART_TX   24
+#define UART_BAUDRATE   115200
                      
 #define BDIR_PIN_MASK   ((uint32_t)1 << BDIR_PIN)
 #define BC1_PIN_MASK    ((uint32_t)1 << BC1_PIN)

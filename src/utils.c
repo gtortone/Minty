@@ -1,0 +1,31 @@
+
+#include <string.h>
+#include <ctype.h>
+#include <stdbool.h>
+
+char* trim(char *s) {
+   while (*s == ' ') s++;
+
+   char *end = s + strlen(s) - 1;
+   while (end > s && (*end == ' ' || *end == '\n' || *end == '\r' || *end == '\t')) {
+      *end = '\0';
+      end--;
+   }
+
+   return s;
+}
+
+bool stralpha(char *s) {
+
+   if (*s == '\0') 
+      return 0;
+
+   while (*s) {
+      if (isalnum((unsigned char)*s))
+         return true;
+      s++;
+   }
+
+   return false;
+}
+

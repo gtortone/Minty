@@ -26,8 +26,12 @@ int main(void) {
    gpio_set_dir(RST_PIN, true);
 
 #ifdef UART_ID
+#if UART_TX != -1
    gpio_set_function(UART_TX, UART_FUNCSEL_NUM(UART_ID, UART_TX));
+#endif
+#if UART_RX != -1
    gpio_set_function(UART_RX, UART_FUNCSEL_NUM(UART_ID, UART_RX));
+#endif
    uart_init(UART_ID, UART_BAUDRATE);
    stdio_uart_init_full(UART_ID, 115200, UART_TX, UART_RX);
 #else

@@ -1,18 +1,21 @@
 #include "memory.h"
 
-unsigned int romLen;
-unsigned int ramfrom = 0;
-unsigned int ramto = 0;
-unsigned int mapfrom[80];
-unsigned int mapto[80];
-unsigned int maprom[80];
-int mapdelta[80];
-unsigned int mapsize[80];
-unsigned int addrto[80];
-unsigned int RAMused = 0;
-unsigned int RAMwidth = 0;
-unsigned int type[80];          // 0-rom / 1-page / 2-ram
-unsigned int page[80];          // page number
+#include <stdint.h>
+#include <stdbool.h>
+
+uint32_t romLen;
+uint32_t ramfrom;
+uint32_t ramto;
+uint32_t mapfrom[80];
+uint32_t mapto[80];
+uint32_t maprom[80];
+int32_t mapdelta[80];  // signed
+uint32_t mapsize[80];
+uint32_t addrto[80];
+bool RAMused;
+uint8_t RAMwidth;
+uint8_t type[80];          // 0-rom / 1-page / 2-ram
+uint8_t page[80];          // page number
 
 int slot;
 int hacks;
@@ -52,7 +55,7 @@ void config_memory(int cfg) {
          type[2] = 0;
          page[2] = 0;
 
-         slot = 2;
+         slot = 3;
          break;
 
       case 1:
@@ -74,7 +77,7 @@ void config_memory(int cfg) {
          type[1] = 0;
          page[1] = 0;
 
-         slot = 1;
+         slot = 2;
          break;
 
       case 2:
@@ -105,7 +108,7 @@ void config_memory(int cfg) {
          type[2] = 0;
          page[2] = 0;
 
-         slot = 2;
+         slot = 3;
          break;
 
       case 3:
@@ -145,7 +148,7 @@ void config_memory(int cfg) {
          type[3] = 0;
          page[3] = 0;
 
-         slot = 3;
+         slot = 4;
          break;
 
       case 4:
@@ -170,7 +173,7 @@ void config_memory(int cfg) {
          type[1] = 2;
          page[1] = 0;
 
-         slot = 1;
+         slot = 2;
          break;
 
       case 5:
@@ -192,7 +195,7 @@ void config_memory(int cfg) {
          type[1] = 0;
          page[1] = 0;
 
-         slot = 1;
+         slot = 2;
          break;
 
       case 6:
@@ -205,7 +208,7 @@ void config_memory(int cfg) {
          type[0] = 0;
          page[0] = 0;
 
-         slot = 0;
+         slot = 1;
          break;
 
       case 7:
@@ -218,7 +221,7 @@ void config_memory(int cfg) {
          type[0] = 0;
          page[0] = 0;
 
-         slot = 0;
+         slot = 1;
          break;
 
       case 8:
@@ -240,7 +243,7 @@ void config_memory(int cfg) {
          type[1] = 0;
          page[1] = 0;
 
-         slot = 1;
+         slot = 2;
          break;
 
       case 9:
@@ -292,7 +295,7 @@ void config_memory(int cfg) {
          type[4] = 2;
          page[4] = 0;
 
-         slot = 4;
+         slot = 5;
          break;
 
       default:
