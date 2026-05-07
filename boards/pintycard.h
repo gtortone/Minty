@@ -6,6 +6,9 @@ pico_board_cmake_set(PICO_PLATFORM, rp2350)
 // for board detection
 #define PINTYCARD 1
 
+// internal flash W25Q16JVWI
+#define PICO_BOOT_STAGE2_CHOOSE_W25Q080 1
+
 pico_board_cmake_set_default(PICO_FLASH_SIZE_BYTES, (2 * 1024 * 1024))
 #ifndef PICO_FLASH_SIZE_BYTES
 #define PICO_FLASH_SIZE_BYTES (2 * 1024 * 1024)
