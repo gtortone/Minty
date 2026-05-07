@@ -4,6 +4,8 @@
 #define resetLow()  gpio_set_dir(RST_PIN,true); gpio_put(RST_PIN,true);    // Minty to INTV BUS ; RST Output set to 0
 #define resetHigh() gpio_set_dir(RST_PIN,true); gpio_put(RST_PIN,false);   // RST is INPUT; B->A, INTV BUS to Pico
 
+#define GPIO_GET_LOW_32(v)    pico_default_asm_volatile ("mrc p0, #0, %0, c0, c8" : "=r" (v));
+
 // Inty bus values (BC1+BC2+BDIR) GPIO 18-17-16
 #define BUS_NACT  0b000         //0
 #define BUS_BAR   0b001         //1
