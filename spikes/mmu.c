@@ -89,20 +89,19 @@ void addSlot(uint32_t from, uint32_t to, uint16_t target, uint8_t page) {
    uint8_t baseslot = (target >> 8);
 
    if (slots[baseslot].filled) {
+      
       // handle collision
-      if (from < slots[baseslot].from[page])
-         slots[baseslot].from[page] = from;
-      else
-         from = slots[baseslot].from[page];
+      if (slots[baseslot].from[page]) {
+         if (slots[baseslot].from[page] < from)
+            from = slots[baseslot].from[page];
+      }
 
-      if (to > slots[baseslot].to[page])
-         slots[baseslot].to[page] = to;
-      else
-         to = slots[baseslot].to[page];
+      if (slots[baseslot].to[page]) {
+         if (slots[baseslot].to[page] > to)
+            to = slots[baseslot].to[page];
+      }
 
-      if (target < slots[baseslot].target)
-         slots[baseslot].target = target;
-      else
+      if (slots[baseslot].target < target)
          target = slots[baseslot].target;
    }
 
@@ -111,7 +110,6 @@ void addSlot(uint32_t from, uint32_t to, uint16_t target, uint8_t page) {
       slots[i].from[page] = from;
       slots[i].to[page] = to;
       slots[i].target = target;
-
       slots[i].filled = true;
 
       //printf("## FILL ## ");
@@ -140,6 +138,8 @@ void test_cfg0(void) {
     * $3000 - $3FFF = $F000   ;  4K to $F000 - $FFFF
     */
 
+   printf("--- start test_cfg0 ---\n");
+
    cleanSlots();
 
    addSlot(0x0000, 0x1FFF, 0x5000, 0);
@@ -158,6 +158,8 @@ void test_cfg0(void) {
       else printf("E: slot not found\n");
       printf("\n");
    }
+
+   printf("--- end test_cfg0 ---\n");
 }
 
 void test_cfg_custom0(void) {
@@ -183,6 +185,8 @@ void test_cfg_custom0(void) {
     * $FB05 - $10AC4 = $C040 
     * $10AC5 - $11847 = $D000
     */
+
+   printf("--- start test_cfg_custom0 ---\n");
 
    cleanSlots();
    
@@ -246,6 +250,8 @@ void test_cfg_custom0(void) {
       else printf("E: slot not found\n");
       printf("\n");
    }
+
+   printf("--- end test_cfg_custom0 ---\n");
 }
 
 void test_cfg_collision(void) {
@@ -254,6 +260,8 @@ void test_cfg_collision(void) {
     * $8000 - $800D = $4800
     * $800E - $844D = $4810
     */
+
+   printf("--- start test_cfg_collision---\n");
 
    cleanSlots();
    
@@ -273,6 +281,8 @@ void test_cfg_collision(void) {
       else printf("E: slot not found\n");
       printf("\n");
    }
+
+   printf("--- end test_cfg_collision---\n");
 }
 
 int main(void) {
