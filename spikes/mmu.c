@@ -17,10 +17,17 @@
  *
  */
 
+typedef enum {
+    ROM,
+    RAM8,
+    RAM16
+} mapType;
+
 struct mapEntry {
    uint32_t from[NPAGES];
    uint16_t size[NPAGES];
    uint16_t target;
+   mapType type;
    bool filled;
 };
 
@@ -42,8 +49,8 @@ struct mapHole holes[NSLOTS];
 
 void printSlot(uint8_t idx, uint8_t page) {
 
-   printf("slot #0x%X: from: 0x%X, to: 0x%X, target: 0x%X, page: 0x%X, [%s]\n", 
-         idx, slots[idx].from[page], slots[idx].from[page]+slots[idx].size[page], 
+   printf("slot #0x%X: type: %d, from: 0x%X, to: 0x%X, target: 0x%X, page: 0x%X, [%s]\n", 
+         idx, slots[idx].type, slots[idx].from[page], slots[idx].from[page]+slots[idx].size[page], 
          slots[idx].target, page, slots[idx].filled?"FILLED":"EMPTY");
 }
 
@@ -68,7 +75,17 @@ void cleanSlots(void) {
       memset(slots[i].from, 0, NPAGES);
       memset(slots[i].size, 0, NPAGES);
       slots[i].target = 0;
+      slots[i].type = 0;
       slots[i].filled = false;
+   }
+}
+
+void cleanHoles(void) {
+
+   for(int i=0; i<NSLOTS; i++) {
+      holes[i].from = 0;
+      holes[i].size = 0;
+      holes[i].filled = false;
    }
 }
 
@@ -91,16 +108,49 @@ void cleanSlots(void) {
    *
    */
 
-void addSlot(uint32_t from, uint32_t to, uint16_t target, uint8_t page) {
+void addSlot(uint32_t from, uint32_t to, uint16_t target, uint8_t page, mapType type) {
    
-   uint8_t baseslot = (target >> 8);
+   uint8_t nslots = 0;
+   bool hole = false;
+   uint8_t baseslot = 0;
 
-   if (slots[baseslot].filled) {
+   if (type == ROM)
+      baseslot = (target >> 8);
+   else
+      baseslot = (from >> 8);
 
-      uint16_t from_in = slots[baseslot].from[page];
-      uint16_t to_in = slots[baseslot].from[page] + slots[baseslot].size[page];
+   // detect collision  (only for ROM type for not paged addresses)
+   if ( (type == ROM) && slots[baseslot].filled && (page == 0)) {
 
-      // handle collision
+      uint32_t from_in = slots[baseslot].from[page];
+      uint32_t to_in = slots[baseslot].from[page] + slots[baseslot].size[page];
+
+      uint32_t target_from = target;
+      uint32_t target_to = target + (to - from);
+
+      uint32_t target_from_in = slots[baseslot].target;
+      uint32_t target_to_in = slots[baseslot].target + slots[baseslot].size[page];
+
+      // handle map hole
+      if (target_from > target_from_in) {
+         if ( (target_from - target_to_in) > 1 ) {
+            // hole detected
+            hole = true;
+            holes[baseslot].from = target_to_in;
+            holes[baseslot].size = (target_from - target_to_in) - 1;
+            holes[baseslot].filled = true;
+         }
+
+      } else {
+         if ( (target_from_in - target_to) > 1 ) {
+            // hole detected
+            hole = true;
+            holes[baseslot].from = target_to;
+            holes[baseslot].size = (target_from_in - target_to) - 1; 
+            holes[baseslot].filled = true;
+         }
+      }
+      
       if (slots[baseslot].from[page]) {
          if (from_in < from)
             from = from_in;
@@ -110,21 +160,29 @@ void addSlot(uint32_t from, uint32_t to, uint16_t target, uint8_t page) {
          if (to_in > to)
             to = to_in;
       }
-
       if (slots[baseslot].target < target)
          target = slots[baseslot].target;
-
-      // handle map hole
-      //
    }
 
-   uint8_t nslots = (( (target + (to - from)) ) >> 8) - (target >> 8);
+   //if(hole) {
+   //   printf("--- hole --- from: 0x%X, size: %d\n",
+   //      holes[baseslot].from, holes[baseslot].size);
+   //}
+
+   if (type == ROM)
+      nslots = (( (target + (to - from)) ) >> 8) - (target >> 8);
+   else
+      nslots = (to >> 8) - (from >> 8);
 
    for(int i=baseslot; i<=(baseslot + nslots); i++) {
 
       slots[i].from[page] = from;
       slots[i].size[page] = to - from;
-      slots[i].target = target;
+      if (type == ROM)
+         slots[i].target = target;
+      else
+         slots[i].target = 0;
+      slots[i].type = type;
       slots[i].filled = true;
 
       //printf("## FILL ## ");
@@ -133,16 +191,47 @@ void addSlot(uint32_t from, uint32_t to, uint16_t target, uint8_t page) {
 }
 
 // return slot index if address is mapped and value compatible with slot size
-
-int mapAddress(uint16_t addr, uint8_t page) {
+bool mapSlot(uint16_t addr, uint8_t page, uint8_t *slot) {
 
    uint8_t idx = (addr >> 8);
+   uint16_t offset = 0;
 
-   if ( (slots[idx].filled) && ((addr - slots[idx].target) <= slots[idx].size[page]) ) {
-      return idx;
-   } else {
-      return -1;
+   if (slots[idx].type == ROM) {
+
+      if ( (slots[idx].filled) && ((addr - slots[idx].target) <= slots[idx].size[page]) ) {
+         *slot = idx;
+         return true;
+      }
+
+   } else {    // RAM8 or RAM16
+   
+      if ( (slots[idx].filled) && ((addr - slots[idx].from[0]) <= slots[idx].size[0]) ) {
+         *slot = idx;
+         return true;
+      }
    }
+
+   return false;
+}
+
+// return ROM/cartridge address for Intellivision address
+bool mapAddress(uint16_t addr, uint8_t page, uint32_t *romaddr) {
+
+   uint8_t slot;
+
+   if ( mapSlot(addr, page, &slot) ) {
+
+      *romaddr = slots[slot].from[page] + (addr - slots[slot].target);
+      
+      if (holes[slot].filled) {
+         if (addr > holes[slot].from)
+            *romaddr -= holes[slot].size;
+      }
+
+      return true;
+   }
+
+   return false;
 }
 
 void test_cfg0(void) {
@@ -156,21 +245,25 @@ void test_cfg0(void) {
    printf("--- start test_cfg0 ---\n");
 
    cleanSlots();
+   cleanHoles();
 
-   addSlot(0x0000, 0x1FFF, 0x5000, 0);
-   addSlot(0x2000, 0x2FFF, 0xD000, 0);
-   addSlot(0x3000, 0x3FFF, 0xF000, 0);
+   addSlot(0x0000, 0x1FFF, 0x5000, 0, ROM);
+   addSlot(0x2000, 0x2FFF, 0xD000, 0, ROM);
+   addSlot(0x3000, 0x3FFF, 0xF000, 0, ROM);
+   addSlot(0x8000, 0x8FFF, 0, 0, RAM8);
+   addSlot(0x9000, 0x9FFF, 0, 0, RAM8);
 
-   uint16_t addr[] = {0x5890, 0xD852, 0xFFFF};
+   uint16_t addr[] = {0x5890, 0xD852, 0xFFFF, 0x8050};
    int ret;
    uint8_t page = 0;
+   uint32_t romaddr = 0;
 
    for(int i=0; i<sizeof(addr)/sizeof(uint16_t); i++) {
       printf("%d) requested address: 0x%X\n", i, addr[i]);
-      ret = mapAddress(addr[i], page);
-      if (ret >= 0)
-         printSlot(ret, page);
-      else printf("E: slot not found\n");
+      ret = mapAddress(addr[i], page, &romaddr);
+      if (ret)
+         printf("** ROM address: 0x%X\n", romaddr);
+      else printf("E: address not found\n");
       printf("\n");
    }
 
@@ -184,7 +277,7 @@ void test_cfg_custom0(void) {
     * $1000 - $1FFF = $F000 PAGE 0
     * $2000 - $2FFF = $E000 PAGE 2
     * $3000 - $3FFF = $F000 PAGE 2
-    * $4000 - $4FFF = $E000 PAGE 3slots[baseslot].size[page]
+    * $4000 - $4FFF = $E000 PAGE 3
     * $5000 - $5FFF = $F000 PAGE 3
     * $6000 - $6FFF = $E000 PAGE 4
     * $7000 - $7FFF = $F000 PAGE 4
@@ -204,65 +297,67 @@ void test_cfg_custom0(void) {
    printf("--- start test_cfg_custom0 ---\n");
 
    cleanSlots();
+   cleanHoles();
    
-   addSlot(0x0000, 0x0FFF, 0xE000, 0);
-   addSlot(0x1000, 0x1FFF, 0xF000, 0);
-   addSlot(0x2000, 0x2FFF, 0xE000, 2);
-   addSlot(0x3000, 0x3FFF, 0xF000, 2);
-   addSlot(0x4000, 0x4FFF, 0xE000, 3);
-   addSlot(0x5000, 0x5FFF, 0xF000, 3);
-   addSlot(0x6000, 0x6FFF, 0xE000, 4);
-   addSlot(0x7000, 0x7FFF, 0xF000, 4);
-   addSlot(0x8000, 0x8FFF, 0xE000, 5);
-   addSlot(0x9000, 0x9FFF, 0xF000, 5);
-   addSlot(0xA000, 0xAFFF, 0xE000, 6);
-   addSlot(0xB000, 0xBFFF, 0xF000, 6);
-   addSlot(0xC000, 0xC00D, 0x4800, 0);
-   addSlot(0xC00E, 0xD00D, 0x5000, 0);
-   addSlot(0xD00E, 0xDD8A, 0x6000, 0);
-   addSlot(0xDD8B, 0xED8A, 0xA000, 0);
-   addSlot(0xED8B, 0xFB04, 0xB000, 0);
-   addSlot(0xFB05, 0x10AC4, 0xC040, 0);
-   addSlot(0x10AC5, 0x11847, 0xD000, 0);
+   addSlot(0x0000, 0x0FFF, 0xE000, 0, ROM);
+   addSlot(0x1000, 0x1FFF, 0xF000, 0, ROM);
+   addSlot(0x2000, 0x2FFF, 0xE000, 2, ROM);
+   addSlot(0x3000, 0x3FFF, 0xF000, 2, ROM);
+   addSlot(0x4000, 0x4FFF, 0xE000, 3, ROM);
+   addSlot(0x5000, 0x5FFF, 0xF000, 3, ROM);
+   addSlot(0x6000, 0x6FFF, 0xE000, 4, ROM);
+   addSlot(0x7000, 0x7FFF, 0xF000, 4, ROM);
+   addSlot(0x8000, 0x8FFF, 0xE000, 5, ROM);
+   addSlot(0x9000, 0x9FFF, 0xF000, 5, ROM);
+   addSlot(0xA000, 0xAFFF, 0xE000, 6, ROM);
+   addSlot(0xB000, 0xBFFF, 0xF000, 6, ROM);
+   addSlot(0xC000, 0xC00D, 0x4800, 0, ROM);
+   addSlot(0xC00E, 0xD00D, 0x5000, 0, ROM);
+   addSlot(0xD00E, 0xDD8A, 0x6000, 0, ROM);
+   addSlot(0xDD8B, 0xED8A, 0xA000, 0, ROM);
+   addSlot(0xED8B, 0xFB04, 0xB000, 0, ROM);
+   addSlot(0xFB05, 0x10AC4, 0xC040, 0, ROM);
+   addSlot(0x10AC5, 0x11847, 0xD000, 0, ROM);
 
    uint16_t addr[] = {0xE055, 0xF055};
    uint8_t page;
    int ret;
+   uint32_t romaddr;
 
    page = 0;
    for(int i=0; i<sizeof(addr)/sizeof(uint16_t); i++) {
       printf("%d) requested address: 0x%X, page: %d\n", i, addr[i], page);
-      ret = mapAddress(addr[i], page);
-      if (ret >= 0)
-         printSlot(ret, page);
-      else printf("E: slot not found\n");
+      ret = mapAddress(addr[i], page, &romaddr);
+      if (ret)
+         printf("** ROM address: 0x%X\n", romaddr);
+      else printf("E: address not found\n");
       printf("\n");
    }
    page = 1;
    for(int i=0; i<sizeof(addr)/sizeof(uint16_t); i++) {
       printf("%d) requested address: 0x%X, page: %d\n", i, addr[i], page);
-      ret = mapAddress(addr[i], page);
-      if (ret >= 0)
-         printSlot(ret, page);
-      else printf("E: slot not found\n");
+      ret = mapAddress(addr[i], page, &romaddr);
+      if (ret)
+         printf("** ROM address: 0x%X\n", romaddr);
+      else printf("E: address not found\n");
       printf("\n");
    }
    page = 2;
    for(int i=0; i<sizeof(addr)/sizeof(uint16_t); i++) {
       printf("%d) requested address: 0x%X, page: %d\n", i, addr[i], page);
-      ret = mapAddress(addr[i], page);
-      if (ret >= 0)
-         printSlot(ret, page);
-      else printf("E: slot not found\n");
+      ret = mapAddress(addr[i], page, &romaddr);
+      if (ret)
+         printf("** ROM address: 0x%X\n", romaddr);
+      else printf("E: address not found\n");
       printf("\n");
    }
    page = 3;
    for(int i=0; i<sizeof(addr)/sizeof(uint16_t); i++) {
       printf("%d) requested address: 0x%X, page: %d\n", i, addr[i], page);
-      ret = mapAddress(addr[i], page);
-      if (ret >= 0)
-         printSlot(ret, page);
-      else printf("E: slot not found\n");
+      ret = mapAddress(addr[i], page, &romaddr);
+      if (ret)
+         printf("** ROM address: 0x%X\n", romaddr);
+      else printf("E: address not found\n");
       printf("\n");
    }
 
@@ -279,21 +374,28 @@ void test_cfg_collision(void) {
    printf("--- start test_cfg_collision---\n");
 
    cleanSlots();
+   cleanHoles();
    
-   addSlot(0x8000, 0x800D, 0x4800, 0);
-   addSlot(0x800E, 0x844D, 0x480E, 0);
+   // without hole
+   //addSlot(0x8000, 0x800D, 0x4800, 0);
+   //addSlot(0x800E, 0x844D, 0x480E, 0);
+   
+   // with hole
+   addSlot(0x8000, 0x800D, 0x4800, 0, ROM);
+   addSlot(0x800E, 0x844D, 0x4810, 0, ROM);
 
-   uint16_t addr[] = {0x1234, 0x2345};
+   uint16_t addr[] = {0x4801, 0x4810, 0x4811, 0x4812, 0x4C4B};
    uint8_t page;
    int ret;
+   uint32_t romaddr;
    
    page = 0;
    for(int i=0; i<sizeof(addr)/sizeof(uint16_t); i++) {
       printf("%d) requested address: 0x%X, page: %d\n", i, addr[i], page);
-      ret = mapAddress(addr[i], page);
-      if (ret >= 0)
-         printSlot(ret, page);
-      else printf("E: slot not found\n");
+      ret = mapAddress(addr[i], page, &romaddr);
+      if (ret)
+         printf("** ROM address: 0x%X\n", romaddr);
+      else printf("E: address not found\n");
       printf("\n");
    }
 
@@ -311,8 +413,6 @@ int main(void) {
 
    //test_cfg_collision();
    //printFilledSlots();
-
-   //test_cfg_collision_with_hole();
 
    return 0;
 }
