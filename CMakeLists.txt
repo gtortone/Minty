@@ -63,6 +63,7 @@ target_sources(${PROJECT} PUBLIC
    ${CMAKE_CURRENT_LIST_DIR}/src/flash_fs.c
    ${CMAKE_CURRENT_LIST_DIR}/src/hw_config.c
    ${CMAKE_CURRENT_LIST_DIR}/src/utils.c
+   ${CMAKE_CURRENT_LIST_DIR}/src/sort.c
 )
 
 target_include_directories(${PROJECT} PUBLIC

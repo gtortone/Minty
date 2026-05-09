@@ -22,16 +22,17 @@
 #include "interface.h"
 #include "usb_tasks.h"
 #include "utils.h"
+#include "sort.h"
 
 unsigned char busLookup[8];
 
 #if PICO_RP2040
    #define BINLENGTH 1024*64     // 128 kb
+   #define RAMSIZE   0x2000
 #elif PICO_RP2350
    #define BINLENGTH 1024*200    // 400 kb
+   #define RAMSIZE   0x4000
 #endif
-
-#define RAMSIZE   0x2000
 
 uint16_t ROM[BINLENGTH];
 volatile uint16_t RAM[RAMSIZE];
@@ -76,7 +77,6 @@ extern uint32_t mapto[80];
 extern uint32_t maprom[80];
 extern int32_t mapdelta[80];  // signed
 extern uint32_t mapsize[80];
-extern uint32_t addrto[80];
 extern uint8_t RAMused;
 extern bool RAMwidth;
 extern uint8_t type[80];          // 0-rom / 1-page / 2-ram
@@ -84,6 +84,10 @@ extern uint8_t page[80];          // page number
 
 extern int slot;
 extern int hacks;
+
+volatile bool JLPOn = false;
+volatile bool pagingOn = false;
+volatile bool flashingOn = false;
 
 int base = 0x17f;
 
@@ -113,21 +117,26 @@ void resetCart() {
  go away at that point. Inty polls 50001 until it reads $1.
 */
 
-void __not_in_flash_func(core1_main()) {
-   unsigned int lastBusState, busState1;
-   unsigned int parallelBus;
-   unsigned int dataOut;
-   unsigned int dataWrite = 0;
-   unsigned char busBit;
-   bool deviceAddress = false;
-   unsigned int curPage = 0;
-   unsigned int checkpage = 0;
+__attribute__((optimize("O3")))     // TEST
+void __time_critical_func(core1_main()) {       // TEST
+   volatile unsigned int lastBusState, busState;
+   volatile unsigned int parallelBus;
+   volatile unsigned int dataOut;
+   volatile uint32_t dataWrite = 0;
+   volatile unsigned char busBit;
+   volatile bool deviceAddress = false;
+   volatile uint8_t curPageArr[16];        
+   //unsigned int curPage = 0;
+   //unsigned int checkpage = 0;
+   volatile uint8_t seg;
+   //uint16_t curCRC = 0;
+   //int cnt = 0;
 
    multicore_lockout_victim_init();
 
    sleep_ms(480);
 
-   busState1 = BUS_NACT;
+   busState = BUS_NACT;
    lastBusState = BUS_NACT;
 
    dataOut = 0;
@@ -137,6 +146,9 @@ void __not_in_flash_func(core1_main()) {
 
    // Initial conditions
    SET_DATA_MODE_IN;
+   //memset(curPageArr, 0, sizeof(curPageArr));
+
+   ///* uint32_t irqstatus = */ save_and_disable_interrupts();
 
    while (1) {
       // Wait for the bus state to change
@@ -147,51 +159,50 @@ void __not_in_flash_func(core1_main()) {
       // We detected a change, but reread the bus state to make sure that all three pins have settled
       lastBusState = sio_hw->gpio_in;
 
-      busState1 = (bool)(lastBusState & BC1_PIN_MASK) << 2 |
+      busState = (bool)(lastBusState & BC1_PIN_MASK) << 2 |
                   (bool)(lastBusState & BC2_PIN_MASK) << 1 |
                   (bool)(lastBusState & BDIR_PIN_MASK);
 
-      busBit = busLookup[busState1];
-      
+      busBit = busLookup[busState];
+
       // Avoiding switch statements here because timing is critical and needs to be deterministic
       if (!busBit) {
+         
          // -----------------------
          // DTB
          // -----------------------
+
          // DTB needs to come first since its timing is critical.  The CP-1600 expects data to be
          // placed on the bus early in the bus cycle (i.e. we need to get data on the bus quickly!)
          if (deviceAddress) {
-            // The data was prefetched during BAR/ADAR.  There isn't nearly enough time to fetch it here.
-            // We can just output it.
+            // The data was prefetched during BAR/ADAR. Output data here.  
             DATA_OUT(dataOut);
             SET_DATA_MODE_OUT;
             // wait 20ns (@200Mhz)
             asm inline("nop;nop;nop;nop;");
-
-            while (sio_hw->gpio_in & BC1_PIN_MASK) ;  //wait BC1 go down
-
+            while (sio_hw->gpio_in & BC1_PIN_MASK) ;  // wait BC1 go down
             SET_DATA_MODE_IN;
          }
       } else {
          busBit >>= 1;
          if (!busBit) {
+            
             // -----------------------
             // BAR, ADAR
             // -----------------------
-            if (busState1 == BUS_ADAR) {
+
+            if (busState == BUS_ADAR) {
                if (deviceAddress) {
-                  // The data was prefetched during BAR/ADAR.
-                  // There isn't nearly enough time to fetch it here.
-                  // We can just output it.
+                  // The data was prefetched during BAR/ADAR. Output data here.  
                   DATA_OUT(dataOut);
                   SET_DATA_MODE_OUT;
                   // wait 20ns (@200Mhz)
                   asm inline("nop;nop;nop;nop;");
-                  while (sio_hw->gpio_in & BC1_PIN_MASK) ;  //wait BC1 go down 
+                  while (sio_hw->gpio_in & BC1_PIN_MASK) ;  // wait BC1 go down 
                   SET_DATA_MODE_IN;
-
                }
             }
+
             /// ELSE is BAR   
             // Prefetch data here because there won't be enough time to get it during DTB.
             // However, we can't take forever because of all the time we had to wait for
@@ -201,82 +212,104 @@ void __not_in_flash_func(core1_main()) {
             // waiting bus is stable 66 nop at 200mhz is ok/85 at 240
 
             // wait DIR go low for finish BAR cycle 
-            while (((parallelBus = sio_hw->gpio_in) & BDIR_PIN_MASK)) ; 
+
+            SET_DATA_MODE_IN;
+
+            while (sio_hw->gpio_in & BDIR_PIN_MASK) ; 
+
             parallelBus = sio_hw->gpio_in & 0xFFFF;
 
             deviceAddress = false;
 
             // Load data for DTB here to save time
             for (int8_t i=0; i<slot; i++) {
+
                if ((parallelBus - maprom[i]) <= mapsize[i]) {
-                  if (type[i] == 0) {
-                     dataOut = ROM[(parallelBus - mapdelta[i])];
-                     deviceAddress = true;
-                     break;
-                  }
-                  if (type[i] == 1) {
-                     if (page[i] == curPage) {
-                        dataOut = ROM[(parallelBus - mapdelta[i])];
-                        deviceAddress = true;
-                        break;
-                     }
-                     if ((parallelBus & 0xfff) == 0xfff) {
-                        checkpage = 1;
-                        deviceAddress = true;
-                        break;
-                     }
-                  }
+
+                  deviceAddress = true;
+
                   if (type[i] == 2) {
                      dataOut = RAM[parallelBus - ramfrom];
-                     deviceAddress = true;
                      break;
+                  }
+
+                  if (type[i] == 0) {
+                     dataOut = ROM[(parallelBus - mapdelta[i])];
+                     break;
+                  }
+
+                  if (type[i] == 1) {
+                     seg = (parallelBus >> 12) & 0xF;
+                     if (page[i] == curPageArr[seg]) {
+                        dataOut = ROM[(parallelBus - mapdelta[i])];
+                        break;
+                     } else {
+                        dataOut=0xFFFF;
+                     }
                   }
                }
             }
 
+            // TEST - disable hacks
+            /*
             if (hacks > 0) {
                for (int i = 0; i < maxHacks; i++) {
                   if (parallelBus == HACK[i]) {
                      dataOut = HACK_CODE[i];
                      deviceAddress = true;
+                     break;
                   }
-                  break;
                }
             }
+            */
+            
          } else {
             busBit >>= 1;
             if (!busBit) {
+
                // -----------------------
-               // DWS
+               // DWS WRITE
                // -----------------------
+               
+               SET_DATA_MODE_IN;
+
+               if ( pagingOn ) {
+                  if ((parallelBus & 0xFFF) == 0xFFF) {
+                     dataWrite = sio_hw->gpio_in;
+                     if ( (dataWrite & 0x0A50) == 0x0A50 ) {
+                        // read segment
+                        seg = (parallelBus >> 12) & 0xF;
+                        // set page
+                        curPageArr[seg] = dataWrite & 0xF;
+                     }
+                  }
+               }              
 
                if (deviceAddress) {
 
                   dataWrite = sio_hw->gpio_in & 0xFFFF;
 
-                  if (RAMused == 1) {
+                  if ( (parallelBus >= ramfrom) && (parallelBus <= ramto) ) {
                      if(RAMwidth == 8)
                         RAM[parallelBus - ramfrom] = dataWrite & 0xFF;
                      else  // RAMwidth == 16
                         RAM[parallelBus - ramfrom] = dataWrite;
                   }
-                  if ((checkpage == 1) && (((dataWrite >> 4) & 0xff) == 0xA5)) {
-                     curPage = dataWrite & 0xf;
-                     checkpage = 0;
-                  }
 
                } else {
+                  
                   // -----------------------
                   // NACT, IAB, DW, INTAK
                   // -----------------------
+
                   // reconnect to bus
-                  parallelBus2 = parallelBus;
+                  SET_DATA_MODE_IN;
                }
 
             }
          }
       }
-   }
+   } // end while
 }
 
 void error(int numblink) {
@@ -417,7 +450,6 @@ void load_file(char *filename) {
             mapfrom[i] = mapfrom[i-1] + mapsize[i-1] + 1;
          mapto[i] = mapfrom[i] + (hi - lo) - 1;
          mapsize[i] = (hi - lo) - 1;
-         addrto[i] = maprom[i] + mapsize[i];
          mapdelta[i] = maprom[i] - mapfrom[i];
          type[i] = 0;
          page[i] = 0;
@@ -462,7 +494,6 @@ void load_file(char *filename) {
             mapfrom[slot] = ramfrom;
             mapto[slot] = mapfrom[slot] + ((hi - lo) * 0x100) - 1;
             maprom[slot] = mapfrom[slot];
-            addrto[slot] = mapto[slot];
             mapdelta[slot] = maprom[slot] - mapfrom[slot];
             mapsize[slot] = mapto[slot] - mapfrom[slot];
             type[slot] = 2;
@@ -470,14 +501,6 @@ void load_file(char *filename) {
 
          }
       }
-
-      /*
-      printf("slots: %d\n", slot);
-      for(int i=0; i<slot; i++) {
-         printf("%d) block: 0x%X, mapfrom: 0x%X - mapto: 0x%X, mapsize: 0x%X, addrto: 0x%X, mapdelta: 0x%X, type: %d\n", 
-               i, maprom[i], mapfrom[i], mapto[i], mapsize[i], addrto[i], mapdelta[i], type[i]);
-      }
-      */
 
    } else {
 
@@ -576,6 +599,10 @@ void load_cfg(char *filename) {
 
    hacks = 0;
    RAMused = 0;
+   JLPOn = false;
+   pagingOn = false;
+   ramfrom = 0;
+   ramto = 0;
 
    cfgsec = NONE;
 
@@ -623,6 +650,7 @@ void load_cfg(char *filename) {
                printf("E: parsing error in line: \n\t %s\n", line);
                return;
             }
+            pagingOn = true;
             type[slot] = 1;
             page[slot] = p;
 
@@ -643,7 +671,6 @@ void load_cfg(char *filename) {
 
          mapdelta[slot] = maprom[slot] - mapfrom[slot];
          mapsize[slot] = mapto[slot] - mapfrom[slot];
-         addrto[slot] = maprom[slot] + (mapto[slot] - mapfrom[slot]);
 
          slot++;
          
@@ -667,7 +694,10 @@ void load_cfg(char *filename) {
 
          mapdelta[slot] = maprom[slot] - mapfrom[slot];
          mapsize[slot] = mapto[slot] - mapfrom[slot];
-         addrto[slot] = maprom[slot] + (mapto[slot] - mapfrom[slot]);
+
+         // FIXME
+         ramfrom = a;
+         ramto = b;
 
          slot++;
           
@@ -693,6 +723,9 @@ void load_cfg(char *filename) {
    }
 
    f_close(&fil);
+
+   //sortSlotsSimple(mapfrom, mapto, maprom, mapdelta, mapsize, page, type, slot);
+   printf("load_cfg done\n");
 
    return;
 }
@@ -803,22 +836,26 @@ void LoadGame() {
          load_cfg(fullpath);
 
       // debug
+      /*
       printf("slots: %d\n", slot);
       for(int i=0; i<slot; i++) {
-         printf("%d) type: %d, maprom: 0x%X, mapfrom: 0x%X - mapto: 0x%X, mapsize: 0x%X, addrto: 0x%X, mapdelta: 0x%X", 
-            i, type[i], maprom[i], mapfrom[i], mapto[i], mapsize[i], addrto[i], mapdelta[i]);
+         printf("%d) type: %d, maprom: 0x%X, mapfrom: 0x%X - mapto: 0x%X, mapsize: 0x%X, mapdelta: 0x%X", 
+            i, type[i], maprom[i], mapfrom[i], mapto[i], mapsize[i], mapdelta[i]);
          
          if (type[i] == 1)
             printf(" page: 0x%X", page[i]);
 
          printf("\n");
       }
+      */
 
       gpio_put(LED_PIN, false);
 
       sleep_ms(200);
-      resetCart();              // start game !
       memset((uint16_t *) RAM, 0, sizeof(RAM));
+
+      resetCart();              // start game !
+                                
       while (1) {
          gpio_put(LED_PIN, true);
          sleep_ms(2000);
@@ -882,7 +919,6 @@ void Inty_cart_main() {
    maprom[0] = 0x5000;
    type[0] = 0;
    page[0] = 0;
-   addrto[0] = 0x5fff;
    mapdelta[0] = maprom[0] - mapfrom[0];
    mapsize[0] = mapto[0] - mapfrom[0];
 
@@ -892,7 +928,6 @@ void Inty_cart_main() {
    maprom[1] = 0x6000;
    type[1] = 0;
    page[1] = 0;
-   addrto[1] = 0x6fff;
    mapdelta[1] = maprom[1] - mapfrom[1];
    mapsize[1] = mapto[1] - mapfrom[1];
 
@@ -900,13 +935,13 @@ void Inty_cart_main() {
    //$8000 - $9FFF = RAM 8
    RAMused = 1;
    RAMwidth = 8;
-   ramfrom = 0x8000;
    mapfrom[2] = 0x8000;
    mapto[2] = 0x9fff;
+   ramfrom = 0x8000;
+   ramto = 0x9fff;
    maprom[2] = 0x8000;
    type[2] = 2;
    page[2] = 0;
-   addrto[2] = 0x9fff;
    mapdelta[2] = maprom[2] - mapfrom[2];
    mapsize[2] = mapto[2] - mapfrom[2];
 

@@ -19,8 +19,14 @@
 
 struct mapEntry {
    uint32_t from[NPAGES];
-   uint32_t to[NPAGES];
+   uint16_t size[NPAGES];
    uint16_t target;
+   bool filled;
+};
+
+struct mapHole {
+   uint32_t from;
+   uint16_t size;
    bool filled;
 };
 
@@ -32,12 +38,13 @@ struct mapEntry {
  */
 
 struct mapEntry slots[NSLOTS];
+struct mapHole holes[NSLOTS];
 
 void printSlot(uint8_t idx, uint8_t page) {
 
    printf("slot #0x%X: from: 0x%X, to: 0x%X, target: 0x%X, page: 0x%X, [%s]\n", 
-         idx, slots[idx].from[page], slots[idx].to[page], slots[idx].target, 
-         page, slots[idx].filled?"FILLED":"EMPTY");
+         idx, slots[idx].from[page], slots[idx].from[page]+slots[idx].size[page], 
+         slots[idx].target, page, slots[idx].filled?"FILLED":"EMPTY");
 }
 
 void printFilledSlots(void) {
@@ -47,7 +54,8 @@ void printFilledSlots(void) {
          for(int page=0; page<NPAGES; page++) {
             if (slots[i].from[page]) {
                printf("%X) $%X - $%X = $%X PAGE %d\n", 
-                     i, slots[i].from[page], slots[i].to[page], slots[i].target, page);
+                     i, slots[i].from[page], slots[i].from[page]+slots[i].size[page], 
+                     slots[i].target, page);
             }
          }
       }
@@ -58,7 +66,7 @@ void cleanSlots(void) {
 
    for(int i=0; i<NSLOTS; i++) {
       memset(slots[i].from, 0, NPAGES);
-      memset(slots[i].to, 0, NPAGES);
+      memset(slots[i].size, 0, NPAGES);
       slots[i].target = 0;
       slots[i].filled = false;
    }
@@ -85,30 +93,37 @@ void cleanSlots(void) {
 
 void addSlot(uint32_t from, uint32_t to, uint16_t target, uint8_t page) {
    
-   uint8_t nslots = (( (target + (to - from)) ) >> 8) - (target >> 8);
    uint8_t baseslot = (target >> 8);
 
    if (slots[baseslot].filled) {
-      
+
+      uint16_t from_in = slots[baseslot].from[page];
+      uint16_t to_in = slots[baseslot].from[page] + slots[baseslot].size[page];
+
       // handle collision
       if (slots[baseslot].from[page]) {
-         if (slots[baseslot].from[page] < from)
-            from = slots[baseslot].from[page];
+         if (from_in < from)
+            from = from_in;
       }
 
-      if (slots[baseslot].to[page]) {
-         if (slots[baseslot].to[page] > to)
-            to = slots[baseslot].to[page];
+      if (slots[baseslot].size[page]) {
+         if (to_in > to)
+            to = to_in;
       }
 
       if (slots[baseslot].target < target)
          target = slots[baseslot].target;
+
+      // handle map hole
+      //
    }
+
+   uint8_t nslots = (( (target + (to - from)) ) >> 8) - (target >> 8);
 
    for(int i=baseslot; i<=(baseslot + nslots); i++) {
 
       slots[i].from[page] = from;
-      slots[i].to[page] = to;
+      slots[i].size[page] = to - from;
       slots[i].target = target;
       slots[i].filled = true;
 
@@ -123,7 +138,7 @@ int mapAddress(uint16_t addr, uint8_t page) {
 
    uint8_t idx = (addr >> 8);
 
-   if ( (slots[idx].filled) && ((addr - slots[idx].target) <= (slots[idx].to[page] - slots[idx].from[page])) ) {
+   if ( (slots[idx].filled) && ((addr - slots[idx].target) <= slots[idx].size[page]) ) {
       return idx;
    } else {
       return -1;
@@ -146,7 +161,7 @@ void test_cfg0(void) {
    addSlot(0x2000, 0x2FFF, 0xD000, 0);
    addSlot(0x3000, 0x3FFF, 0xF000, 0);
 
-   uint16_t addr[] = {0x5890, 0xD010, 0xD200, 0xD852, 0xFFFF};
+   uint16_t addr[] = {0x5890, 0xD852, 0xFFFF};
    int ret;
    uint8_t page = 0;
 
@@ -169,7 +184,7 @@ void test_cfg_custom0(void) {
     * $1000 - $1FFF = $F000 PAGE 0
     * $2000 - $2FFF = $E000 PAGE 2
     * $3000 - $3FFF = $F000 PAGE 2
-    * $4000 - $4FFF = $E000 PAGE 3
+    * $4000 - $4FFF = $E000 PAGE 3slots[baseslot].size[page]
     * $5000 - $5FFF = $F000 PAGE 3
     * $6000 - $6FFF = $E000 PAGE 4
     * $7000 - $7FFF = $F000 PAGE 4
@@ -210,7 +225,7 @@ void test_cfg_custom0(void) {
    addSlot(0xFB05, 0x10AC4, 0xC040, 0);
    addSlot(0x10AC5, 0x11847, 0xD000, 0);
 
-   uint16_t addr[] = {0xE055};
+   uint16_t addr[] = {0xE055, 0xF055};
    uint8_t page;
    int ret;
 
@@ -258,7 +273,7 @@ void test_cfg_collision(void) {
 
    /*
     * $8000 - $800D = $4800
-    * $800E - $844D = $4810
+    * $800E - $844D = $480E
     */
 
    printf("--- start test_cfg_collision---\n");
@@ -266,7 +281,7 @@ void test_cfg_collision(void) {
    cleanSlots();
    
    addSlot(0x8000, 0x800D, 0x4800, 0);
-   addSlot(0x800E, 0x844D, 0x4810, 0);
+   addSlot(0x800E, 0x844D, 0x480E, 0);
 
    uint16_t addr[] = {0x1234, 0x2345};
    uint8_t page;
@@ -288,13 +303,16 @@ void test_cfg_collision(void) {
 int main(void) {
 
    printf("sizeof slots struct: %ld bytes\n\n", sizeof(slots));
+   printf("sizeof holes struct: %ld bytes\n\n", sizeof(holes));
 
-   test_cfg0();
+   //test_cfg0();
 
    test_cfg_custom0();
 
-   test_cfg_collision();
-   printFilledSlots();
+   //test_cfg_collision();
+   //printFilledSlots();
+
+   //test_cfg_collision_with_hole();
 
    return 0;
 }
