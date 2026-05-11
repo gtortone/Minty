@@ -96,7 +96,7 @@ bool tud_msc_is_writable_cb(uint8_t lun) {
 // Process data in buffer to disk's storage and return number of written bytes
 alarm_id_t alarm_id = -1;
 int64_t sync_callback(alarm_id_t id, void *user_data) {
-   fatfs_disk_sync();
+   return fatfs_disk_sync();
 }
 
 int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *buffer, uint32_t bufsize) {

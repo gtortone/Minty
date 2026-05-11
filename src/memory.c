@@ -29,7 +29,7 @@ struct mapHole holes[NSLOTS];
 
 void printSlot(uint8_t idx, uint8_t page) {
 
-   printf("slot #0x%X: type: %d, from: 0x%X, to: 0x%X, target: 0x%X, page: 0x%X, [%s]\n",
+   printf("slot #0x%X: type: %d, from: 0x%lX, to: 0x%lX, target: 0x%X, page: 0x%X, [%s]\n",
          idx, slots[idx].type, slots[idx].from[page], slots[idx].from[page]+slots[idx].size[page],
          slots[idx].target, page, slots[idx].filled?"FILLED":"EMPTY");
 }
@@ -40,7 +40,7 @@ void printFilledSlots(void) {
       if (slots[i].filled) {
          for(int page=0; page<NPAGES; page++) {
             if(slots[i].size[page]) {
-               printf("%X) $%X - $%X = $%X PAGE %d\n",
+               printf("%X) $%lX - $%lX = $%X PAGE %d\n",
                      i, slots[i].from[page], slots[i].from[page]+slots[i].size[page],
                      slots[i].target, page);
             }
@@ -93,7 +93,7 @@ void cleanHoles(void) {
 void addSlot(uint32_t from, uint32_t to, uint16_t target, uint8_t page, mapType type) {
    
    uint8_t nslots = 0;
-   bool hole = false;
+   //bool hole = false;
    uint8_t baseslot = 0;
 
    if ( (type == ROM_SLOT) || (type == ROM_PAGE_SLOT) )
@@ -117,7 +117,7 @@ void addSlot(uint32_t from, uint32_t to, uint16_t target, uint8_t page, mapType 
       if (target_from > target_from_in) {
          if ( (target_from - target_to_in) > 1 ) {
             // hole detected
-            hole = true;
+            //hole = true;
             holes[baseslot].from = target_to_in;
             holes[baseslot].size = (target_from - target_to_in) - 1;
             holes[baseslot].filled = true;
@@ -126,7 +126,7 @@ void addSlot(uint32_t from, uint32_t to, uint16_t target, uint8_t page, mapType 
       } else {
          if ( (target_from_in - target_to) > 1 ) {
             // hole detected
-            hole = true;
+            //hole = true;
             holes[baseslot].from = target_to;
             holes[baseslot].size = (target_from_in - target_to) - 1; 
             holes[baseslot].filled = true;

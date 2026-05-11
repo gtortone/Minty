@@ -65,7 +65,8 @@ void debug_print_in_use() {
    printf("END--------------------------------------\n");
 }
 
-void write_fs_map() {
+int64_t write_fs_map() {
+   uint64_t nb = 0;
    //debug_print_in_use();
    for (int i = 0; i < FS_MAP_ENTRIES; i++) {
       if (fs_map_needs_written[i]) {
@@ -73,8 +74,11 @@ void write_fs_map() {
          flash_erase_sector(i);
          flash_write_sector(i, 0, (uint8_t *) & fs_map + (4096 * i), 4096);
          fs_map_needs_written[i] = false;
+         nb += 4096;
       }
    }
+
+   return nb;
 }
 
 uint16_t getNextWriteSector() {
@@ -150,15 +154,15 @@ int flash_fs_mount() {
 
 void flash_fs_create() {
    memset(&fs_map, 0, sizeof(fs_map));
-   strcpy(fs_map.header, MAGIC_8_BYTES);
+   strcpy((char *)fs_map.header, MAGIC_8_BYTES);
    for (int i = 0; i < FS_MAP_ENTRIES; i++)
       fs_map_needs_written[i] = true;
    write_fs_map();
    init_used_bitmap();
 }
 
-void flash_fs_sync() {
-   write_fs_map();
+int64_t flash_fs_sync() {
+   return write_fs_map();
 }
 
 void flash_fs_read_FAT_sector(uint16_t fat_sector, void *buffer) {

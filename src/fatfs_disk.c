@@ -35,7 +35,6 @@ void create_fatfs_disk() {
 
    FATFS fs;                    /* Filesystem object */
    FIL fil;                     /* File object */
-   FRESULT res;                 /* API result code */
    BYTE work[FF_MAX_SS];        /* Work area (larger is better for processing time) */
    
    // set MKFS_PARM to change FAT parameters like max number of entries in root directory
@@ -44,10 +43,10 @@ void create_fatfs_disk() {
    /* Format the default drive with default parameters */
    printf("making fatfs\n");
    //res = f_mkfs("", &opt, work, sizeof work);
-   res = f_mkfs("", 0, work, sizeof work);
+   f_mkfs("", 0, work, sizeof work);
    f_mount(&fs, "", 0);
    f_setlabel("Minty");
-   res = f_open(&fil, "WELCOME.TXT", FA_CREATE_NEW | FA_WRITE);
+   f_open(&fil, "WELCOME.TXT", FA_CREATE_NEW | FA_WRITE);
    f_puts("Minty MultiCart\r\n(c)2025 gtortone\r\nDrag ROM files in here!\r\n", &fil);
    f_close(&fil);
    f_mount(0, "", 0);
@@ -85,6 +84,6 @@ uint32_t fatfs_disk_write(const uint8_t *buff, uint32_t sector, uint32_t count) 
    return RES_OK;
 }
 
-void fatfs_disk_sync() {
-   flash_fs_sync();
+int64_t fatfs_disk_sync() {
+   return flash_fs_sync();
 }

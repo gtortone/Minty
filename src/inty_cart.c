@@ -351,7 +351,7 @@ int is_rom_file(char *filename) {
    UINT br;
    char inputBuffer[3];
 
-   if (fr = f_open(&fil, filename, FA_READ) != FR_OK) {
+   if ( (fr = f_open(&fil, filename, FA_READ)) != FR_OK ) {
       printf("load_file %s error (%s)!\n", filename, FRESULT_str(fr));
       error(2);
    }
@@ -415,13 +415,13 @@ void load_file(char *filename) {
    FIL fil;
    FRESULT fr;
 
-   if (fr = f_open(&fil, filename, FA_READ) != FR_OK) {
+   if ( (fr = f_open(&fil, filename, FA_READ)) != FR_OK ) {
       printf("load_file %s error (%s)!\n", filename, FRESULT_str(fr));
       error(2);
    }
   
    // clean ROM space
-   memset(ROM, 0, BINLENGTH);
+   memset(ROM, 0, sizeof(ROM));
 
    // handle Intellicart rom file
    if(is_rom_file(filename)) {
@@ -507,7 +507,7 @@ void load_file(char *filename) {
    RAM[base + 202] = romLen;
    f_close(&fil);
 
-   printf("load_file: size: %d\n", romLen);
+   printf("load_file: size: %ld\n", romLen);
 }
 
 void load_file_by_id(UINT id) {
@@ -641,7 +641,7 @@ void load_cfg(char *filename) {
 
          if(strstr(line, "PAGE") != NULL) {
 
-            ret = sscanf(line, "$%x - $%x = $%x%*[^P]PAGE %x", &a, &b, &c, &p);
+            ret = sscanf(line, "$%lx - $%lx = $%lx%*[^P]PAGE %lx", &a, &b, &c, &p);
             if (ret != 4) {
                printf("E: parsing error in line: \n\t %s\n", line);
                return;
@@ -651,7 +651,7 @@ void load_cfg(char *filename) {
 
          } else {
 
-            ret = sscanf(line, "$%x - $%x = $%x", &a, &b, &c); 
+            ret = sscanf(line, "$%lx - $%lx = $%lx", &a, &b, &c); 
             if (ret != 3) {
                printf("E: parsing error in line: \n\t %s\n", line);
                return;
@@ -666,7 +666,7 @@ void load_cfg(char *filename) {
          uint32_t a, b;
          uint8_t w;
 
-         ret = sscanf(line, "$%x - $%x =%*[^R]RAM %d", &a, &b, &w);
+         ret = sscanf(line, "$%lx - $%lx =%*[^R]RAM %hhd", &a, &b, &w);
          if (ret != 3) {
             printf("E: parsing error in line: \n\t %s\n", line);
             return;
@@ -684,7 +684,7 @@ void load_cfg(char *filename) {
 
          uint32_t a, b;
 
-         ret = sscanf(line, "p %x %x", &a, &b);
+         ret = sscanf(line, "p %lx %lx", &a, &b);
          if (ret != 2) {
             printf("E: parsing error in line: \n\t %s\n", line);
             return;
@@ -859,7 +859,7 @@ void Inty_cart_main() {
    printf("Inty Pow-ON\n");
 
    gpio_put(LED_PIN, true);
-   memset(ROM, 0, BINLENGTH);
+   memset(ROM, 0, sizeof(ROM));
 
    for (int i = 0; i < (sizeof(mintyfw) / 2); i++) 
       ROM[i] = mintyfw[(i * 2) + 1] | (mintyfw[i * 2] << 8);

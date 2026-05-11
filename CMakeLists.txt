@@ -46,7 +46,7 @@ if(DEFINED DEBUG)
 endif()
 
 target_compile_options(${PROJECT} PRIVATE "-O2")
-target_compile_options(${PROJECT} PRIVATE "-Wunused-variable")
+target_compile_options(${PROJECT} PRIVATE "-Wall")
 target_compile_options(${PROJECT} PRIVATE "-DCFG_TUSB_RHPORT0_MODE")
 
 set_property(TARGET ${PROJECT} APPEND_STRING PROPERTY LINK_FLAGS "-Wl,--print-memory-usage")
