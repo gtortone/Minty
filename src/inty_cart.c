@@ -425,36 +425,36 @@ void load_file(char *filename) {
    // clean ROM space
    memset(ROM, 0, BINLENGTH);
 
-   /*
    // handle Intellicart rom file
    if(is_rom_file(filename)) {
 
-      slot = 0;
+      uint32_t from, prev_from;
+      uint16_t prev_size, target;
       char inputBuffer[3];
 
       f_read(&fil, inputBuffer, sizeof(inputBuffer), &br);
-
+      
       // read number of segments
-      slot = inputBuffer[1];
+      int slots = inputBuffer[1];
 
-      for(int i=0; i<slot; i++) {
+      for(int i=0; i<slots; i++) {
 
          f_read(&fil, byteread, bytes_to_read, &br);
-         int lo =  byteread[0] << 8;
-         int hi =  (byteread[1] << 8) + 0x100;
+         int lo = byteread[0] << 8;
+         int hi = (byteread[1] << 8) + 0x100;
 
          //printf("lo: 0x%X, hi: 0x%X\n", lo, hi);
 
-         maprom[i] = lo;
-         if(i == 0)
-            mapfrom[i] = 0x0000;
+         target = lo;
+         if (i == 0)
+            from = 0x0000;
          else
-            mapfrom[i] = mapfrom[i-1] + mapsize[i-1] + 1;
-         mapto[i] = mapfrom[i] + (hi - lo) - 1;
-         mapsize[i] = (hi - lo) - 1;
-         mapdelta[i] = maprom[i] - mapfrom[i];
-         type[i] = 0;
-         page[i] = 0;
+            from = prev_from + prev_size + 1;
+
+         prev_size = (hi - lo) - 1;
+         prev_from = from;
+
+         addSlot(from, from + (hi - lo) - 1, target, 0, ROM_SLOT);
 
          for (int j = lo; j < hi; j++) {
 
@@ -485,25 +485,20 @@ void load_file(char *filename) {
          // check if memory block has write attribute
          if(attr & 0x02) { 
 
-            slot++;
+            mapType type;
 
             if(attr & 0x04)
-               ramwidth = 8;     // narrow flag (8-bit)
+               type = RAM8_SLOT;   // narrow flag (8-bit)
             else
-               ramwidth = 16;
-            ramfrom = i * 0x800;
-            mapfrom[slot] = ramfrom;
-            mapto[slot] = mapfrom[slot] + ((hi - lo) * 0x100) - 1;
-            maprom[slot] = mapfrom[slot];
-            mapdelta[slot] = maprom[slot] - mapfrom[slot];
-            mapsize[slot] = mapto[slot] - mapfrom[slot];
-            type[slot] = 2;
-            page[slot] = 0;
+               type = RAM16_SLOT;
 
+            addSlot(i * 0x800, (i * 0x800) + ((hi - lo) * 0x100) - 1, 0, 0, type);
          }
       }
 
-   } else { */
+      getRAMRange(&ramfrom, &ramto, &ramwidth);
+
+   } else { 
 
       // handle raw rom file
 
@@ -513,7 +508,7 @@ void load_file(char *filename) {
          ROM[size] = byteread[1] | (byteread[0] << 8);
          size++;
       }
-   //}      // TEST: disable Intellicart ROM file
+   }
 
    romLen = size;
    RAM[base + 202] = romLen;
