@@ -22,7 +22,6 @@
 #include "interface.h"
 #include "usb_tasks.h"
 #include "utils.h"
-#include "sort.h"
 
 unsigned char busLookup[8];
 
