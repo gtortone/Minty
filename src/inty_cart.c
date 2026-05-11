@@ -26,7 +26,7 @@
 unsigned char busLookup[8];
 
 #if PICO_RP2040
-   #define BINLENGTH 1024*64     // 128 kb
+   #define BINLENGTH 1024*59     // 120 kb
    #define RAMSIZE   0x2000
 #elif PICO_RP2350
    #define BINLENGTH 1024*200    // 400 kb
@@ -280,8 +280,6 @@ void __time_critical_func(core1_main()) {
                         seg = (addrIn >> 12) & 0xF;
                         // set page
                         curPageArr[seg] = dataWrite & 0xF;
-                        //if (cnt++ > 3)
-                        //printf("S:%d, B:%d\n", seg, curPageArr[seg]);
                      }
                   }
                }              
@@ -443,8 +441,6 @@ void load_file(char *filename) {
          int lo = byteread[0] << 8;
          int hi = (byteread[1] << 8) + 0x100;
 
-         //printf("lo: 0x%X, hi: 0x%X\n", lo, hi);
-
          target = lo;
          if (i == 0)
             from = 0x0000;
@@ -478,9 +474,6 @@ void load_file(char *filename) {
          int lohi = memattr[16 + ((i >> 1) | ((i & 1) << 4))];
          int lo   = (lohi >> 4) & 0x7;
          int hi   = (lohi & 0x7) + 1;
-
-         //printf("%d) memattr: 0x%X, lohi: 0x%X, lo: 0x%X, hi: 0x%X\n",
-         //      i, attr, lohi, lo, hi);
 
          // check if memory block has write attribute
          if(attr & 0x02) { 
@@ -793,9 +786,6 @@ void DirUp() {
    }
 }
 
-#pragma GCC push_options
-#pragma GCC optimize ("O0")
-
 void LoadGame() {
    int numfile = 0;
 
@@ -967,5 +957,3 @@ void Inty_cart_main() {
 #endif
    }
 }
-
-#pragma GCC pop_options
