@@ -1,301 +1,328 @@
-#include "memory.h"
 
+#include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 
-uint32_t romLen;
-uint32_t ramfrom;
-uint32_t ramto;
-uint32_t mapfrom[80];
-uint32_t mapto[80];
-uint32_t maprom[80];
-int32_t mapdelta[80];  // signed
-uint32_t mapsize[80];
-uint32_t addrto[80];
-bool RAMused;
-uint8_t RAMwidth;
-uint8_t type[80];          // 0-rom / 1-page / 2-ram
-uint8_t page[80];          // page number
+#include "memory.h"
+
+uint16_t ramfrom;
+uint16_t ramto;
+uint8_t ramwidth;
+
+bool JLPOn = false;
+bool pagingOn = false;
+bool flashingOn = false;
 
 int slot;
 int hacks;
 
+/*
+ * each element of slots array is a bucket for MSB of Intellivision
+ * bus address
+ *
+ * e.g.  $5000    ->    bucket 0x50 (80)
+ */
+
+struct mapEntry slots[NSLOTS];
+struct mapHole holes[NSLOTS];
+
+void printSlot(uint8_t idx, uint8_t page) {
+
+   printf("slot #0x%X: type: %d, from: 0x%X, to: 0x%X, target: 0x%X, page: 0x%X, [%s]\n",
+         idx, slots[idx].type, slots[idx].from[page], slots[idx].from[page]+slots[idx].size[page],
+         slots[idx].target, page, slots[idx].filled?"FILLED":"EMPTY");
+}
+
+void printFilledSlots(void) {
+
+   for(int i=0; i<NSLOTS; i++) {
+      if (slots[i].filled) {
+         for(int page=0; page<NPAGES; page++) {
+            if(slots[i].size[page]) {
+               printf("%X) $%X - $%X = $%X PAGE %d\n",
+                     i, slots[i].from[page], slots[i].from[page]+slots[i].size[page],
+                     slots[i].target, page);
+            }
+         }
+      }
+   }
+}
+
+void cleanSlots(void) {
+
+   for(int i=0; i<NSLOTS; i++) {
+      for(int j=0;j<NPAGES;j++) {
+         slots[i].from[j] = 0;
+         slots[i].size[j] = 0;
+      }
+      slots[i].target = 0;
+      slots[i].type = 0;
+      slots[i].filled = false;
+   }
+}
+
+void cleanHoles(void) {
+
+   for(int i=0; i<NSLOTS; i++) {
+      holes[i].from = 0;
+      holes[i].size = 0;
+      holes[i].filled = false;
+   }
+}
+
+/*
+   * addSlot function fills a slot using nearby slots to fill
+   * whole available range
+   *
+   * e.g.    $8000 - $844D = $4800
+   *
+   * bus address $4800 is mapped from $8000 up to $844D
+   * so this range goes from $4800 to $4800 + ($844D - $8000) = $4C4D
+   *
+   * relevant slots are:   48, 49, 4A, 4B, 4C
+   *
+   * 48) $8000 - $844D = $4800
+   * 49) $8000 - $844D = $4800
+   * 4A) $8000 - $844D = $4800
+   * 4B) $8000 - $844D = $4800
+   * 4C) $8000 - $844D = $4800
+   *
+   */
+
+void addSlot(uint32_t from, uint32_t to, uint16_t target, uint8_t page, mapType type) {
+   
+   uint8_t nslots = 0;
+   bool hole = false;
+   uint8_t baseslot = 0;
+
+   if ( (type == ROM_SLOT) || (type == ROM_PAGE_SLOT) )
+      baseslot = (target >> 8);
+   else
+      baseslot = (from >> 8);
+
+   // detect collision  (only for ROM type for not paged addresses)
+   if ( (type == ROM_SLOT) && slots[baseslot].filled && (page == 0)) {
+
+      uint32_t from_in = slots[baseslot].from[page];
+      uint32_t to_in = slots[baseslot].from[page] + slots[baseslot].size[page];
+
+      uint32_t target_from = target;
+      uint32_t target_to = target + (to - from);
+
+      uint32_t target_from_in = slots[baseslot].target;
+      uint32_t target_to_in = slots[baseslot].target + slots[baseslot].size[page];
+
+      // handle map hole
+      if (target_from > target_from_in) {
+         if ( (target_from - target_to_in) > 1 ) {
+            // hole detected
+            hole = true;
+            holes[baseslot].from = target_to_in;
+            holes[baseslot].size = (target_from - target_to_in) - 1;
+            holes[baseslot].filled = true;
+         }
+
+      } else {
+         if ( (target_from_in - target_to) > 1 ) {
+            // hole detected
+            hole = true;
+            holes[baseslot].from = target_to;
+            holes[baseslot].size = (target_from_in - target_to) - 1; 
+            holes[baseslot].filled = true;
+         }
+      }
+      
+      if (slots[baseslot].from[page]) {
+         if (from_in < from)
+            from = from_in;
+      }
+
+      if (slots[baseslot].size[page]) {
+         if (to_in > to)
+            to = to_in;
+      }
+      if (slots[baseslot].target < target)
+         target = slots[baseslot].target;
+   }
+
+   //if(hole) {
+   //   printf("--- hole --- from: 0x%X, size: %d\n",
+   //      holes[baseslot].from, holes[baseslot].size);
+   //}
+
+   if ( (type == ROM_SLOT) || (type == ROM_PAGE_SLOT) )
+      nslots = (( (target + (to - from)) ) >> 8) - (target >> 8);
+   else
+      nslots = (to >> 8) - (from >> 8);
+
+   for(int i=baseslot; i<=(baseslot + nslots); i++) {
+
+      slots[i].from[page] = from;
+      slots[i].size[page] = to - from;
+      if ( (type == ROM_SLOT) || (type == ROM_PAGE_SLOT) )
+         slots[i].target = target;
+      else
+         slots[i].target = 0;
+      slots[i].type = type;
+      slots[i].filled = true;
+
+      //printf("## FILL ## ");
+      //printSlot(i, page);
+   }
+}
+
+// return slot index if address is mapped and value compatible with slot size
+bool mapSlot(uint16_t addr, uint8_t page, uint8_t *slot) {
+
+   uint8_t idx = (addr >> 8);
+
+   if ( (slots[idx].type == ROM_SLOT) || (slots[idx].type == ROM_PAGE_SLOT) ) {
+
+      if ( (slots[idx].filled) && ((addr - slots[idx].target) <= slots[idx].size[page]) ) {
+         *slot = idx;
+         return true;
+      }
+
+   } else {    // RAM8 or RAM16
+   
+      if ( (slots[idx].filled) && ((addr - slots[idx].from[0]) <= slots[idx].size[0]) ) {
+         *slot = idx;
+         return true;
+      }
+   }
+
+   return false;
+}
+
+// return ROM/cartridge address for Intellivision address
+bool mapAddress(uint16_t addr, uint8_t page, uint32_t *romaddr, mapType *type) {
+
+   uint8_t slot;
+
+   if ( mapSlot(addr, page, &slot) ) {
+
+      *type = slots[slot].type;
+
+      if ( (*type == ROM_SLOT) || (*type == ROM_PAGE_SLOT) ) {
+
+         *romaddr = slots[slot].from[page] + (addr - slots[slot].target);
+         
+         if (holes[slot].filled) {
+            if (addr > holes[slot].from)
+               *romaddr -= holes[slot].size;
+         }
+
+         return true;
+
+      } else {    // RAM8_SLOT or ROM16_SLOT
+
+         *romaddr = (addr - slots[slot].from[0]);
+
+         return true;
+      }
+   }
+
+   return false;
+}
+
+void getRAMRange(uint16_t *ramfrom, uint16_t *ramto, uint8_t *ramwidth) {
+
+   uint16_t from = 0;
+   uint16_t to = 0;
+
+   for(int slot=0;slot<NSLOTS;slot++) {
+
+      if ( (slots[slot].type == RAM8_SLOT) || (slots[slot].type == RAM16_SLOT) ) {
+
+         uint16_t to_in = slots[slot].from[0] + slots[slot].size[0];
+      
+         if ( (from == 0) && (to == 0) ) {
+            from = slots[slot].from[0];
+            to = to_in;
+            if(slots[slot].type == RAM8_SLOT)
+               *ramwidth = 8;
+            else
+               *ramwidth = 16;
+            continue;
+         }
+
+         if (slots[slot].from[0] < from)
+            from = slots[slot].from[0];
+
+         if (to_in > to)
+            to = to_in;
+      }
+   }
+
+   *ramfrom = from;
+   *ramto = to;
+}
+
+// ---
+
 void config_memory(int cfg) {
    slot = 0;
-   RAMused = 0;
    hacks = 0;
+
+   cleanSlots();
+   cleanHoles();
 
    switch (cfg) {
 
       case 0:
-         mapfrom[0] = 0;
-         mapto[0] = 0x1FFF;
-         maprom[0] = 0x5000;
-         addrto[0] = maprom[0] + (mapto[0] - mapfrom[0]);
-         mapdelta[0] = maprom[0] - mapfrom[0];
-         mapsize[0] = mapto[0] - mapfrom[0];
-         type[0] = 0;
-         page[0] = 0;
-
-         mapfrom[1] = 0x2000;
-         mapto[1] = 0x2FFF;
-         maprom[1] = 0xD000;
-         addrto[1] = maprom[1] + (mapto[1] - mapfrom[1]);
-         mapdelta[1] = maprom[1] - mapfrom[1];
-         mapsize[1] = mapto[1] - mapfrom[1];
-         type[1] = 0;
-         page[1] = 0;
-
-         mapfrom[2] = 0x3000;
-         mapto[2] = 0x3FFF;
-         maprom[2] = 0xF000;
-         addrto[2] = maprom[2] + (mapto[2] - mapfrom[2]);
-         mapdelta[2] = maprom[2] - mapfrom[2];
-         mapsize[2] = mapto[2] - mapfrom[2];
-         type[2] = 0;
-         page[2] = 0;
-
-         slot = 3;
+         addSlot(0x0000, 0x1FFF, 0x5000, 0, ROM_SLOT);
+         addSlot(0x2000, 0x2FFF, 0xD000, 0, ROM_SLOT);
+         addSlot(0x3000, 0x3FFF, 0xF000, 0, ROM_SLOT);
          break;
 
       case 1:
-         mapfrom[0] = 0;
-         mapto[0] = 0x1FFF;
-         maprom[0] = 0x5000;
-         addrto[0] = maprom[0] + (mapto[0] - mapfrom[0]);
-         mapdelta[0] = maprom[0] - mapfrom[0];
-         mapsize[0] = mapto[0] - mapfrom[0];
-         type[0] = 0;
-         page[0] = 0;
-
-         mapfrom[1] = 0x2000;
-         mapto[1] = 0x4FFF;
-         maprom[1] = 0xD000;
-         addrto[1] = maprom[1] + (mapto[1] - mapfrom[1]);
-         mapdelta[1] = maprom[1] - mapfrom[1];
-         mapsize[1] = mapto[1] - mapfrom[1];
-         type[1] = 0;
-         page[1] = 0;
-
-         slot = 2;
+         addSlot(0x0000, 0x1FFF, 0x5000, 0, ROM_SLOT);
+         addSlot(0x2000, 0x4FFF, 0xD000, 0, ROM_SLOT);
          break;
 
       case 2:
-         mapfrom[0] = 0;
-         mapto[0] = 0x1FFF;
-         maprom[0] = 0x5000;
-         addrto[0] = maprom[0] + (mapto[0] - mapfrom[0]);
-         mapdelta[0] = maprom[0] - mapfrom[0];
-         mapsize[0] = mapto[0] - mapfrom[0];
-         type[0] = 0;
-         page[0] = 0;
-
-         mapfrom[1] = 0x2000;
-         mapto[1] = 0x4FFF;
-         maprom[1] = 0x9000;
-         addrto[1] = maprom[1] + (mapto[1] - mapfrom[1]);
-         mapdelta[1] = maprom[1] - mapfrom[1];
-         mapsize[1] = mapto[1] - mapfrom[1];
-         type[1] = 0;
-         page[1] = 0;
-
-         mapfrom[2] = 0x5000;
-         mapto[2] = 0x5FFF;
-         maprom[2] = 0xD000;
-         addrto[2] = maprom[2] + (mapto[2] - mapfrom[2]);
-         mapdelta[2] = maprom[2] - mapfrom[2];
-         mapsize[2] = mapto[2] - mapfrom[2];
-         type[2] = 0;
-         page[2] = 0;
-
-         slot = 3;
+         addSlot(0x0000, 0x1FFF, 0x5000, 0, ROM_SLOT);
+         addSlot(0x2000, 0x4FFF, 0x9000, 0, ROM_SLOT);
+         addSlot(0x5000, 0x5FFF, 0xD000, 0, ROM_SLOT);
          break;
 
       case 3:
-         mapfrom[0] = 0;
-         mapto[0] = 0x1FFF;
-         maprom[0] = 0x5000;
-         addrto[0] = maprom[0] + (mapto[0] - mapfrom[0]);
-         mapdelta[0] = maprom[0] - mapfrom[0];
-         mapsize[0] = mapto[0] - mapfrom[0];
-         type[0] = 0;
-         page[0] = 0;
-
-         mapfrom[1] = 0x2000;
-         mapto[1] = 0x3FFF;
-         maprom[1] = 0x9000;
-         addrto[1] = maprom[1] + (mapto[1] - mapfrom[1]);
-         mapdelta[1] = maprom[1] - mapfrom[1];
-         mapsize[1] = mapto[1] - mapfrom[1];
-         type[1] = 0;
-         page[1] = 0;
-
-         mapfrom[2] = 0x4000;
-         mapto[2] = 0x4FFF;
-         maprom[2] = 0xD000;
-         addrto[2] = maprom[2] + (mapto[2] - mapfrom[2]);
-         mapdelta[2] = maprom[2] - mapfrom[2];
-         mapsize[2] = mapto[2] - mapfrom[2];
-         type[2] = 0;
-         page[2] = 0;
-
-         mapfrom[3] = 0x5000;
-         mapto[3] = 0x5FFF;
-         maprom[3] = 0xF000;
-         addrto[3] = maprom[3] + (mapto[3] - mapfrom[3]);
-         mapdelta[3] = maprom[3] - mapfrom[3];
-         mapsize[3] = mapto[3] - mapfrom[3];
-         type[3] = 0;
-         page[3] = 0;
-
-         slot = 4;
+         addSlot(0x0000, 0x1FFF, 0x5000, 0, ROM_SLOT);
+         addSlot(0x2000, 0x3FFF, 0x9000, 0, ROM_SLOT);
+         addSlot(0x4000, 0x4FFF, 0xD000, 0, ROM_SLOT);
+         addSlot(0x5000, 0x5FFF, 0xF000, 0, ROM_SLOT);
          break;
 
       case 4:
-         mapfrom[0] = 0;
-         mapto[0] = 0x1FFF;
-         maprom[0] = 0x5000;
-         addrto[0] = maprom[0] + (mapto[0] - mapfrom[0]);
-         mapdelta[0] = maprom[0] - mapfrom[0];
-         mapsize[0] = mapto[0] - mapfrom[0];
-         type[0] = 0;
-         page[0] = 0;
-
-         RAMused = 1;
-         RAMwidth = 8;
-         ramfrom = 0xD000;
-         mapfrom[1] = 0xD000;
-         mapto[1] = 0xD3FF;
-         maprom[1] = 0xD000;
-         addrto[1] = 0xD3FF;
-         mapdelta[1] = maprom[1] - mapfrom[1];
-         mapsize[1] = mapto[1] - mapfrom[1];
-         type[1] = 2;
-         page[1] = 0;
-
-         slot = 2;
+         addSlot(0x0000, 0x1FFF, 0x5000, 0, ROM_SLOT);
+         addSlot(0xD000, 0xD3FF, 0, 0, RAM8_SLOT);
          break;
 
       case 5:
-         mapfrom[0] = 0;
-         mapto[0] = 0x2FFF;
-         maprom[0] = 0x5000;
-         addrto[0] = maprom[0] + (mapto[0] - mapfrom[0]);
-         mapdelta[0] = maprom[0] - mapfrom[0];
-         mapsize[0] = mapto[0] - mapfrom[0];
-         type[0] = 0;
-         page[0] = 0;
-
-         mapfrom[1] = 0x3000;
-         mapto[1] = 0x5FFF;
-         maprom[1] = 0x9000;
-         addrto[1] = maprom[1] + (mapto[1] - mapfrom[1]);
-         mapdelta[1] = maprom[1] - mapfrom[1];
-         mapsize[1] = mapto[1] - mapfrom[1];
-         type[1] = 0;
-         page[1] = 0;
-
-         slot = 2;
+         addSlot(0x0000, 0x2FFF, 0x5000, 0, ROM_SLOT);
+         addSlot(0x3000, 0x5FFF, 0x9000, 0, ROM_SLOT);
          break;
 
       case 6:
-         mapfrom[0] = 0;
-         mapto[0] = 0x1FFF;
-         maprom[0] = 0x6000;
-         addrto[0] = maprom[0] + (mapto[0] - mapfrom[0]);
-         mapdelta[0] = maprom[0] - mapfrom[0];
-         mapsize[0] = mapto[0] - mapfrom[0];
-         type[0] = 0;
-         page[0] = 0;
-
-         slot = 1;
+         addSlot(0x0000, 0x1FFF, 0x6000, 0, ROM_SLOT);
          break;
 
       case 7:
-         mapfrom[0] = 0;
-         mapto[0] = 0x1FFF;
-         maprom[0] = 0x4800;
-         addrto[0] = maprom[0] + (mapto[0] - mapfrom[0]);
-         mapdelta[0] = maprom[0] - mapfrom[0];
-         mapsize[0] = mapto[0] - mapfrom[0];
-         type[0] = 0;
-         page[0] = 0;
-
-         slot = 1;
+         addSlot(0x0000, 0x1FFF, 0x4800, 0, ROM_SLOT);
          break;
 
       case 8:
-         mapfrom[0] = 0;
-         mapto[0] = 0x0FFF;
-         maprom[0] = 0x5000;
-         addrto[0] = maprom[0] + (mapto[0] - mapfrom[0]);
-         mapdelta[0] = maprom[0] - mapfrom[0];
-         mapsize[0] = mapto[0] - mapfrom[0];
-         type[0] = 0;
-         page[0] = 0;
-
-         mapfrom[1] = 0x1000;
-         mapto[1] = 0x1FFF;
-         maprom[1] = 0x7000;
-         addrto[1] = maprom[1] + (mapto[1] - mapfrom[1]);
-         mapdelta[1] = maprom[1] - mapfrom[1];
-         mapsize[1] = mapto[1] - mapfrom[1];
-         type[1] = 0;
-         page[1] = 0;
-
-         slot = 2;
+         addSlot(0x0000, 0x0FFF, 0x5000, 0, ROM_SLOT);
+         addSlot(0x1000, 0x1FFF, 0x7000, 0, ROM_SLOT);
          break;
 
       case 9:
-         mapfrom[0] = 0;
-         mapto[0] = 0x1FFF;
-         maprom[0] = 0x5000;
-         addrto[0] = maprom[0] + (mapto[0] - mapfrom[0]);
-         mapdelta[0] = maprom[0] - mapfrom[0];
-         mapsize[0] = mapto[0] - mapfrom[0];
-         type[0] = 0;
-         page[0] = 0;
-
-         mapfrom[1] = 0x2000;
-         mapto[1] = 0x3FFF;
-         maprom[1] = 0x9000;
-         addrto[1] = maprom[1] + (mapto[1] - mapfrom[1]);
-         mapdelta[1] = maprom[1] - mapfrom[1];
-         mapsize[1] = mapto[1] - mapfrom[1];
-         type[1] = 0;
-         page[1] = 0;
-
-         mapfrom[2] = 0x4000;
-         mapto[2] = 0x4FFF;
-         maprom[2] = 0xD000;
-         addrto[2] = maprom[2] + (mapto[2] - mapfrom[2]);
-         mapdelta[2] = maprom[2] - mapfrom[2];
-         mapsize[2] = mapto[2] - mapfrom[2];
-         type[2] = 0;
-         page[2] = 0;
-
-         mapfrom[3] = 0x5000;
-         mapto[3] = 0x5FFF;
-         maprom[3] = 0xF000;
-         addrto[3] = maprom[3] + (mapto[3] - mapfrom[3]);
-         mapdelta[3] = maprom[3] - mapfrom[3];
-         mapsize[3] = mapto[3] - mapfrom[3];
-         type[3] = 0;
-         page[3] = 0;
-
-         RAMused = 1;
-         RAMwidth = 8;
-         ramfrom = 0x8800;
-         mapfrom[4] = 0x8800;
-         mapto[4] = 0x8FFF;
-         maprom[4] = 0x8800;
-         addrto[4] = 0x8FFF;
-         mapdelta[4] = maprom[4] - mapfrom[4];
-         mapsize[4] = mapto[4] - mapfrom[4];
-         type[4] = 2;
-         page[4] = 0;
-
-         slot = 5;
+         addSlot(0x0000, 0x1FFF, 0x5000, 0, ROM_SLOT);
+         addSlot(0x2000, 0x3FFF, 0x9000, 0, ROM_SLOT);
+         addSlot(0x4000, 0x4FFF, 0xD000, 0, ROM_SLOT);
+         addSlot(0x5000, 0x5FFF, 0xF000, 0, ROM_SLOT);
+         addSlot(0x8800, 0x8FFF, 0, 0, RAM8_SLOT);
          break;
 
       default:

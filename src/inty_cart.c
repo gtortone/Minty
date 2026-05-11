@@ -59,7 +59,7 @@ typedef struct {
 int num_dir_entries = 0;         // how many entries in the current directory
 char fullpath[512];              // full path of current file
 
-unsigned int parallelBus2;
+unsigned int addrIn2;
 
 typedef enum {
    NONE,
@@ -69,25 +69,21 @@ typedef enum {
    MACRO
 } cfgSection;
 
-extern uint32_t romLen;
-extern uint32_t ramfrom;
-extern uint32_t ramto;
-extern uint32_t mapfrom[80];
-extern uint32_t mapto[80];
-extern uint32_t maprom[80];
-extern int32_t mapdelta[80];  // signed
-extern uint32_t mapsize[80];
-extern uint8_t RAMused;
-extern bool RAMwidth;
-extern uint8_t type[80];          // 0-rom / 1-page / 2-ram
-extern uint8_t page[80];          // page number
+uint32_t romLen;
+extern uint16_t ramfrom;
+extern uint16_t ramto;
+extern uint8_t ramwidth;
 
-extern int slot;
 extern int hacks;
 
-volatile bool JLPOn = false;
-volatile bool pagingOn = false;
-volatile bool flashingOn = false;
+extern bool JLPOn;
+extern bool pagingOn;
+extern bool flashingOn;
+
+volatile uint32_t romaddr;
+volatile uint8_t idx;
+
+extern struct mapEntry slots[NSLOTS];
 
 int base = 0x17f;
 
@@ -117,20 +113,16 @@ void resetCart() {
  go away at that point. Inty polls 50001 until it reads $1.
 */
 
-__attribute__((optimize("O3")))     // TEST
-void __time_critical_func(core1_main()) {       // TEST
+__attribute__((optimize("O3")))
+void __time_critical_func(core1_main()) {
    volatile unsigned int lastBusState, busState;
-   volatile unsigned int parallelBus;
+   volatile unsigned int addrIn;
    volatile unsigned int dataOut;
    volatile uint32_t dataWrite = 0;
    volatile unsigned char busBit;
    volatile bool deviceAddress = false;
-   volatile uint8_t curPageArr[16];        
-   //unsigned int curPage = 0;
-   //unsigned int checkpage = 0;
-   volatile uint8_t seg;
-   //uint16_t curCRC = 0;
-   //int cnt = 0;
+   uint8_t curPageArr[16];        
+   volatile uint8_t seg = 0;
 
    multicore_lockout_victim_init();
 
@@ -146,9 +138,7 @@ void __time_critical_func(core1_main()) {       // TEST
 
    // Initial conditions
    SET_DATA_MODE_IN;
-   //memset(curPageArr, 0, sizeof(curPageArr));
-
-   ///* uint32_t irqstatus = */ save_and_disable_interrupts();
+   memset(curPageArr, 0, sizeof(curPageArr));
 
    while (1) {
       // Wait for the bus state to change
@@ -217,35 +207,45 @@ void __time_critical_func(core1_main()) {       // TEST
 
             while (sio_hw->gpio_in & BDIR_PIN_MASK) ; 
 
-            parallelBus = sio_hw->gpio_in & 0xFFFF;
+            addrIn = sio_hw->gpio_in & 0xFFFF;
 
             deviceAddress = false;
 
-            // Load data for DTB here to save time
-            for (int8_t i=0; i<slot; i++) {
+            idx = (addrIn >> 8);
 
-               if ((parallelBus - maprom[i]) <= mapsize[i]) {
+            if (slots[idx].filled) {
 
-                  deviceAddress = true;
+               deviceAddress = true;
 
-                  if (type[i] == 2) {
-                     dataOut = RAM[parallelBus - ramfrom];
-                     break;
+               if (slots[idx].type == ROM_SLOT) {
+
+                  if ( (addrIn - slots[idx].target) <= slots[idx].size[0] ) { 
+
+                     romaddr = slots[idx].from[0] + (addrIn - slots[idx].target);
+                     dataOut = ROM[romaddr];
                   }
 
-                  if (type[i] == 0) {
-                     dataOut = ROM[(parallelBus - mapdelta[i])];
-                     break;
-                  }
+               } else if (slots[idx].type == ROM_PAGE_SLOT) {
 
-                  if (type[i] == 1) {
-                     seg = (parallelBus >> 12) & 0xF;
-                     if (page[i] == curPageArr[seg]) {
-                        dataOut = ROM[(parallelBus - mapdelta[i])];
-                        break;
+                  if ( (addrIn - slots[idx].target) <= slots[idx].size[curPageArr[seg]] ) { 
+
+                     seg = (addrIn >> 12) & 0xF;
+                     uint8_t page = curPageArr[seg];
+
+                     if (slots[idx].size[page] != 0) {    // page is filled
+                        romaddr = slots[idx].from[page] + (addrIn - slots[idx].target);
+                        dataOut = ROM[romaddr];
                      } else {
-                        dataOut=0xFFFF;
+                        dataOut = 0xFFFF;
                      }
+                  }
+
+               } else { // RAM8_SLOT or RAM16_SLOT
+               
+                  if ( (addrIn - slots[idx].from[0]) <= slots[idx].size[0] ) {
+
+                     romaddr = (addrIn - slots[idx].from[0]);
+                     dataOut = RAM[romaddr];
                   }
                }
             }
@@ -254,7 +254,7 @@ void __time_critical_func(core1_main()) {       // TEST
             /*
             if (hacks > 0) {
                for (int i = 0; i < maxHacks; i++) {
-                  if (parallelBus == HACK[i]) {
+                  if (addrIn == HACK[i]) {
                      dataOut = HACK_CODE[i];
                      deviceAddress = true;
                      break;
@@ -273,14 +273,16 @@ void __time_critical_func(core1_main()) {       // TEST
                
                SET_DATA_MODE_IN;
 
-               if ( pagingOn ) {
-                  if ((parallelBus & 0xFFF) == 0xFFF) {
+               if (pagingOn) {
+                  if ((addrIn & 0xFFF) == 0xFFF) {
                      dataWrite = sio_hw->gpio_in;
                      if ( (dataWrite & 0x0A50) == 0x0A50 ) {
                         // read segment
-                        seg = (parallelBus >> 12) & 0xF;
+                        seg = (addrIn >> 12) & 0xF;
                         // set page
                         curPageArr[seg] = dataWrite & 0xF;
+                        //if (cnt++ > 3)
+                        //printf("S:%d, B:%d\n", seg, curPageArr[seg]);
                      }
                   }
                }              
@@ -289,11 +291,11 @@ void __time_critical_func(core1_main()) {       // TEST
 
                   dataWrite = sio_hw->gpio_in & 0xFFFF;
 
-                  if ( (parallelBus >= ramfrom) && (parallelBus <= ramto) ) {
-                     if(RAMwidth == 8)
-                        RAM[parallelBus - ramfrom] = dataWrite & 0xFF;
-                     else  // RAMwidth == 16
-                        RAM[parallelBus - ramfrom] = dataWrite;
+                  if ( (addrIn >= ramfrom) && (addrIn <= ramto) ) {
+                     if(ramwidth == 8)
+                        RAM[addrIn - ramfrom] = dataWrite & 0xFF;
+                     else  // ramwidth == 16
+                        RAM[addrIn - ramfrom] = dataWrite;
                   }
 
                } else {
@@ -424,6 +426,7 @@ void load_file(char *filename) {
    // clean ROM space
    memset(ROM, 0, BINLENGTH);
 
+   /*
    // handle Intellicart rom file
    if(is_rom_file(filename)) {
 
@@ -485,11 +488,10 @@ void load_file(char *filename) {
 
             slot++;
 
-            RAMused = 1;
             if(attr & 0x04)
-               RAMwidth = 8;     // narrow flag (8-bit)
+               ramwidth = 8;     // narrow flag (8-bit)
             else
-               RAMwidth = 16;
+               ramwidth = 16;
             ramfrom = i * 0x800;
             mapfrom[slot] = ramfrom;
             mapto[slot] = mapfrom[slot] + ((hi - lo) * 0x100) - 1;
@@ -502,7 +504,7 @@ void load_file(char *filename) {
          }
       }
 
-   } else {
+   } else { */
 
       // handle raw rom file
 
@@ -512,7 +514,7 @@ void load_file(char *filename) {
          ROM[size] = byteread[1] | (byteread[0] << 8);
          size++;
       }
-   }
+   //}      // TEST: disable Intellicart ROM file
 
    romLen = size;
    RAM[base + 202] = romLen;
@@ -579,10 +581,16 @@ void load_cfg(char *filename) {
                   config_memory(8);
                else
                   config_memory(0);
+
+               getRAMRange(&ramfrom, &ramto, &ramwidth);
+
                return;
             }
 
             config_memory(fingerprints[i+1]);
+            getRAMRange(&ramfrom, &ramto, &ramwidth);
+            printf("ramfrom: 0x%X, ramto: 0x%X, ramwidth: %d\n",
+                  ramfrom, ramto, ramwidth);
 
             return;
          }
@@ -595,14 +603,15 @@ void load_cfg(char *filename) {
 
    printf("load_cfg: use %s config file\n", cfgfile);
    // read config file to SRAM
-   slot = 0;
 
    hacks = 0;
-   RAMused = 0;
    JLPOn = false;
    pagingOn = false;
    ramfrom = 0;
    ramto = 0;
+
+   cleanSlots();
+   cleanHoles();
 
    cfgsec = NONE;
 
@@ -651,8 +660,7 @@ void load_cfg(char *filename) {
                return;
             }
             pagingOn = true;
-            type[slot] = 1;
-            page[slot] = p;
+            addSlot(a, b, c, p, ROM_PAGE_SLOT);
 
          } else {
 
@@ -661,19 +669,9 @@ void load_cfg(char *filename) {
                printf("E: parsing error in line: \n\t %s\n", line);
                return;
             }
-            type[slot] = 0;
-            page[slot] = 0;
+            addSlot(a, b, c, 0, ROM_SLOT);
          }
 
-         mapfrom[slot] = a;
-         mapto[slot] = b;
-         maprom[slot] = c;
-
-         mapdelta[slot] = maprom[slot] - mapfrom[slot];
-         mapsize[slot] = mapto[slot] - mapfrom[slot];
-
-         slot++;
-         
       } else if (cfgsec == MEMATTR) {
          // example:
          // $8800 - $8FFF = RAM 8
@@ -686,21 +684,11 @@ void load_cfg(char *filename) {
             printf("E: parsing error in line: \n\t %s\n", line);
             return;
          }
-         type[slot] = 2;
-         RAMused = 1;
-         mapfrom[slot] = maprom[slot] = a;
-         mapto[slot] = b;
-         RAMwidth = w;
+         if (w == 8)
+            addSlot(a, b, 0, 0, RAM8_SLOT);
+         else
+            addSlot(a, b, 0, 0, RAM16_SLOT);
 
-         mapdelta[slot] = maprom[slot] - mapfrom[slot];
-         mapsize[slot] = mapto[slot] - mapfrom[slot];
-
-         // FIXME
-         ramfrom = a;
-         ramto = b;
-
-         slot++;
-          
       } else if (cfgsec == VARS) {
 
       } else if (cfgsec == MACRO) {
@@ -724,7 +712,8 @@ void load_cfg(char *filename) {
 
    f_close(&fil);
 
-   //sortSlotsSimple(mapfrom, mapto, maprom, mapdelta, mapsize, page, type, slot);
+   getRAMRange(&ramfrom, &ramto, &ramwidth);
+
    printf("load_cfg done\n");
 
    return;
@@ -835,20 +824,6 @@ void LoadGame() {
       if(!is_rom_file(fullpath))
          load_cfg(fullpath);
 
-      // debug
-      /*
-      printf("slots: %d\n", slot);
-      for(int i=0; i<slot; i++) {
-         printf("%d) type: %d, maprom: 0x%X, mapfrom: 0x%X - mapto: 0x%X, mapsize: 0x%X, mapdelta: 0x%X", 
-            i, type[i], maprom[i], mapfrom[i], mapto[i], mapsize[i], mapdelta[i]);
-         
-         if (type[i] == 1)
-            printf(" page: 0x%X", page[i]);
-
-         printf("\n");
-      }
-      */
-
       gpio_put(LED_PIN, false);
 
       sleep_ms(200);
@@ -902,9 +877,9 @@ void Inty_cart_main() {
    gpio_put(LED_PIN, true);
    memset(ROM, 0, BINLENGTH);
 
-   for (int i = 0; i < (sizeof(mintyfw) / 2); i++) {
+   for (int i = 0; i < (sizeof(mintyfw) / 2); i++) 
       ROM[i] = mintyfw[(i * 2) + 1] | (mintyfw[i * 2] << 8);
-   }
+
    memset((uint16_t *) RAM, 0, sizeof(RAM));
 
    for (int i = 0; i < maxHacks; i++) {
@@ -912,40 +887,21 @@ void Inty_cart_main() {
       HACK_CODE[i] = 0;
    }
 
-   //  [mapping]
-   //$0000 - $0FFF = $5000
-   mapfrom[0] = 0x0;
-   mapto[0] = 0xfff;
-   maprom[0] = 0x5000;
-   type[0] = 0;
-   page[0] = 0;
-   mapdelta[0] = maprom[0] - mapfrom[0];
-   mapsize[0] = mapto[0] - mapfrom[0];
+   /*
+    * [mapping]
+    * $0000 - $0FFF = $5000
+    * $1000 - $114E = $6000
+    * [memattr]
+    * $8000 - $9FFF = RAM 8
+    */
 
-   //$1000 - $114E = $6000
-   mapfrom[1] = 0x1000;
-   mapto[1] = 0x1fff;
-   maprom[1] = 0x6000;
-   type[1] = 0;
-   page[1] = 0;
-   mapdelta[1] = maprom[1] - mapfrom[1];
-   mapsize[1] = mapto[1] - mapfrom[1];
+   cleanSlots();
+   cleanHoles();
 
-   //[memattr]
-   //$8000 - $9FFF = RAM 8
-   RAMused = 1;
-   RAMwidth = 8;
-   mapfrom[2] = 0x8000;
-   mapto[2] = 0x9fff;
-   ramfrom = 0x8000;
-   ramto = 0x9fff;
-   maprom[2] = 0x8000;
-   type[2] = 2;
-   page[2] = 0;
-   mapdelta[2] = maprom[2] - mapfrom[2];
-   mapsize[2] = mapto[2] - mapfrom[2];
-
-   slot = 3;
+   addSlot(0x0000, 0x0FFF, 0x5000, 0, ROM_SLOT);
+   addSlot(0x1000, 0x1FFF, 0x6000, 0, ROM_SLOT);
+   addSlot(0x8000, 0x9FFF, 0, 0, RAM8_SLOT);
+   getRAMRange(&ramfrom, &ramto, &ramwidth);
 
    sleep_ms(200);
    resetCart();
