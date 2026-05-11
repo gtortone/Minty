@@ -95,6 +95,7 @@ target_link_libraries(${PROJECT} PUBLIC
    pico_stdio_uart
    tinyusb_device
    pico_multicore
+   pico_rand
    no-OS-FatFS-SD-SDIO-SPI-RPi-Pico
 )
 

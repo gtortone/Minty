@@ -11,6 +11,7 @@
 #include "pico/multicore.h"
 #include "pico/platform.h"
 #include "pico/stdlib.h"
+#include "pico/rand.h"
 
 #include "rom.h"
 #include "memory.h"
@@ -58,7 +59,8 @@ typedef struct {
 int num_dir_entries = 0;         // how many entries in the current directory
 char fullpath[512];              // full path of current file
 
-unsigned int addrIn2;
+volatile uint16_t addrInCopy;
+volatile bool jlp_op_done = false;
 
 typedef enum {
    NONE,
@@ -115,15 +117,14 @@ void resetCart() {
 __attribute__((optimize("O3")))
 void __time_critical_func(core1_main()) {
    volatile unsigned int lastBusState, busState;
-   volatile unsigned int addrIn;
-   volatile unsigned int dataOut;
+   volatile uint16_t addrIn;
+   volatile uint16_t dataOut;
    volatile uint32_t dataWrite = 0;
    volatile unsigned char busBit;
    volatile bool deviceAddress = false;
    uint8_t curPageArr[16];        
    volatile uint8_t seg = 0;
-
-   multicore_lockout_victim_init();
+   volatile uint16_t crc = 0;
 
    sleep_ms(480);
 
@@ -207,44 +208,53 @@ void __time_critical_func(core1_main()) {
             while (sio_hw->gpio_in & BDIR_PIN_MASK) ; 
 
             addrIn = sio_hw->gpio_in & 0xFFFF;
+            addrInCopy = addrIn;
 
             deviceAddress = false;
 
-            idx = (addrIn >> 8);
-
-            if (slots[idx].filled) {
+            if ( JLPOn && ((addrIn >= 0x8000) && (addrIn <= 0x9FFF)) ) {
 
                deviceAddress = true;
+               dataOut = RAM[addrIn - 0x8000];
 
-               if (slots[idx].type == ROM_SLOT) {
+            } else {
 
-                  if ( (addrIn - slots[idx].target) <= slots[idx].size[0] ) { 
+               idx = (addrIn >> 8);
 
-                     romaddr = slots[idx].from[0] + (addrIn - slots[idx].target);
-                     dataOut = ROM[romaddr];
-                  }
+               if (slots[idx].filled) {
 
-               } else if (slots[idx].type == ROM_PAGE_SLOT) {
+                  deviceAddress = true;
 
-                  if ( (addrIn - slots[idx].target) <= slots[idx].size[curPageArr[seg]] ) { 
+                  if (slots[idx].type == ROM_SLOT) {
 
-                     seg = (addrIn >> 12) & 0xF;
-                     uint8_t page = curPageArr[seg];
+                     if ( (addrIn - slots[idx].target) <= slots[idx].size[0] ) { 
 
-                     if (slots[idx].size[page] != 0) {    // page is filled
-                        romaddr = slots[idx].from[page] + (addrIn - slots[idx].target);
+                        romaddr = slots[idx].from[0] + (addrIn - slots[idx].target);
                         dataOut = ROM[romaddr];
-                     } else {
-                        dataOut = 0xFFFF;
                      }
-                  }
 
-               } else { // RAM8_SLOT or RAM16_SLOT
-               
-                  if ( (addrIn - slots[idx].from[0]) <= slots[idx].size[0] ) {
+                  } else if (slots[idx].type == ROM_PAGE_SLOT) {
 
-                     romaddr = (addrIn - slots[idx].from[0]);
-                     dataOut = RAM[romaddr];
+                     if ( (addrIn - slots[idx].target) <= slots[idx].size[curPageArr[seg]] ) { 
+
+                        seg = (addrIn >> 12) & 0xF;
+                        uint8_t page = curPageArr[seg];
+
+                        if (slots[idx].size[page] != 0) {    // page is filled
+                           romaddr = slots[idx].from[page] + (addrIn - slots[idx].target);
+                           dataOut = ROM[romaddr];
+                        } else {
+                           dataOut = 0xFFFF;
+                        }
+                     }
+
+                  } else { // RAM8_SLOT or RAM16_SLOT
+                  
+                     if ( (addrIn - slots[idx].from[0]) <= slots[idx].size[0] ) {
+
+                        romaddr = (addrIn - slots[idx].from[0]);
+                        dataOut = RAM[romaddr];
+                     }
                   }
                }
             }
@@ -288,11 +298,29 @@ void __time_critical_func(core1_main()) {
 
                   dataWrite = sio_hw->gpio_in & 0xFFFF;
 
-                  if ( (addrIn >= ramfrom) && (addrIn <= ramto) ) {
-                     if(ramwidth == 8)
-                        RAM[addrIn - ramfrom] = dataWrite & 0xFF;
-                     else  // ramwidth == 16
-                        RAM[addrIn - ramfrom] = dataWrite;
+                  if ( (JLPOn) && ((addrIn >= 0x8000) && (addrIn <= 0x9FFF)) ) {
+
+                     // JLP CRC-16 accelerator function
+                     if (addrIn == 0x9FFC) { 
+                        crc = RAM[0x1FFD];
+                        crc ^= dataWrite;
+                        for (int i=0; i<16; i++)
+                           crc = (crc >> 1) ^ (crc & 1 ? 0xAD52 : 0);
+                        RAM[0x1FFD] = crc;
+
+                     } else {
+
+                        RAM[addrIn - 0x8000] = dataWrite;
+                     }
+
+                  } else {
+
+                     if ( (addrIn >= ramfrom) && (addrIn <= ramto) ) {
+                        if(ramwidth == 8)
+                           RAM[addrIn - ramfrom] = dataWrite & 0xFF;
+                        else  // ramwidth == 16
+                           RAM[addrIn - ramfrom] = dataWrite;
+                     }
                   }
 
                } else {
@@ -786,7 +814,11 @@ void DirUp() {
    }
 }
 
-void LoadGame() {
+// disable optimization here to avoid issues with core "sleep"
+#pragma GCC push_options
+#pragma GCC optimize ("O0")
+void LoadGame(void) {
+
    int numfile = 0;
 
    numfile = RAM[0x899] + filefrom - 1;
@@ -814,13 +846,151 @@ void LoadGame() {
       memset((uint16_t *) RAM, 0, sizeof(RAM));
 
       resetCart();              // start game !
-                                
+
+      volatile uint16_t pbc = addrInCopy; 
+
+      JLPOn = true;     // FIXME
+
+      // initialize random seed with first random number request 
+      get_rand_32();
+
+      int16_t s16_op1, s16_op2;
+      int16_t prev_s16_op1, prev_s16_op2;
+
+      uint16_t u16_op1, u16_op2;
+      uint16_t prev_u16_op1, prev_u16_op2;
+
+      s16_op1 = s16_op2 = 0;
+      prev_s16_op1 = prev_s16_op2 = 0;
+
+      u16_op1 = u16_op2 = 0;
+      prev_u16_op1 = prev_u16_op2 = 0;
+
       while (1) {
-         gpio_put(LED_PIN, true);
-         sleep_ms(2000);
-         gpio_put(LED_PIN, false);
-         sleep_ms(2000);
-      }
+
+         if (JLPOn) {
+
+            pbc = addrInCopy;
+
+            // handle JLP accelerator features
+            if ( (pbc >= 0x9F80) && (pbc <= 0x9FFF) ) {
+
+               switch(pbc) {
+      
+                  // MPYSS: signed 16bit by signed 16bit multiply into 32bit result
+                  case 0x9F80:
+                  case 0x9F81: {
+                     s16_op1 = RAM[0x1F80];
+                     s16_op2 = RAM[0x1F81];
+                     if ( (s16_op1 != prev_s16_op1) && (s16_op2 != prev_s16_op2) ) {
+                        int32_t res = s16_op1 * s16_op2;
+                        RAM[0x1F8F] = (res) >> 16;
+                        RAM[0x1F8E] = (res & 0xffff);
+                        s16_op1 = s16_op2 = 0;
+                        prev_s16_op1 = prev_s16_op2 = 0;
+                     }
+                  }
+                  break;
+                  
+                  // MPYSU: signed 16bit by unsigned 16bit multiply into 32bit result
+                  case 0x9F82:
+                  case 0x9F83: {
+                     s16_op1 = RAM[0x1F82];
+                     u16_op2 = RAM[0x1F83];
+                     if ( (s16_op1 != prev_s16_op1) && (u16_op2 != prev_u16_op2) ) {
+                        int32_t res = s16_op1 * u16_op2;
+                        RAM[0x1F8F] = (res) >> 16;
+                        RAM[0x1F8E] = (res & 0xffff);
+                        s16_op1 = u16_op2 = 0;
+                        prev_s16_op1 = prev_u16_op2 = 0;
+                     }
+                  }
+                  break;
+
+                  // MPYUS: unsigned 16bit by signed 16bit multiply into 32bit result
+                  case 0x9F84:
+                  case 0x9F85: {
+                     u16_op1 = RAM[0x1F84];
+                     s16_op2 = RAM[0x1F85];
+                     if ( (u16_op1 != prev_u16_op1) && (s16_op2 != prev_s16_op2) ) {
+                        int32_t res = u16_op1 * s16_op2;
+                        RAM[0x1F8F] = (res) >> 16;
+                        RAM[0x1F8E] = (res & 0xffff);
+                        u16_op1 = s16_op2 = 0;
+                        prev_u16_op1 = prev_s16_op2 = 0;
+                     }
+                  }
+                  break;
+                  
+                  // MPYUU: unsigned 16bit by unsigned 16bit multiply into 32bit result
+                  case 0x9F86:
+                  case 0x9F87: {
+                     u16_op1 = RAM[0x1F86];
+                     u16_op2 = RAM[0x1F87];
+                     if ( (u16_op1 != prev_u16_op1) && (u16_op2 != prev_u16_op2) ) {
+                        int32_t res = u16_op1 * u16_op2;
+                        RAM[0x1F8F] = (res) >> 16;
+                        RAM[0x1F8E] = (res & 0xffff);
+                        u16_op1 = u16_op2 = 0;
+                        prev_u16_op1 = prev_u16_op2 = 0;
+                     }
+                  }
+                  break;
+                  
+                  // DIVSS: signed 16bit by signed 16bit divide with remainder
+                  case 0x9F88:
+                  case 0x9F89: {
+                     s16_op1 = RAM[0x1F88];
+                     s16_op2 = RAM[0x1F89];
+                     if ( (s16_op1 != prev_s16_op1) && (s16_op2 != prev_s16_op2) ) {
+                        int16_t res = s16_op1 % s16_op2;
+                        RAM[0x1F8F] = res;
+                        res = s16_op1 / s16_op2;
+                        RAM[0x1F8E] = res;
+                        s16_op1 = s16_op2 = 0;
+                        prev_s16_op1 = prev_s16_op2 = 0;
+                     }
+                  }
+                  break;
+                  
+                  // DIVUU: unsigned 16bit by unsigned 16bit divide with remainder
+                  case 0x9F8A:
+                  case 0x9F8B: {
+                     u16_op1 = RAM[0x1F8A];
+                     u16_op2 = RAM[0x1F8B];
+                     if ( (u16_op1 != prev_u16_op1) && (u16_op2 != prev_u16_op2) ) {
+                        int16_t res = u16_op1 % u16_op2;
+                        RAM[0x1F8F] = res;
+                        res = u16_op1 / u16_op2;
+                        RAM[0x1F8E] = res;
+                        u16_op1 = u16_op2 = 0;
+                        prev_u16_op1 = prev_u16_op2 = 0;
+                     }
+                  }
+                  break;
+
+                  // non­deterministic hardware random number generator
+                  case 0x9FFE: {
+                     RAM[0x1FFE] = get_rand_32() & 0xFFFF;
+                  }
+                  break;
+
+                  default:
+                     break;
+
+               }
+            }
+
+         } else { 
+            
+            // JLP off
+            gpio_put(LED_PIN, true);
+            sleep_ms(2000);
+            gpio_put(LED_PIN, false);
+            sleep_ms(2000);
+         }
+
+      }  // end while
    }
 }
 
@@ -957,3 +1127,5 @@ void Inty_cart_main() {
 #endif
    }
 }
+
+#pragma GCC pop_options
