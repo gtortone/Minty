@@ -29,7 +29,7 @@ unsigned char busLookup[8];
    #define BINLENGTH 1024*59     // 120 kb
    #define RAMSIZE   0x2000
 #elif PICO_RP2350
-   #define BINLENGTH 1024*200    // 400 kb
+   #define BINLENGTH 1024*205    // ~420 kb
    #define RAMSIZE   0x4000
 #endif
 
