@@ -10,13 +10,6 @@ uint16_t ramfrom;
 uint16_t ramto;
 uint8_t ramwidth;
 
-bool JLPOn = false;
-bool pagingOn = false;
-bool flashingOn = false;
-
-int slot;
-int hacks;
-
 /*
  * each element of slots array is a bucket for MSB of Intellivision
  * bus address
@@ -262,8 +255,6 @@ void getRAMRange(uint16_t *ramfrom, uint16_t *ramto, uint8_t *ramwidth) {
 // ---
 
 void config_memory(int cfg) {
-   slot = 0;
-   hacks = 0;
 
    cleanSlots();
    cleanHoles();

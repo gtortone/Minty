@@ -37,9 +37,15 @@ unsigned char busLookup[8];
 uint16_t ROM[BINLENGTH];
 volatile uint16_t RAM[RAMSIZE];
 
-#define maxHacks 32
-uint16_t HACK[maxHacks];
-uint16_t HACK_CODE[maxHacks];
+#define MAX_HACKS_NUM   32
+
+struct memHack {
+   uint16_t address;
+   uint8_t value;
+};
+
+struct memHack hacks[MAX_HACKS_NUM];
+uint8_t numhacks = 0;
 
 char curPath[256] = "";
 char path[512];
@@ -60,7 +66,6 @@ int num_dir_entries = 0;         // how many entries in the current directory
 char fullpath[512];              // full path of current file
 
 volatile uint16_t addrInCopy;
-volatile bool jlp_op_done = false;
 
 typedef enum {
    NONE,
@@ -75,11 +80,15 @@ extern uint16_t ramfrom;
 extern uint16_t ramto;
 extern uint8_t ramwidth;
 
-extern int hacks;
+bool JLPSupport = false;
+bool JLPFlash = false;
+uint8_t JLPFlashSize = 0;  // number of 1.5KB JLP flash sectors
+bool JLPAccel = false;
 
-extern bool JLPOn;
-extern bool pagingOn;
-extern bool flashingOn;
+#define JLP_FEATURE_ACCEL(status)   (value & (1U << 0))
+#define JLP_FEATURE_FLASH(status)   (value & (1U << 1))
+
+bool pagingOn = false;
 
 volatile uint32_t romaddr;
 volatile uint8_t idx;
@@ -212,7 +221,8 @@ void __time_critical_func(core1_main()) {
 
             deviceAddress = false;
 
-            if ( JLPOn && ((addrIn >= 0x8000) && (addrIn <= 0x9FFF)) ) {
+            // check for JLP support and accelerators/RAM enabled 
+            if ( JLPSupport && JLPAccel && ((addrIn >= 0x8040) && (addrIn <= 0x9FFF)) ) {
 
                deviceAddress = true;
                dataOut = RAM[addrIn - 0x8000];
@@ -259,19 +269,6 @@ void __time_critical_func(core1_main()) {
                }
             }
 
-            // TEST - disable hacks
-            /*
-            if (hacks > 0) {
-               for (int i = 0; i < maxHacks; i++) {
-                  if (addrIn == HACK[i]) {
-                     dataOut = HACK_CODE[i];
-                     deviceAddress = true;
-                     break;
-                  }
-               }
-            }
-            */
-            
          } else {
             busBit >>= 1;
             if (!busBit) {
@@ -298,7 +295,8 @@ void __time_critical_func(core1_main()) {
 
                   dataWrite = sio_hw->gpio_in & 0xFFFF;
 
-                  if ( (JLPOn) && ((addrIn >= 0x8000) && (addrIn <= 0x9FFF)) ) {
+                  // check for JLP support and accelerators/RAM enabled 
+                  if ( JLPSupport && JLPAccel && ((addrIn >= 0x8040) && (addrIn <= 0x9FFF)) ) {
 
                      // JLP CRC-16 accelerator function
                      if (addrIn == 0x9FFC) { 
@@ -619,11 +617,15 @@ void load_cfg(char *filename) {
    printf("load_cfg: use %s config file\n", cfgfile);
    // read config file to SRAM
 
-   hacks = 0;
-   JLPOn = false;
+   numhacks = 0;
    pagingOn = false;
    ramfrom = 0;
    ramto = 0;
+
+   JLPSupport = false;
+   JLPFlash = false;
+   JLPFlashSize = 0; 
+   JLPAccel = false;
 
    cleanSlots();
    cleanHoles();
@@ -706,6 +708,35 @@ void load_cfg(char *filename) {
 
       } else if (cfgsec == VARS) {
 
+         uint8_t value;
+
+         if ( sscanf(line, "jlp = %hhd", &value) == 1  ||
+               sscanf(line, "jlp_accel = %hhd", &value) == 1  || 
+               sscanf(line, "jlpaccel = %hhd", &value) == 1 ) {
+
+            if (value != 0) {
+               // JLP required
+               JLPSupport = true;
+               printf("JLP support ON\n");
+
+               if (JLP_FEATURE_ACCEL(value)) {
+                  JLPAccel = true;
+                  printf("JLP accelerators ON\n");
+               }
+            }
+         }
+
+         if ( sscanf(line, "jlp_flash = %hhd", &JLPFlashSize) == 1  ||
+               sscanf(line, "jlpflash = %hhd", &JLPFlashSize) == 1 ) {
+
+            if ( JLP_FEATURE_FLASH(value) && (JLPFlashSize > 0) ) {
+               JLPFlash = true;
+               printf("JLP flash ON\n");
+               printf("JLP flash size: %d\n", JLPFlashSize);
+            }
+         }
+
+
       } else if (cfgsec == MACRO) {
          // example: 
          // p 66fe 34
@@ -718,10 +749,9 @@ void load_cfg(char *filename) {
             return;
          }
 
-         HACK[hacks] = a;
-         HACK_CODE[hacks] = b;
-
-         hacks++;
+         hacks[numhacks].address = a;
+         hacks[numhacks].value = b;
+         numhacks++;
       }
    }
 
@@ -840,6 +870,12 @@ void LoadGame(void) {
       if(!is_rom_file(fullpath))
          load_cfg(fullpath);
 
+      for (int i=0; i<numhacks; i++) {
+         uint32_t romaddr;
+         mapAddress(hacks[i].address, 0, &romaddr, ROM_SLOT);
+         ROM[romaddr] = hacks[i].value;
+      }
+
       gpio_put(LED_PIN, false);
 
       sleep_ms(200);
@@ -847,9 +883,7 @@ void LoadGame(void) {
 
       resetCart();              // start game !
 
-      volatile uint16_t pbc = addrInCopy; 
-
-      JLPOn = true;     // FIXME
+      volatile uint16_t pbc; 
 
       // initialize random seed with first random number request 
       get_rand_32();
@@ -868,12 +902,29 @@ void LoadGame(void) {
 
       while (1) {
 
-         if (JLPOn) {
+         if (JLPSupport) {
 
             pbc = addrInCopy;
 
+            switch(pbc) {
+
+               // switch off JLP RAM and accelerators
+               case 0x8034: {
+                  if (RAM[0x34] == 0x6A7A)
+                     JLPAccel = false;
+               }
+               break;
+
+               // switch on JLP RAM and accelerators
+               case 0x8033: {
+                  if (RAM[0x33] == 0x4A5A)
+                     JLPAccel = true;
+               break;
+               }
+            }
+
             // handle JLP accelerator features
-            if ( (pbc >= 0x9F80) && (pbc <= 0x9FFF) ) {
+            if ( (JLPAccel) && (pbc >= 0x9F80) && (pbc <= 0x9FFF) ) {
 
                switch(pbc) {
       
@@ -977,7 +1028,6 @@ void LoadGame(void) {
 
                   default:
                      break;
-
                }
             }
 
@@ -1036,9 +1086,9 @@ void Inty_cart_main() {
 
    memset((uint16_t *) RAM, 0, sizeof(RAM));
 
-   for (int i = 0; i < maxHacks; i++) {
-      HACK[i] = 0;
-      HACK_CODE[i] = 0;
+   for (int i=0; i<MAX_HACKS_NUM; i++) {
+      hacks[i].address = 0;
+      hacks[i].value = 0;
    }
 
    /*
