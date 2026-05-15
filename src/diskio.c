@@ -20,7 +20,7 @@
 
 /* Definitions of physical drive number for each drive */
 #define DEV_FLASH    0       /* internal flash */
-#ifdef PIRTO_II_SD
+#ifdef HAS_SD_SLOT
    #define DEV_SD       1       /* SD card */
 #endif
 
@@ -35,7 +35,7 @@ DSTATUS disk_status(BYTE pdrv   /* Physical drive number to identify the drive *
    if (pdrv == DEV_FLASH) {
       return 0;
    } 
-#ifdef PIRTO_II_SD
+#ifdef HAS_SD_SLOT
    if(pdrv == DEV_SD) {
       //TRACE_PRINTF(">>> %s\n", __FUNCTION__);
       sd_card_t *sd_card_p = sd_get_by_num(0);
@@ -57,7 +57,7 @@ DSTATUS disk_initialize(BYTE pdrv       /* Physical drive number to identify the
    if (pdrv == DEV_FLASH) {
       return 0;
    } 
-#ifdef PIRTO_II_SD
+#ifdef HAS_SD_SLOT
    if(pdrv == DEV_SD) {
       //TRACE_PRINTF(">>> %s\n", __FUNCTION__);
       
@@ -76,7 +76,7 @@ DSTATUS disk_initialize(BYTE pdrv       /* Physical drive number to identify the
    return STA_NOINIT;
 }
 
-#ifdef PIRTO_II_SD
+#ifdef HAS_SD_SLOT
    static int sdrc2dresult(int sd_rc) {
       switch (sd_rc) {
            case SD_BLOCK_DEVICE_ERROR_NONE:
@@ -116,7 +116,7 @@ DRESULT disk_read(BYTE pdrv,    /* Physical drive number to identify the drive *
       res = fatfs_disk_read((uint8_t *) buff, sector, count);
       return res;
    } 
-#ifdef PIRTO_II_SD
+#ifdef HAS_SD_SLOT
    if(pdrv == DEV_SD) {
       //TRACE_PRINTF(">>> %s\n", __FUNCTION__);
       sd_card_t *sd_card_p = sd_get_by_num(0);
@@ -146,7 +146,7 @@ DRESULT disk_write(BYTE pdrv,   /* Physical drive number to identify the drive *
       res = fatfs_disk_write((const uint8_t *) buff, sector, count);
       return res;
    } 
-#ifdef PIRTO_II_SD
+#ifdef HAS_SD_SLOT
    if(pdrv == DEV_SD) {
       //TRACE_PRINTF(">>> %s\n", __FUNCTION__);
       sd_card_t *sd_card_p = sd_get_by_num(0);
@@ -189,7 +189,7 @@ DRESULT disk_ioctl(BYTE pdrv,   /* Physical drive number (0..) */
             return RES_PARERR;
       }
    } 
-#ifdef PIRTO_II_SD
+#ifdef HAS_SD_SLOT
    if(pdrv == DEV_SD) {
 
       //TRACE_PRINTF(">>> %s\n", __FUNCTION__);

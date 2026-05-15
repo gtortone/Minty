@@ -12,6 +12,8 @@ project(${PROJECT} C CXX ASM)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
+option(DEBUG "Enable debug prints on UART" OFF)
+
 pico_sdk_init()
 
 include(FetchContent)
@@ -37,13 +39,17 @@ add_subdirectory(
 
 add_executable(${PROJECT})
 
+if(DEBUG)
+   add_compile_definitions(DEBUG)
+   target_link_libraries(${PROJECT} pico_stdio_uart)
+   # enable uart output
+   pico_enable_stdio_usb(${PROJECT} 1)
+   pico_enable_stdio_uart(${PROJECT} 1)
+endif()
+
 target_compile_definitions(${PROJECT} PRIVATE "-DPICO_FLASH_SIZE_BYTES=${PICO_FLASH_SIZE_BYTES}")
 target_compile_options(${PROJECT} PRIVATE "-DPICO_FLASH_SPI_CLKDIV=${PICO_FLASH_SPI_CLKDIV}")
 #pico_set_linker_script(${PROJECT} ${CMAKE_CURRENT_SOURCE_DIR}/support/memmap_custom_16MB.ld)
-
-if(DEFINED DEBUG)
-   target_compile_definitions(${PROJECT} PRIVATE "-DDEBUG")
-endif()
 
 target_compile_options(${PROJECT} PRIVATE "-O2")
 target_compile_options(${PROJECT} PRIVATE "-Wall")
@@ -85,14 +91,9 @@ add_custom_target(ffconf.h
 
 add_dependencies(${PROJECT} ffconf.h glue.c)
 
-# Enable usb output, disable uart output
-pico_enable_stdio_usb(${PROJECT} 0)
-pico_enable_stdio_uart(${PROJECT} 1)
-
-target_link_libraries(${PROJECT} PUBLIC 
+target_link_libraries(${PROJECT}
    pico_stdlib
    hardware_flash 
-   pico_stdio_uart
    tinyusb_device
    pico_multicore
    pico_rand

@@ -13,6 +13,7 @@
 #include "pico/stdlib.h"
 #include "pico/rand.h"
 
+#include "board.h"
 #include "rom.h"
 #include "memory.h"
 
@@ -110,10 +111,10 @@ int base = 0x17f;
 FATFS FatFs;
 
 void resetCart() {
-   gpio_init(MSYNC_PIN);
-   gpio_set_dir(MSYNC_PIN, false);
-   gpio_set_pulls(MSYNC_PIN, false, true);
-   gpio_put(LED_PIN, false);
+   gpio_init(MSYNC);
+   gpio_set_dir(MSYNC, false);
+   gpio_set_pulls(MSYNC, false, true);
+   gpio_put(LED, false);
 
    resetHigh();
    sleep_ms(30);                // was 20 for Model II; 30 works for both
@@ -122,7 +123,7 @@ void resetCart() {
    sleep_ms(1);                 // was 1 for Model II; 
 
    resetHigh();
-   gpio_put(LED_PIN, true);
+   gpio_put(LED, true);
 }
 
 __attribute__((optimize("O3")))
@@ -160,9 +161,9 @@ void __time_critical_func(core1_main()) {
       // We detected a change, but reread the bus state to make sure that all three pins have settled
       lastBusState = sio_hw->gpio_in;
 
-      busState = (bool)(lastBusState & BC1_PIN_MASK) << 2 |
-                  (bool)(lastBusState & BC2_PIN_MASK) << 1 |
-                  (bool)(lastBusState & BDIR_PIN_MASK);
+      busState = (bool)(lastBusState & BC1_MASK) << 2 |
+                  (bool)(lastBusState & BC2_MASK) << 1 |
+                  (bool)(lastBusState & BDIR_MASK);
 
       busBit = busLookup[busState];
 
@@ -181,7 +182,7 @@ void __time_critical_func(core1_main()) {
             SET_DATA_MODE_OUT;
             // wait 20ns (@200Mhz)
             asm inline("nop;nop;nop;nop;");
-            while (sio_hw->gpio_in & BC1_PIN_MASK) ;  // wait BC1 go down
+            while (sio_hw->gpio_in & BC1_MASK) ;  // wait BC1 go down
             SET_DATA_MODE_IN;
          }
       } else {
@@ -199,7 +200,7 @@ void __time_critical_func(core1_main()) {
                   SET_DATA_MODE_OUT;
                   // wait 20ns (@200Mhz)
                   asm inline("nop;nop;nop;nop;");
-                  while (sio_hw->gpio_in & BC1_PIN_MASK) ;  // wait BC1 go down 
+                  while (sio_hw->gpio_in & BC1_MASK) ;  // wait BC1 go down 
                   SET_DATA_MODE_IN;
                }
             }
@@ -216,7 +217,7 @@ void __time_critical_func(core1_main()) {
 
             SET_DATA_MODE_IN;
 
-            while (sio_hw->gpio_in & BDIR_PIN_MASK) ; 
+            while (sio_hw->gpio_in & BDIR_MASK) ; 
 
             addrIn = sio_hw->gpio_in & 0xFFFF;
             addrInCopy = addrIn;
@@ -351,7 +352,7 @@ void __time_critical_func(core1_main()) {
 
 void error(int numblink) {
    while (1) {
-      gpio_set_dir(LED_PIN, GPIO_OUT);
+      gpio_set_dir(LED, GPIO_OUT);
 
       for (int i = 0; i < numblink; i++) {
          gpio_put(25, true);
@@ -1056,7 +1057,7 @@ void LoadGame(void) {
          ROM[romaddr] = hacks[i].value;
       }
 
-      gpio_put(LED_PIN, false);
+      gpio_put(LED, false);
 
       sleep_ms(200);
       memset((uint16_t *) RAM, 0, sizeof(RAM));
@@ -1254,9 +1255,9 @@ void LoadGame(void) {
          } else { 
             
             // JLP off
-            gpio_put(LED_PIN, true);
+            gpio_put(LED, true);
             sleep_ms(2000);
-            gpio_put(LED_PIN, false);
+            gpio_put(LED, false);
             sleep_ms(2000);
          }
 
@@ -1280,16 +1281,16 @@ void Inty_cart_main() {
    multicore_launch_core1(core1_main);
 
    gpio_init_mask(ALWAYS_OUT_MASK);
-   gpio_init_mask(DATA_PIN_MASK);
+   gpio_init_mask(DATA_MASK);
    gpio_init_mask(BUS_STATE_MASK);
    gpio_set_dir_in_masked(ALWAYS_IN_MASK);
    gpio_set_dir_out_masked(ALWAYS_OUT_MASK);
-   gpio_init(LED_PIN);
-   gpio_put(LED_PIN, true);
-   gpio_init(RST_PIN);
+   gpio_init(LED);
+   gpio_put(LED, true);
+   gpio_init(RESET);
 
-   gpio_set_dir(MSYNC_PIN, GPIO_IN);
-   gpio_pull_down(MSYNC_PIN);
+   gpio_set_dir(MSYNC, GPIO_IN);
+   gpio_pull_down(MSYNC);
 
    sleep_ms(800);
 
@@ -1298,7 +1299,7 @@ void Inty_cart_main() {
    resetLow();
    printf("Inty Pow-ON\n");
 
-   gpio_put(LED_PIN, true);
+   gpio_put(LED, true);
    memset(ROM, 0, sizeof(ROM));
 
    for (int i = 0; i < (sizeof(mintyfw) / 2); i++) 
@@ -1336,7 +1337,7 @@ void Inty_cart_main() {
    sleep_ms(800);
    
    // initial conditions 
-#ifdef PIRTO_II_SD
+#ifdef HAS_SD_SLOT
    RAM[HAS_SD_ADDR] = 1;
 #else
    RAM[HAS_SD_ADDR] = 0;
@@ -1346,7 +1347,7 @@ void Inty_cart_main() {
    RAM[DEV_ADDR] = volumeId;
 
    RAM[DONE_ADDR] = 123;      // release welcome screen
-   gpio_put(LED_PIN, true);
+   gpio_put(LED, true);
 
    IntyMenu(1);
    
@@ -1379,7 +1380,7 @@ void Inty_cart_main() {
                DirUp();
                IntyMenu(1);
                break;
-#ifdef PIRTO_II_SD
+#ifdef HAS_SD_SLOT
             case 6:            // change storage device
                volumeId = RAM[DEV_ADDR];
                sprintf(curPath, "%d:/", volumeId);
