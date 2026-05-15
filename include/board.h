@@ -14,7 +14,7 @@
    #define DIRC      MI_DIR_PIN
 #endif
 
-#ifdef HAS_SD_SLOT
+#if CONFIG_SD_STORAGE
    #define SD_SPI_PORT  SPI_INSTANCE(MI_SD_SPI)
    #define SD_SCK       MI_SD_SPI_SCK_PIN
    #define SD_MOSI      MI_SD_SPI_TX_PIN

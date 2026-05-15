@@ -13,8 +13,12 @@
 
 #include "board.h"
 #include "inty_cart.h"
-#include "usb_tasks.h"
 #include "debug.h"
+
+#if CONFIG_USB_DEVICE
+   #include "tusb.h"
+   #include "usb_tasks.h"
+#endif
 
 int main(void) {
 
@@ -47,7 +51,9 @@ int main(void) {
    sleep_ms(500);
 #endif
 
+#if CONFIG_USB_DEVICE
    tud_init(BOARD_TUD_RHPORT);
+#endif
 
    printf("START\n");
 
@@ -64,12 +70,18 @@ int main(void) {
    }
 
    // check why loop is ended...
-   if (gpio_get(MSYNC) == 1)
+   if (gpio_get(MSYNC) == 1) {
+
       Inty_cart_main();
 
-   while (1) {
-      tud_task();    // tinyusb device task
-      cdc_task();
+   } else {
+      // board not plugged in Intellivision - start USB tasks
+      while(1) {
+#if CONFIG_USB_DEVICE
+         tud_task();
+         cdc_task();
+#endif
+      }
    }
 
    return 0;

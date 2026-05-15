@@ -20,12 +20,14 @@ See
 https://github.com/carlk3/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico/tree/main#customizing-for-the-hardware-configuration
 */
 
+#include <stddef.h>
+
 #include "hw_config.h"
 #include "board.h"
 
 const char * VolumeStr[FF_VOLUMES] = {FF_VOLUME_STRS};	/* Pre-defined volume ID */
 
-#ifdef HAS_SD_SLOT
+#if CONFIG_SD_STORAGE
 
 /* Configuration of hardware SPI object */
 static spi_t spi = {

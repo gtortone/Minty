@@ -1,3 +1,4 @@
+#if CONFIG_USB_DEVICE
 
 #include "usb_tasks.h"
 #include "fatfs_disk.h"
@@ -75,3 +76,4 @@ void tud_resume_cb(void) {
 //  blink_interval_ms = BLINK_MOUNTED;
 }
 
+#endif

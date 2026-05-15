@@ -22,8 +22,11 @@
 #include "fatfs_disk.h"
 #include "fingerprints.h"
 #include "interface.h"
-#include "usb_tasks.h"
 #include "utils.h"
+
+#if CONFIG_USB_DEVICE
+   #include "usb_tasks.h"
+#endif
 
 unsigned char busLookup[8];
 
@@ -1337,7 +1340,7 @@ void Inty_cart_main() {
    sleep_ms(800);
    
    // initial conditions 
-#ifdef HAS_SD_SLOT
+#if CONFIG_SD_STORAGE
    RAM[HAS_SD_ADDR] = 1;
 #else
    RAM[HAS_SD_ADDR] = 0;
@@ -1380,7 +1383,7 @@ void Inty_cart_main() {
                DirUp();
                IntyMenu(1);
                break;
-#ifdef HAS_SD_SLOT
+#if CONFIG_SD_STORAGE
             case 6:            // change storage device
                volumeId = RAM[DEV_ADDR];
                sprintf(curPath, "%d:/", volumeId);
@@ -1392,7 +1395,7 @@ void Inty_cart_main() {
          RAM[DONE_ADDR] = 1;
       }
 
-#ifdef DEBUG
+#if CONFIG_USB_DEVICE
       tud_task();
       cdc_task();
 #endif

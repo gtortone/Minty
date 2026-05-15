@@ -9,6 +9,7 @@
 #define __FLASH_FS_H__
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #define SECTOR_SIZE  512
 #define HW_FLASH_STORAGE_BASE  (512 * 1024)

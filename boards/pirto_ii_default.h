@@ -3,22 +3,13 @@
 
 // PirtoII by aotta (https://github.com/aotta/PiRTOII)
 
-pico_board_cmake_set(PICO_PLATFORM, rp2040)
-
 // for board detection
 #define PIRTO_II_DEFAULT 1
 
 #define PICO_BOOT_STAGE2_CHOOSE_W25Q080 1
- 
-#ifndef PICO_FLASH_SPI_CLKDIV
-#define PICO_FLASH_SPI_CLKDIV 2
-#endif
- 
-pico_board_cmake_set_default(PICO_FLASH_SIZE_BYTES, (16 * 1024 * 1024))
-#ifndef PICO_FLASH_SIZE_BYTES
-#define PICO_FLASH_SIZE_BYTES (16 * 1024 * 1024)
-#endif
 
+// see .cmake file for build options
+ 
 // Pico pin usage definitions
 #define MI_AD0_PIN            0
 

@@ -5,6 +5,9 @@ set(PROJECT Minty)
 # set boards directory
 set(PICO_BOARD_HEADER_DIRS ${CMAKE_CURRENT_LIST_DIR}/boards)
 
+# import board build options
+include(${CMAKE_SOURCE_DIR}/boards/${PICO_BOARD}.cmake)
+
 include($ENV{PICO_SDK_PATH}/pico_sdk_init.cmake)
 
 project(${PROJECT} C CXX ASM)
@@ -43,13 +46,15 @@ if(DEBUG)
    add_compile_definitions(DEBUG)
    target_link_libraries(${PROJECT} pico_stdio_uart)
    # enable uart output
-   pico_enable_stdio_usb(${PROJECT} 1)
+   pico_enable_stdio_usb(${PROJECT} 0)
    pico_enable_stdio_uart(${PROJECT} 1)
 endif()
 
-target_compile_definitions(${PROJECT} PRIVATE "-DPICO_FLASH_SIZE_BYTES=${PICO_FLASH_SIZE_BYTES}")
-target_compile_options(${PROJECT} PRIVATE "-DPICO_FLASH_SPI_CLKDIV=${PICO_FLASH_SPI_CLKDIV}")
-#pico_set_linker_script(${PROJECT} ${CMAKE_CURRENT_SOURCE_DIR}/support/memmap_custom_16MB.ld)
+target_compile_definitions(${PROJECT} PRIVATE "PICO_FLASH_SIZE_BYTES=${PICO_FLASH_SIZE_BYTES}")
+target_compile_definitions(${PROJECT} PRIVATE "PICO_FLASH_SPI_CLKDIV=${PICO_FLASH_SPI_CLKDIV}")
+target_compile_definitions(${PROJECT} PRIVATE "CONFIG_USB_DEVICE=${CONFIG_USB_DEVICE}")
+target_compile_definitions(${PROJECT} PRIVATE "CONFIG_SD_STORAGE=${CONFIG_SD_STORAGE}")
+target_compile_definitions(${PROJECT} PRIVATE "CONFIG_FLASH_STORAGE=${CONFIG_FLASH_STORAGE}")
 
 target_compile_options(${PROJECT} PRIVATE "-O2")
 target_compile_options(${PROJECT} PRIVATE "-Wall")

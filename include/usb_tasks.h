@@ -1,6 +1,7 @@
-
 #ifndef USB_TASKS_H_
 #define USB_TASKS_H_
+
+#if CONFIG_USB_DEVICE
 
 #include "tusb.h"
 
@@ -11,5 +12,7 @@ void tud_mount_cb(void);
 void tud_umount_cb(void);
 void tud_suspend_cb(bool remote_wakeup_en);
 void tud_resume_cb(void);
+
+#endif
 
 #endif

@@ -3,24 +3,12 @@
 
 // PirtoII with microSD slot by sukkopera (https://github.com/SukkoPera/PiRTOII)
 
-pico_board_cmake_set(PICO_PLATFORM, rp2040)
-
 // for board detection
 #define PIRTO_II_SD 1
 
 #define PICO_BOOT_STAGE2_CHOOSE_W25Q080 1
  
-#ifndef PICO_FLASH_SPI_CLKDIV
-#define PICO_FLASH_SPI_CLKDIV 2
-#endif
- 
-pico_board_cmake_set_default(PICO_FLASH_SIZE_BYTES, (2 * 1024 * 1024))
-#ifndef PICO_FLASH_SIZE_BYTES
-#define PICO_FLASH_SIZE_BYTES (2 * 1024 * 1024)
-#endif
-
-// additional features
-#define HAS_SD_SLOT     1
+// see .cmake file for build options
 
 // Pico pin usage definitions
 #define MI_AD0_PIN   0
