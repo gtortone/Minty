@@ -27,7 +27,7 @@
 unsigned char busLookup[8];
 
 #if PICO_RP2040
-   #define BINLENGTH 1024*59     // 120 kb
+   #define BINLENGTH 1024*55     // 110 kb
    #define RAMSIZE   0x2000
 #elif PICO_RP2350
    #define BINLENGTH 1024*205    // ~420 kb
@@ -51,7 +51,7 @@ char curPath[256] = "";
 char path[512];
 
 int volumeId = 0;    // flash
-unsigned char files[512 * 24] = {0};
+unsigned char files[256 * 24] = {0};
 
 int filefrom = 0, fileto = 0;
 volatile char cmd = 0;
@@ -84,9 +84,19 @@ bool JLPSupport = false;
 bool JLPFlash = false;
 uint8_t JLPFlashSize = 0;  // number of 1.5KB JLP flash sectors
 bool JLPAccel = false;
+char flashfile[512] = {0};
+FIL filesave;
 
 #define JLP_FEATURE_ACCEL(status)   (value & (1U << 0))
 #define JLP_FEATURE_FLASH(status)   (value & (1U << 1))
+
+#define JLP_FLASH_ROWS_PER_SECTOR    8
+#define JLP_FLASH_ROW_BYTES         96 * 2     // 96 * uint16_t
+#define JLP_FLASH_SECTOR_BYTES      JLP_FLASH_ROWS_PER_SECTOR * JLP_FLASH_ROW_BYTES
+#define JLP_RAM_ADDRESS             RAM[0x25]
+#define JLP_ROW_NUMBER              RAM[0x26]
+
+uint8_t erase_pattern[JLP_FLASH_SECTOR_BYTES];
 
 bool pagingOn = false;
 
@@ -114,14 +124,6 @@ void resetCart() {
    resetHigh();
    gpio_put(LED_PIN, true);
 }
-
-/*
- Theory of Operation
- -------------------
- Inty sends command to mcu on cart by writing to 50000 (CMD), 50001 (parameter) and menu (50002-50641) 
- Inty must be running from RAM when it sends a command, since the mcu on the cart will
- go away at that point. Inty polls 50001 until it reads $1.
-*/
 
 __attribute__((optimize("O3")))
 void __time_critical_func(core1_main()) {
@@ -222,50 +224,58 @@ void __time_critical_func(core1_main()) {
             deviceAddress = false;
 
             // check for JLP support and accelerators/RAM enabled 
-            if ( JLPSupport && JLPAccel && ((addrIn >= 0x8040) && (addrIn <= 0x9FFF)) ) {
+            if ( JLPSupport ) {
+
+                  if ( (JLPAccel || JLPFlash) && ((addrIn >= 0x8000) && (addrIn <= 0x9FFF)) ) {
+
+                     deviceAddress = true;
+
+                     if ((JLPFlash) && (addrIn == 0x8023)) {
+                        dataOut = 0;
+                     } else if ((JLPFlash) && addrIn == 0x8024) {
+                        dataOut = (JLPFlashSize * JLP_FLASH_ROWS_PER_SECTOR) - 1;
+                     } else {
+                        dataOut = RAM[addrIn - 0x8000];
+                     }
+
+                     continue;
+                  }
+            } 
+
+            idx = (addrIn >> 8);
+
+            if (slots[idx].filled) {
 
                deviceAddress = true;
-               dataOut = RAM[addrIn - 0x8000];
 
-            } else {
+               if (slots[idx].type == ROM_SLOT) {
 
-               idx = (addrIn >> 8);
+                  //if ( (addrIn - slots[idx].target) <= slots[idx].size[0] ) { 
 
-               if (slots[idx].filled) {
+                     romaddr = slots[idx].from[0] + (addrIn - slots[idx].target);
+                     dataOut = ROM[romaddr];
+                  //}
 
-                  deviceAddress = true;
+               } else if (slots[idx].type == ROM_PAGE_SLOT) {
 
-                  if (slots[idx].type == ROM_SLOT) {
+                  //if ( (addrIn - slots[idx].target) <= slots[idx].size[curPageArr[seg]] ) { 
 
-                     if ( (addrIn - slots[idx].target) <= slots[idx].size[0] ) { 
+                     seg = (addrIn >> 12) & 0xF;
+                     uint8_t page = curPageArr[seg];
 
-                        romaddr = slots[idx].from[0] + (addrIn - slots[idx].target);
+                     if (slots[idx].size[page] != 0) {    // page is filled
+                        romaddr = slots[idx].from[page] + (addrIn - slots[idx].target);
                         dataOut = ROM[romaddr];
-                     }
+                     } 
+                  //}
 
-                  } else if (slots[idx].type == ROM_PAGE_SLOT) {
+               } else { // RAM8_SLOT or RAM16_SLOT
+               
+                  //if ( (addrIn - slots[idx].from[0]) <= slots[idx].size[0] ) {
 
-                     if ( (addrIn - slots[idx].target) <= slots[idx].size[curPageArr[seg]] ) { 
-
-                        seg = (addrIn >> 12) & 0xF;
-                        uint8_t page = curPageArr[seg];
-
-                        if (slots[idx].size[page] != 0) {    // page is filled
-                           romaddr = slots[idx].from[page] + (addrIn - slots[idx].target);
-                           dataOut = ROM[romaddr];
-                        } else {
-                           dataOut = 0xFFFF;
-                        }
-                     }
-
-                  } else { // RAM8_SLOT or RAM16_SLOT
-                  
-                     if ( (addrIn - slots[idx].from[0]) <= slots[idx].size[0] ) {
-
-                        romaddr = (addrIn - slots[idx].from[0]);
-                        dataOut = RAM[romaddr];
-                     }
-                  }
+                     romaddr = (addrIn - slots[idx].from[0]);
+                     dataOut = RAM[romaddr];
+                  //}
                }
             }
 
@@ -278,10 +288,11 @@ void __time_critical_func(core1_main()) {
                // -----------------------
                
                SET_DATA_MODE_IN;
+               
+               dataWrite = sio_hw->gpio_in & 0xFFFF;
 
                if (pagingOn) {
                   if ((addrIn & 0xFFF) == 0xFFF) {
-                     dataWrite = sio_hw->gpio_in;
                      if ( (dataWrite & 0x0A50) == 0x0A50 ) {
                         // read segment
                         seg = (addrIn >> 12) & 0xF;
@@ -293,23 +304,24 @@ void __time_critical_func(core1_main()) {
 
                if (deviceAddress) {
 
-                  dataWrite = sio_hw->gpio_in & 0xFFFF;
-
                   // check for JLP support and accelerators/RAM enabled 
-                  if ( JLPSupport && JLPAccel && ((addrIn >= 0x8040) && (addrIn <= 0x9FFF)) ) {
+                  if ( JLPSupport ) { 
 
-                     // JLP CRC-16 accelerator function
-                     if (addrIn == 0x9FFC) { 
-                        crc = RAM[0x1FFD];
-                        crc ^= dataWrite;
-                        for (int i=0; i<16; i++)
-                           crc = (crc >> 1) ^ (crc & 1 ? 0xAD52 : 0);
-                        RAM[0x1FFD] = crc;
+                     if ( (JLPAccel || JLPFlash) && ((addrIn >= 0x8000) && (addrIn <= 0x9FFF)) ) {
 
-                     } else {
+                        // JLP CRC-16 accelerator function
+                        if (addrIn == 0x9FFC) { 
+                           crc = RAM[0x1FFD];
+                           crc ^= dataWrite;
+                           for (int i=0; i<16; i++)
+                              crc = (crc >> 1) ^ (crc & 1 ? 0xAD52 : 0);
+                           RAM[0x1FFD] = crc;
+                           continue;
+                        }
 
+                        // JLP RAM addressing
                         RAM[addrIn - 0x8000] = dataWrite;
-                     }
+                     } 
 
                   } else {
 
@@ -615,8 +627,8 @@ void load_cfg(char *filename) {
    }
 
    printf("load_cfg: use %s config file\n", cfgfile);
+  
    // read config file to SRAM
-
    numhacks = 0;
    pagingOn = false;
    ramfrom = 0;
@@ -626,6 +638,8 @@ void load_cfg(char *filename) {
    JLPFlash = false;
    JLPFlashSize = 0; 
    JLPAccel = false;
+   flashfile[0] = '\0';
+   memset(erase_pattern, 0xFF, sizeof(erase_pattern));
 
    cleanSlots();
    cleanHoles();
@@ -757,11 +771,70 @@ void load_cfg(char *filename) {
 
    f_close(&fil);
 
+   if (JLPFlash) {
+
+      strncpy(flashfile, filename, (dot - filename));
+      strcat(flashfile, ".save");
+
+      FILINFO fno;
+      FRESULT res;
+
+      // check if JLP flash file exists
+      res = f_stat(flashfile, &fno);
+
+      if(res == FR_NO_FILE) {
+
+         uint8_t buffer[JLP_FLASH_SECTOR_BYTES];
+         uint32_t size = JLPFlashSize * JLP_FLASH_SECTOR_BYTES;
+         
+         // create JLP flash file
+         res = f_open(&fil, flashfile, FA_CREATE_ALWAYS | FA_WRITE);
+         if (res != FR_OK) {
+            printf("E: file create error\n");
+            f_close(&fil);
+            return;
+         }
+
+         res = f_expand(&fil, size, 1);
+         if (res != FR_OK) {
+            printf("E: expand error\n");
+            f_close(&fil);
+            return;
+         }
+
+         printf("creating JLP flash file: %s, size: %ld\n", flashfile, size);
+
+         memset(buffer, 0xFF, sizeof(buffer));
+
+         uint32_t remaining = size;
+         unsigned int written = 0;
+
+         f_lseek(&fil, 0);
+
+         while (remaining) {
+            uint32_t chunk = (remaining > sizeof(buffer)) ? sizeof(buffer) : remaining;
+
+            res = f_write(&fil, buffer, chunk, &written);
+
+            if (res != FR_OK || written != chunk) {
+               printf("E: write error\n");
+               f_close(&fil);
+               break;
+            }
+
+            remaining -= written;
+         }
+
+         f_close(&fil);
+      }
+
+      printf("I: use available JLP flash file: %s\n", flashfile);
+
+   }  // end if(JLPFlash)
+
    getRAMRange(&ramfrom, &ramto, &ramwidth);
 
    printf("load_cfg done\n");
-
-   return;
 }
 
 void filelist(DIR_ENTRY *en, int da, int a) {
@@ -844,6 +917,113 @@ void DirUp() {
    }
 }
 
+// flash -> RAM
+void readFlash(int row, uint16_t addr) {
+
+   unsigned int br = 0;
+   unsigned int c;
+   uint32_t offset = row * JLP_FLASH_ROW_BYTES;
+   uint8_t temp[2];
+   FRESULT res;
+
+   if (f_open(&filesave, flashfile, FA_READ) != FR_OK) {
+      printf("E: JLP flash read - open error\n");
+      return;
+   }
+
+   f_lseek(&filesave, 0);
+   f_lseek(&filesave, offset);
+
+   //printf("ROW:%d\n", row);
+   for(int i=0; i<(JLP_FLASH_ROW_BYTES/2); i++) {
+      res = f_read(&filesave, temp, 2, &c); 
+      //printf("R[%d]: %X %X\n", i, temp[0], temp[1]);
+      if ( (res != FR_OK) || (c < 2) ) {
+         printf("E: JLP flash read - chunk read error %d/2 (res=%d)\n", c, res);
+         f_close(&filesave);
+         return;
+      }
+
+      RAM[(addr - 0x8000) + i] = (uint16_t) ((temp[0] << 8) | temp[1]);
+      br += 2;
+   }
+
+   if (br != JLP_FLASH_ROW_BYTES) {
+      printf("E: JLP flash read - size mismatch %d/%d\n", br, JLP_FLASH_ROW_BYTES);
+      f_close(&filesave);
+      return;
+   }
+
+   f_close(&filesave);
+}
+
+// RAM -> flash
+void writeFlash(int row, uint16_t addr) {
+
+   unsigned int c;
+   unsigned int bw = 0;
+   uint32_t offset = row * JLP_FLASH_ROW_BYTES;
+   uint8_t temp[2];
+   FRESULT res;
+
+   if (f_open(&filesave, flashfile, FA_WRITE) != FR_OK) {
+      printf("E: JLP flash write - open error\n");
+      return;
+   }
+
+   f_lseek(&filesave, 0);
+   f_lseek(&filesave, offset);
+
+   //printf("ROW:%d\n", row);
+   for(int i=0; i<(JLP_FLASH_ROW_BYTES/2); i++) {
+      temp[0] = (RAM[(addr - 0x8000) + i] >> 8) & 0xFF;
+      temp[1] = RAM[(addr - 0x8000) + i] & 0xFF;
+      //printf("W[%d]: %X %X\n", i, temp[0], temp[1]);
+      res = f_write(&filesave, temp, 2, &c);
+      if ( (res != FR_OK) || (c < 2) ) {
+         printf("E: JLP flash write - chunk write error %d/2\n", c);
+         f_close(&filesave);
+         return;
+      }
+      bw += 2;
+   }
+   if (bw != JLP_FLASH_ROW_BYTES) {
+      printf("E: JLP flash write - size mismatch %d/%d\n", bw, JLP_FLASH_ROW_BYTES);
+      f_close(&filesave);
+      return;
+   }
+
+   f_close(&filesave);
+}
+
+void eraseFlash(int row) {
+
+   unsigned int bw;
+   uint16_t sector = row % JLP_FLASH_ROWS_PER_SECTOR;
+   uint32_t offset = sector * JLP_FLASH_SECTOR_BYTES;
+
+   if (f_open(&filesave, flashfile, FA_WRITE) != FR_OK) {
+      printf("E: JLP flash erase - open error\n");
+      return;
+   }
+
+   f_lseek(&filesave, offset);
+
+   if (f_write(&filesave, erase_pattern, sizeof(erase_pattern), &bw) != FR_OK) {
+      //printf("E: JLP flash erase - erase sector %d\n", sector);
+      f_close(&filesave);
+      return;
+   }
+
+   if (bw != JLP_FLASH_SECTOR_BYTES) {
+      //printf("E: JLP flash erase - size mismatch %d/%d\n", bw, JLP_FLASH_SECTOR_BYTES);
+      f_close(&filesave);
+      return;
+   }
+
+   f_close(&filesave);
+}
+
 // disable optimization here to avoid issues with core "sleep"
 #pragma GCC push_options
 #pragma GCC optimize ("O0")
@@ -923,7 +1103,7 @@ void LoadGame(void) {
                }
             }
 
-            // handle JLP accelerator features
+            // handle JLP accelerator feature
             if ( (JLPAccel) && (pbc >= 0x9F80) && (pbc <= 0x9FFF) ) {
 
                switch(pbc) {
@@ -1030,6 +1210,46 @@ void LoadGame(void) {
                      break;
                }
             }
+            
+            // handle JLP flash feature
+            if ( (JLPFlash) && (pbc >= 0x802D) && (pbc <= 0x802F) ) {
+
+               switch (pbc) {
+ 
+                  // JF.wrcmd: copy JLP RAM to flash. Must write the value $C0DE.
+                  case 0x802D: {
+                     if (RAM[0x2D] == 0xC0DE) {
+                        RAM[0x2D] = 0xFFFF;
+                        writeFlash(JLP_ROW_NUMBER, JLP_RAM_ADDRESS);
+                        RAM[0x2D] = 0x0000;
+                     }
+                  }
+                  break;
+
+                  // JF.rdcmd: copy flash to JLP RAM. Must write the value $DEC0.
+                  case 0x802E: {
+                     if (RAM[0x2E] == 0xDEC0) {
+                        RAM[0x2E] = 0xFFFF;
+                        readFlash(JLP_ROW_NUMBER, JLP_RAM_ADDRESS);
+                        RAM[0x2E] = 0x0000;
+                     }
+                  }
+                  break;
+
+                  // JF.ercmd: erase flash sector. Must write the value $BEEF.
+                  case 0x802F: {
+                     if (RAM[0x2F] == 0xBEEF) {
+                        RAM[0x2F] = 0xFFFF;
+                        eraseFlash(JLP_ROW_NUMBER);
+                        RAM[0x2F] = 0x0000;
+                     }
+                  break;
+                  }
+
+                  default:
+                     break;
+               }
+            }
 
          } else { 
             
@@ -1125,7 +1345,7 @@ void Inty_cart_main() {
    sprintf(curPath, "%d:/", volumeId);
    RAM[DEV_ADDR] = volumeId;
 
-   RAM[DONE_ADDR] = 123;
+   RAM[DONE_ADDR] = 123;      // release welcome screen
    gpio_put(LED_PIN, true);
 
    IntyMenu(1);
