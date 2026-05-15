@@ -15,8 +15,6 @@ project(${PROJECT} C CXX ASM)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
-option(DEBUG "Enable debug prints on UART" OFF)
-
 pico_sdk_init()
 
 include(FetchContent)
@@ -42,12 +40,19 @@ add_subdirectory(
 
 add_executable(${PROJECT})
 
-if(DEBUG)
-   add_compile_definitions(DEBUG)
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
    target_link_libraries(${PROJECT} pico_stdio_uart)
-   # enable uart output
-   pico_enable_stdio_usb(${PROJECT} 0)
    pico_enable_stdio_uart(${PROJECT} 1)
+endif()
+
+if(CONFIG_USB_DEVICE)
+   target_link_libraries(${PROJECT} tinyusb_device)
+   target_compile_options(${PROJECT} PRIVATE "-DCFG_TUSB_RHPORT0_MODE")
+   target_sources(${PROJECT} PUBLIC
+      ${CMAKE_CURRENT_LIST_DIR}/src/msc_disk.c
+      ${CMAKE_CURRENT_LIST_DIR}/src/usb_tasks.c
+      ${CMAKE_CURRENT_LIST_DIR}/src/usb_descriptors.c
+   )
 endif()
 
 target_compile_definitions(${PROJECT} PRIVATE "PICO_FLASH_SIZE_BYTES=${PICO_FLASH_SIZE_BYTES}")
@@ -58,7 +63,6 @@ target_compile_definitions(${PROJECT} PRIVATE "CONFIG_FLASH_STORAGE=${CONFIG_FLA
 
 target_compile_options(${PROJECT} PRIVATE "-O2")
 target_compile_options(${PROJECT} PRIVATE "-Wall")
-target_compile_options(${PROJECT} PRIVATE "-DCFG_TUSB_RHPORT0_MODE")
 
 set_property(TARGET ${PROJECT} APPEND_STRING PROPERTY LINK_FLAGS "-Wl,--print-memory-usage")
 
@@ -66,10 +70,7 @@ target_sources(${PROJECT} PUBLIC
    ${CMAKE_CURRENT_LIST_DIR}/src/main.c
    ${CMAKE_CURRENT_LIST_DIR}/src/inty_cart.c
    ${CMAKE_CURRENT_LIST_DIR}/src/memory.c
-   ${CMAKE_CURRENT_LIST_DIR}/src/usb_tasks.c
-   ${CMAKE_CURRENT_LIST_DIR}/src/usb_descriptors.c
    #${CMAKE_CURRENT_LIST_DIR}/src/diskio.c
-   ${CMAKE_CURRENT_LIST_DIR}/src/msc_disk.c
    ${CMAKE_CURRENT_LIST_DIR}/src/fatfs_disk.c
    ${CMAKE_CURRENT_LIST_DIR}/src/flash_fs.c
    ${CMAKE_CURRENT_LIST_DIR}/src/hw_config.c
@@ -99,7 +100,6 @@ add_dependencies(${PROJECT} ffconf.h glue.c)
 target_link_libraries(${PROJECT}
    pico_stdlib
    hardware_flash 
-   tinyusb_device
    pico_multicore
    pico_rand
    no-OS-FatFS-SD-SDIO-SPI-RPi-Pico

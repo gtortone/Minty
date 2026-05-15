@@ -37,7 +37,7 @@ int main(void) {
    gpio_init(RESET);
    gpio_set_dir(RESET, true);
 
-#ifdef DEBUG
+#ifndef NDEBUG
    #ifdef PICO_UART_CONSOLE
       #ifndef UART_ID
          #warning "debug UART console not available for this board"

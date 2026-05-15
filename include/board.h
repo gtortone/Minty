@@ -22,7 +22,7 @@
    #define SD_CS        MI_SD_SPI_CSN_PIN
 #endif
 
-#ifdef DEBUG
+#ifndef NDEBUG
    #ifdef MI_DBG_UART_ID
       #define UART_ID   uart_get_instance(MI_DBG_UART_ID)
       #define UART_TX   MI_DBG_UART_TX_PIN 
