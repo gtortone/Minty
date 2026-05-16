@@ -37,6 +37,10 @@ int main(void) {
    gpio_init(RESET);
    gpio_set_dir(RESET, true);
 
+#if CONFIG_USB_DEVICE
+   tud_init(BOARD_TUD_RHPORT);
+#endif
+
 #ifndef NDEBUG
    #ifdef PICO_UART_CONSOLE
       #ifndef UART_ID
@@ -51,12 +55,6 @@ int main(void) {
    sleep_ms(500);
 #endif
 
-#if CONFIG_USB_DEVICE
-   tud_init(BOARD_TUD_RHPORT);
-#endif
-
-   printf("START\n");
-
    // reset interval in ms
    int t = 100;
 
@@ -68,6 +66,8 @@ int main(void) {
          gpio_put(RESET, true);
       }
    }
+
+   printf("START\n");
 
    // check why loop is ended...
    if (gpio_get(MSYNC) == 1) {

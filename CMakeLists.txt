@@ -43,6 +43,7 @@ add_executable(${PROJECT})
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
    target_link_libraries(${PROJECT} pico_stdio_uart)
    pico_enable_stdio_uart(${PROJECT} 1)
+   pico_enable_stdio_usb(${PROJECT} 1)
 endif()
 
 if(CONFIG_USB_DEVICE)
