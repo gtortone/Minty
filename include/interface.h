@@ -50,4 +50,6 @@
 
 #define DATA_OUT(v) sio_hw->gpio_togl = (sio_hw->gpio_out ^ v) & 0xFFFF;
 
+void resetCart(void);
+
 #endif

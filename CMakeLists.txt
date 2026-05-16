@@ -69,7 +69,11 @@ set_property(TARGET ${PROJECT} APPEND_STRING PROPERTY LINK_FLAGS "-Wl,--print-me
 
 target_sources(${PROJECT} PUBLIC
    ${CMAKE_CURRENT_LIST_DIR}/src/main.c
-   ${CMAKE_CURRENT_LIST_DIR}/src/inty_cart.c
+   ${CMAKE_CURRENT_LIST_DIR}/src/cartridge.c
+   ${CMAKE_CURRENT_LIST_DIR}/src/interface.c
+   ${CMAKE_CURRENT_LIST_DIR}/src/filesystem.c
+   ${CMAKE_CURRENT_LIST_DIR}/src/intellicart.c
+   ${CMAKE_CURRENT_LIST_DIR}/src/jlpflash.c
    ${CMAKE_CURRENT_LIST_DIR}/src/memory.c
    #${CMAKE_CURRENT_LIST_DIR}/src/diskio.c
    ${CMAKE_CURRENT_LIST_DIR}/src/fatfs_disk.c

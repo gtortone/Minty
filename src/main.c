@@ -12,7 +12,7 @@
 #include "hardware/clocks.h"
 
 #include "board.h"
-#include "inty_cart.h"
+#include "cartridge.h"
 #include "debug.h"
 
 #if CONFIG_USB_DEVICE

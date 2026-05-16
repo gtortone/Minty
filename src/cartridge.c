@@ -1,0 +1,704 @@
+/*
+//   Minty - MultiCart for Mattel Intellivision by Gennaro Tortone 2025
+//
+//   based on PiRTO II Flash MultiCART by Andrea Ottaviani 2024
+//   parts of code are directly from the A8PicoCart project by Robin Edwards 2023
+*/
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "pico/multicore.h"
+#include "pico/platform.h"
+#include "pico/stdlib.h"
+#include "pico/rand.h"
+
+#include "board.h"
+#include "rom.h"
+#include "memory.h"
+
+#include "fatfs_disk.h"
+#include "interface.h"
+#include "filesystem.h"
+#include "intellicart.h"
+#include "jlpflash.h"
+
+#if CONFIG_USB_DEVICE
+   #include "usb_tasks.h"
+#endif
+
+extern Cartridge cart;     // main data structure for cart emulation
+
+unsigned char busLookup[8];
+
+char curPath[256] = "";
+char path[512];
+
+int volumeId = 0;    // flash
+unsigned char files[256 * 24] = {0};
+
+int filefrom = 0, fileto = 0;
+volatile char cmd = 0;
+
+int num_dir_entries = 0;         // how many entries in the current directory
+char fullpath[512];              // full path of current file
+
+volatile uint16_t addrInCopy;
+
+extern struct mapEntry slots[NSLOTS];
+extern struct memHack hacks[MAX_HACKS_NUM];
+
+FATFS FatFs;
+
+__attribute__((optimize("O3")))
+void __time_critical_func(core1_main()) {
+   volatile unsigned int lastBusState, busState;
+   volatile uint16_t addrIn;
+   volatile uint16_t dataOut;
+   volatile uint32_t dataWrite = 0;
+   volatile unsigned char busBit;
+   volatile bool deviceAddress = false;
+   uint8_t curPageArr[16];        
+   volatile uint8_t seg = 0;
+   volatile uint16_t crc = 0;
+   volatile uint32_t romaddr;
+   volatile uint8_t idx;
+
+   sleep_ms(480);
+
+   busState = BUS_NACT;
+   lastBusState = BUS_NACT;
+
+   dataOut = 0;
+
+   gpio_set_dir_in_masked(ALWAYS_IN_MASK);
+   gpio_set_dir_out_masked(ALWAYS_OUT_MASK);
+
+   // Initial conditions
+   SET_DATA_MODE_IN;
+   memset(curPageArr, 0, sizeof(curPageArr));
+
+   while (1) {
+      // Wait for the bus state to change
+
+      do {
+      } while (!((sio_hw->gpio_in ^ lastBusState) & BUS_STATE_MASK));
+      
+      // We detected a change, but reread the bus state to make sure that all three pins have settled
+      lastBusState = sio_hw->gpio_in;
+
+      busState = (bool)(lastBusState & BC1_MASK) << 2 |
+                  (bool)(lastBusState & BC2_MASK) << 1 |
+                  (bool)(lastBusState & BDIR_MASK);
+
+      busBit = busLookup[busState];
+
+      // Avoiding switch statements here because timing is critical and needs to be deterministic
+      if (!busBit) {
+         
+         // -----------------------
+         // DTB
+         // -----------------------
+
+         // DTB needs to come first since its timing is critical.  The CP-1600 expects data to be
+         // placed on the bus early in the bus cycle (i.e. we need to get data on the bus quickly!)
+         if (deviceAddress) {
+            // The data was prefetched during BAR/ADAR. Output data here.  
+            DATA_OUT(dataOut);
+            SET_DATA_MODE_OUT;
+            // wait 20ns (@200Mhz)
+            asm inline("nop;nop;nop;nop;");
+            while (sio_hw->gpio_in & BC1_MASK) ;  // wait BC1 go down
+            SET_DATA_MODE_IN;
+         }
+      } else {
+         busBit >>= 1;
+         if (!busBit) {
+            
+            // -----------------------
+            // BAR, ADAR
+            // -----------------------
+
+            if (busState == BUS_ADAR) {
+               if (deviceAddress) {
+                  // The data was prefetched during BAR/ADAR. Output data here.  
+                  DATA_OUT(dataOut);
+                  SET_DATA_MODE_OUT;
+                  // wait 20ns (@200Mhz)
+                  asm inline("nop;nop;nop;nop;");
+                  while (sio_hw->gpio_in & BC1_MASK) ;  // wait BC1 go down 
+                  SET_DATA_MODE_IN;
+               }
+            }
+
+            /// ELSE is BAR   
+            // Prefetch data here because there won't be enough time to get it during DTB.
+            // However, we can't take forever because of all the time we had to wait for
+            // the address to appear on the bus.
+            //
+            // We have to wait until the address is stable on the bus
+            // waiting bus is stable 66 nop at 200mhz is ok/85 at 240
+
+            // wait DIR go low for finish BAR cycle 
+
+            SET_DATA_MODE_IN;
+
+            while (sio_hw->gpio_in & BDIR_MASK) ; 
+
+            addrIn = sio_hw->gpio_in & 0xFFFF;
+            addrInCopy = addrIn;
+
+            deviceAddress = false;
+
+            // check for JLP support and accelerators/RAM enabled 
+            if ( cart.JLPSupport ) {
+
+                  if ( (cart.JLPAccel || cart.JLPFlash) && ((addrIn >= 0x8000) && (addrIn <= 0x9FFF)) ) {
+
+                     deviceAddress = true;
+
+                     if ((cart.JLPFlash) && (addrIn == 0x8023)) {
+                        dataOut = 0;
+                     } else if ((cart.JLPFlash) && addrIn == 0x8024) {
+                        dataOut = (cart.JLPFlashSize * JLP_FLASH_ROWS_PER_SECTOR) - 1;
+                     } else {
+                        dataOut = cart.RAM[addrIn - 0x8000];
+                     }
+
+                     continue;
+                  }
+            } 
+
+            idx = (addrIn >> 8);
+
+            if (slots[idx].filled) {
+
+               deviceAddress = true;
+
+               if (slots[idx].type == ROM_SLOT) {
+
+                  //if ( (addrIn - slots[idx].target) <= slots[idx].size[0] ) { 
+
+                     romaddr = slots[idx].from[0] + (addrIn - slots[idx].target);
+                     dataOut = cart.ROM[romaddr];
+                  //}
+
+               } else if (slots[idx].type == ROM_PAGE_SLOT) {
+
+                  //if ( (addrIn - slots[idx].target) <= slots[idx].size[curPageArr[seg]] ) { 
+
+                     seg = (addrIn >> 12) & 0xF;
+                     uint8_t page = curPageArr[seg];
+
+                     if (slots[idx].size[page] != 0) {    // page is filled
+                        romaddr = slots[idx].from[page] + (addrIn - slots[idx].target);
+                        dataOut = cart.ROM[romaddr];
+                     } 
+                  //}
+
+               } else { // RAM8_SLOT or RAM16_SLOT
+               
+                  //if ( (addrIn - slots[idx].from[0]) <= slots[idx].size[0] ) {
+
+                     romaddr = (addrIn - slots[idx].from[0]);
+                     dataOut = cart.RAM[romaddr];
+                  //}
+               }
+            }
+
+         } else {
+            busBit >>= 1;
+            if (!busBit) {
+
+               // -----------------------
+               // DWS WRITE
+               // -----------------------
+               
+               SET_DATA_MODE_IN;
+               
+               dataWrite = sio_hw->gpio_in & 0xFFFF;
+
+               if (cart.pagingSupport) {
+                  if ((addrIn & 0xFFF) == 0xFFF) {
+                     if ( (dataWrite & 0x0A50) == 0x0A50 ) {
+                        // read segment
+                        seg = (addrIn >> 12) & 0xF;
+                        // set page
+                        curPageArr[seg] = dataWrite & 0xF;
+                     }
+                  }
+               }              
+
+               if (deviceAddress) {
+
+                  // check for JLP support and accelerators/RAM enabled 
+                  if ( cart.JLPSupport ) { 
+
+                     if ( (cart.JLPAccel || cart.JLPFlash) && ((addrIn >= 0x8000) && (addrIn <= 0x9FFF)) ) {
+
+                        // JLP CRC-16 accelerator function
+                        if (addrIn == 0x9FFC) { 
+                           crc = cart.RAM[0x1FFD];
+                           crc ^= dataWrite;
+                           for (int i=0; i<16; i++)
+                              crc = (crc >> 1) ^ (crc & 1 ? 0xAD52 : 0);
+                           cart.RAM[0x1FFD] = crc;
+                           continue;
+                        }
+
+                        // JLP RAM addressing
+                        cart.RAM[addrIn - 0x8000] = dataWrite;
+                     } 
+
+                  } else {
+
+                     if ( (addrIn >= cart.ramfrom) && (addrIn <= cart.ramto) ) {
+                        if(cart.ramwidth == 8)
+                           cart.RAM[addrIn - cart.ramfrom] = dataWrite & 0xFF;
+                        else  // cart.ramwidth == 16
+                           cart.RAM[addrIn - cart.ramfrom] = dataWrite;
+                     }
+                  }
+
+               } else {
+                  
+                  // -----------------------
+                  // NACT, IAB, DW, INTAK
+                  // -----------------------
+
+                  // reconnect to bus
+                  SET_DATA_MODE_IN;
+               }
+
+            }
+         }
+      }
+   } // end while
+}
+
+void IntyMenu(int type) {       // 1=start, 2=next page, 3=prev page, 4=dir up
+   int maxfile = 0;
+   
+   if (volumeId == 0)
+      mount_fatfs_disk();
+
+   printf("Mounting %s...\n", curPath);
+
+   if (f_mount(&FatFs, curPath, 1) != FR_OK)
+      printf("E: mount %s failed\n", curPath);
+   else
+      printf("I: mount %s ok\n", curPath);
+
+   switch (type) {
+      case 1:
+         num_dir_entries = read_directory(curPath, files);
+         maxfile = 10;
+         filefrom = 0;
+         if (maxfile > num_dir_entries)
+            maxfile = num_dir_entries;
+         fileto = filefrom + maxfile;
+         break;
+      case 2:
+         if (fileto < num_dir_entries) {
+            maxfile = 10;
+            if ((fileto + maxfile) > num_dir_entries)
+               maxfile = num_dir_entries - fileto;
+            filefrom = fileto;
+            fileto = filefrom + maxfile;
+         }
+         break;
+      case 3:
+         if (filefrom >= 10) {
+            filefrom = filefrom - 10;
+            fileto = filefrom + 10;
+         }
+         break;
+   }
+
+   filelist((DIR_ENTRY *) & files[0], filefrom, fileto, num_dir_entries);
+}
+
+void DirUp() {
+   int len = strlen(curPath);
+
+   if(len == 3)      // e.g. "0:/"
+      return;
+
+   if (len > 0) {
+      while (len && curPath[--len] != '/') ;
+      curPath[len] = 0;
+   }
+}
+
+// flash -> RAM
+// disable optimization here to avoid issues with core "sleep"
+#pragma GCC push_options
+#pragma GCC optimize ("O0")
+void LoadGame(void) {
+
+   int numfile = 0;
+
+   numfile = cart.RAM[0x899] + filefrom - 1;
+
+   DIR_ENTRY *entry = (DIR_ENTRY *) & files[0];
+
+   if (entry[numfile].isDir) {  // directory
+      strcat(curPath, "/");
+      strcat(curPath, entry[numfile].long_filename);
+      IntyMenu(1);
+   } else { 
+      memset(path, 0, sizeof(path));
+      strcat(path, curPath);
+      strcat(path, "/");
+      strcat(path, entry[numfile].long_filename);
+
+      load_file_by_id(entry[numfile].id, curPath, fullpath);
+      // ROM file has internal cfg info
+      if(!is_rom_file(fullpath))
+         load_cfg(fullpath);
+
+      for (int i=0; i<getHacksNum(); i++) {
+         uint32_t romaddr;
+         mapAddress(hacks[i].address, 0, &romaddr, ROM_SLOT);
+         cart.ROM[romaddr] = hacks[i].value;
+      }
+
+      gpio_put(LED, false);
+
+      sleep_ms(200);
+      memset((uint16_t *) cart.RAM, 0, sizeof(cart.RAM));
+
+      resetCart();              // start game !
+
+      volatile uint16_t pbc; 
+
+      // initialize random seed with first random number request 
+      get_rand_32();
+
+      int16_t s16_op1, s16_op2;
+      int16_t prev_s16_op1, prev_s16_op2;
+
+      uint16_t u16_op1, u16_op2;
+      uint16_t prev_u16_op1, prev_u16_op2;
+
+      s16_op1 = s16_op2 = 0;
+      prev_s16_op1 = prev_s16_op2 = 0;
+
+      u16_op1 = u16_op2 = 0;
+      prev_u16_op1 = prev_u16_op2 = 0;
+
+      while (1) {
+
+         if (cart.JLPSupport) {
+
+            pbc = addrInCopy;
+
+            switch(pbc) {
+
+               // switch off JLP RAM and accelerators
+               case 0x8034: {
+                  if (cart.RAM[0x34] == 0x6A7A)
+                     cart.JLPAccel = false;
+               }
+               break;
+
+               // switch on JLP RAM and accelerators
+               case 0x8033: {
+                  if (cart.RAM[0x33] == 0x4A5A)
+                     cart.JLPAccel = true;
+               break;
+               }
+            }
+
+            // handle JLP accelerator feature
+            if ( (cart.JLPAccel) && (pbc >= 0x9F80) && (pbc <= 0x9FFF) ) {
+
+               switch(pbc) {
+      
+                  // MPYSS: signed 16bit by signed 16bit multiply into 32bit result
+                  case 0x9F80:
+                  case 0x9F81: {
+                     s16_op1 = cart.RAM[0x1F80];
+                     s16_op2 = cart.RAM[0x1F81];
+                     if ( (s16_op1 != prev_s16_op1) && (s16_op2 != prev_s16_op2) ) {
+                        int32_t res = s16_op1 * s16_op2;
+                        cart.RAM[0x1F8F] = (res) >> 16;
+                        cart.RAM[0x1F8E] = (res & 0xffff);
+                        s16_op1 = s16_op2 = 0;
+                        prev_s16_op1 = prev_s16_op2 = 0;
+                     }
+                  }
+                  break;
+                  
+                  // MPYSU: signed 16bit by unsigned 16bit multiply into 32bit result
+                  case 0x9F82:
+                  case 0x9F83: {
+                     s16_op1 = cart.RAM[0x1F82];
+                     u16_op2 = cart.RAM[0x1F83];
+                     if ( (s16_op1 != prev_s16_op1) && (u16_op2 != prev_u16_op2) ) {
+                        int32_t res = s16_op1 * u16_op2;
+                        cart.RAM[0x1F8F] = (res) >> 16;
+                        cart.RAM[0x1F8E] = (res & 0xffff);
+                        s16_op1 = u16_op2 = 0;
+                        prev_s16_op1 = prev_u16_op2 = 0;
+                     }
+                  }
+                  break;
+
+                  // MPYUS: unsigned 16bit by signed 16bit multiply into 32bit result
+                  case 0x9F84:
+                  case 0x9F85: {
+                     u16_op1 = cart.RAM[0x1F84];
+                     s16_op2 = cart.RAM[0x1F85];
+                     if ( (u16_op1 != prev_u16_op1) && (s16_op2 != prev_s16_op2) ) {
+                        int32_t res = u16_op1 * s16_op2;
+                        cart.RAM[0x1F8F] = (res) >> 16;
+                        cart.RAM[0x1F8E] = (res & 0xffff);
+                        u16_op1 = s16_op2 = 0;
+                        prev_u16_op1 = prev_s16_op2 = 0;
+                     }
+                  }
+                  break;
+                  
+                  // MPYUU: unsigned 16bit by unsigned 16bit multiply into 32bit result
+                  case 0x9F86:
+                  case 0x9F87: {
+                     u16_op1 = cart.RAM[0x1F86];
+                     u16_op2 = cart.RAM[0x1F87];
+                     if ( (u16_op1 != prev_u16_op1) && (u16_op2 != prev_u16_op2) ) {
+                        int32_t res = u16_op1 * u16_op2;
+                        cart.RAM[0x1F8F] = (res) >> 16;
+                        cart.RAM[0x1F8E] = (res & 0xffff);
+                        u16_op1 = u16_op2 = 0;
+                        prev_u16_op1 = prev_u16_op2 = 0;
+                     }
+                  }
+                  break;
+                  
+                  // DIVSS: signed 16bit by signed 16bit divide with remainder
+                  case 0x9F88:
+                  case 0x9F89: {
+                     s16_op1 = cart.RAM[0x1F88];
+                     s16_op2 = cart.RAM[0x1F89];
+                     if ( (s16_op1 != prev_s16_op1) && (s16_op2 != prev_s16_op2) ) {
+                        int16_t res = s16_op1 % s16_op2;
+                        cart.RAM[0x1F8F] = res;
+                        res = s16_op1 / s16_op2;
+                        cart.RAM[0x1F8E] = res;
+                        s16_op1 = s16_op2 = 0;
+                        prev_s16_op1 = prev_s16_op2 = 0;
+                     }
+                  }
+                  break;
+                  
+                  // DIVUU: unsigned 16bit by unsigned 16bit divide with remainder
+                  case 0x9F8A:
+                  case 0x9F8B: {
+                     u16_op1 = cart.RAM[0x1F8A];
+                     u16_op2 = cart.RAM[0x1F8B];
+                     if ( (u16_op1 != prev_u16_op1) && (u16_op2 != prev_u16_op2) ) {
+                        int16_t res = u16_op1 % u16_op2;
+                        cart.RAM[0x1F8F] = res;
+                        res = u16_op1 / u16_op2;
+                        cart.RAM[0x1F8E] = res;
+                        u16_op1 = u16_op2 = 0;
+                        prev_u16_op1 = prev_u16_op2 = 0;
+                     }
+                  }
+                  break;
+
+                  // non­deterministic hardware random number generator
+                  case 0x9FFE: {
+                     cart.RAM[0x1FFE] = get_rand_32() & 0xFFFF;
+                  }
+                  break;
+
+                  default:
+                     break;
+               }
+            }
+            
+            // handle JLP flash feature
+            if ( (cart.JLPFlash) && (pbc >= 0x802D) && (pbc <= 0x802F) ) {
+
+               switch (pbc) {
+ 
+                  // JF.wrcmd: copy JLP RAM to flash. Must write the value $C0DE.
+                  case 0x802D: {
+                     if (cart.RAM[0x2D] == 0xC0DE) {
+                        cart.RAM[0x2D] = 0xFFFF;
+                        writeFlash(JLP_ROW_NUMBER, JLP_RAM_ADDRESS);
+                        cart.RAM[0x2D] = 0x0000;
+                     }
+                  }
+                  break;
+
+                  // JF.rdcmd: copy flash to JLP RAM. Must write the value $DEC0.
+                  case 0x802E: {
+                     if (cart.RAM[0x2E] == 0xDEC0) {
+                        cart.RAM[0x2E] = 0xFFFF;
+                        readFlash(JLP_ROW_NUMBER, JLP_RAM_ADDRESS);
+                        cart.RAM[0x2E] = 0x0000;
+                     }
+                  }
+                  break;
+
+                  // JF.ercmd: erase flash sector. Must write the value $BEEF.
+                  case 0x802F: {
+                     if (cart.RAM[0x2F] == 0xBEEF) {
+                        cart.RAM[0x2F] = 0xFFFF;
+                        eraseFlash(JLP_ROW_NUMBER);
+                        cart.RAM[0x2F] = 0x0000;
+                     }
+                  break;
+                  }
+
+                  default:
+                     break;
+               }
+            }
+
+         } else { 
+            
+            // JLP off
+            gpio_put(LED, true);
+            sleep_ms(2000);
+            gpio_put(LED, false);
+            sleep_ms(2000);
+         }
+
+      }  // end while
+   }
+}
+
+void Inty_cart_main() {
+   printf("Inty_cart_main\n");
+
+   // Initialize the bus state variables
+   busLookup[BUS_NACT] = 4;     // 100
+   busLookup[BUS_BAR] = 1;      // 001
+   busLookup[BUS_IAB] = 4;      // 100
+   busLookup[BUS_DWS] = 2;      // 010   // test without dws handling
+   busLookup[BUS_ADAR] = 1;     // 001
+   busLookup[BUS_DW] = 4;       // 100
+   busLookup[BUS_DTB] = 0;      // 000
+   busLookup[BUS_INTAK] = 4;    // 100
+
+   multicore_launch_core1(core1_main);
+
+   gpio_init_mask(ALWAYS_OUT_MASK);
+   gpio_init_mask(DATA_MASK);
+   gpio_init_mask(BUS_STATE_MASK);
+   gpio_set_dir_in_masked(ALWAYS_IN_MASK);
+   gpio_set_dir_out_masked(ALWAYS_OUT_MASK);
+   gpio_init(LED);
+   gpio_put(LED, true);
+   gpio_init(RESET);
+
+   gpio_set_dir(MSYNC, GPIO_IN);
+   gpio_pull_down(MSYNC);
+
+   sleep_ms(800);
+
+   resetHigh();
+   sleep_ms(30);
+   resetLow();
+   printf("Inty Pow-ON\n");
+
+   gpio_put(LED, true);
+
+   // init cartridge
+   init_cart();
+
+   for (int i = 0; i < (sizeof(mintyfw) / 2); i++) 
+      cart.ROM[i] = mintyfw[(i * 2) + 1] | (mintyfw[i * 2] << 8);
+
+   /*
+    * [mapping]
+    * $0000 - $0FFF = $5000
+    * $1000 - $114E = $6000
+    * [memattr]
+    * $8000 - $9FFF = RAM 8
+    */
+
+   cleanSlots();
+   cleanHoles();
+   cleanHacks();
+
+   addSlot(0x0000, 0x0FFF, 0x5000, 0, ROM_SLOT);
+   addSlot(0x1000, 0x1FFF, 0x6000, 0, ROM_SLOT);
+   addSlot(0x8000, 0x9FFF, 0, 0, RAM8_SLOT);
+   getRAMRange(&cart.ramfrom, &cart.ramto, &cart.ramwidth);
+
+   sleep_ms(200);
+   resetCart();
+   sleep_ms(1200);
+
+   cart.RAM[CMD_ADDR] = 0;
+   IntyMenu(1);
+   sleep_ms(800);
+   
+   // initial conditions 
+#if CONFIG_SD_STORAGE
+   cart.RAM[HAS_SD_ADDR] = 1;
+#else
+   cart.RAM[HAS_SD_ADDR] = 0;
+#endif
+
+   sprintf(curPath, "%d:/", volumeId);
+   cart.RAM[DEV_ADDR] = volumeId;
+
+   cart.RAM[DONE_ADDR] = 123;      // release welcome screen
+   gpio_put(LED, true);
+
+   IntyMenu(1);
+   
+   bool cmd_executing = false;
+
+   while (1) {
+      cmd = cart.RAM[CMD_ADDR];
+
+      if ((cmd > 0) && !(cmd_executing)) {
+
+         cmd_executing = true;
+         cart.RAM[DONE_ADDR] = 0;
+         cart.RAM[CMD_ADDR] = 0;
+         printf("cmd: %d\n", cmd);
+
+         switch (cmd) {
+            case 1:            // read file list
+               IntyMenu(1);
+               break;
+            case 2:            // run file
+               LoadGame();
+               break;
+            case 3:            // next page
+               IntyMenu(2);
+               break;
+            case 4:            // prev page
+               IntyMenu(3);
+               break;
+            case 5:            // up dir
+               DirUp();
+               IntyMenu(1);
+               break;
+#if CONFIG_SD_STORAGE
+            case 6:            // change storage device
+               volumeId = cart.RAM[DEV_ADDR];
+               sprintf(curPath, "%d:/", volumeId);
+               IntyMenu(1);
+               break;
+#endif
+         }
+         cmd_executing = false;
+         cart.RAM[DONE_ADDR] = 1;
+      }
+
+#if CONFIG_USB_DEVICE
+      tud_task();
+      cdc_task();
+#endif
+   }
+}
+
+#pragma GCC pop_options
