@@ -35,7 +35,7 @@ static spi_t spi = {
    .sck_gpio = SD_SCK,    // GPIO number (not Pico pin number)
    .mosi_gpio = SD_MOSI,
    .miso_gpio = SD_MISO,
-   .baud_rate = 2 * 1000 * 1000,
+   .baud_rate = 10 * 1000 * 1000,
    .no_miso_gpio_pull_up = true
 };
 

@@ -62,6 +62,10 @@ target_compile_definitions(${PROJECT} PRIVATE "CONFIG_USB_DEVICE=${CONFIG_USB_DE
 target_compile_definitions(${PROJECT} PRIVATE "CONFIG_SD_STORAGE=${CONFIG_SD_STORAGE}")
 target_compile_definitions(${PROJECT} PRIVATE "CONFIG_FLASH_STORAGE=${CONFIG_FLASH_STORAGE}")
 
+# options to enable FatFS SD debug
+#target_compile_definitions(${PROJECT} PRIVATE "USE_PRINTF=1")
+#target_compile_definitions(${PROJECT} PRIVATE "USE_DBG_PRINTF=1")
+
 target_compile_options(${PROJECT} PRIVATE "-O2")
 target_compile_options(${PROJECT} PRIVATE "-Wall")
 
