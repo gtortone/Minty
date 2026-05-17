@@ -187,13 +187,13 @@ void __time_critical_func(core1_main()) {
 
                   //if ( (addrIn - slots[idx].target) <= slots[idx].size[curPageArr[seg]] ) { 
 
-                     seg = (addrIn >> 12) & 0xF;
+                     seg = addrIn >> 12;
                      uint8_t page = curPageArr[seg];
 
                      if (slots[idx].size[page] != 0) {    // page is filled
                         romaddr = slots[idx].from[page] + (addrIn - slots[idx].target);
                         dataOut = cart.ROM[romaddr];
-                     } 
+                     } else dataOut = 0xFFFF;
                   //}
 
                } else { // RAM8_SLOT or RAM16_SLOT

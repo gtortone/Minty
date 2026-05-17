@@ -112,6 +112,7 @@ target_link_libraries(${PROJECT}
    pico_multicore
    pico_rand
    no-OS-FatFS-SD-SDIO-SPI-RPi-Pico
+   pico_sha256
 )
 
 # create map/bin/hex/uf2 file in addition to ELF.
