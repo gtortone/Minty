@@ -642,6 +642,10 @@ void Inty_cart_main() {
    sleep_ms(1200);
 
    cart.RAM[CMD_ADDR] = 0;
+
+   sprintf(curPath, "%d:/", volumeId);
+   cart.RAM[DEV_ADDR] = volumeId;
+
    IntyMenu(1);
    sleep_ms(800);
    
@@ -651,9 +655,6 @@ void Inty_cart_main() {
 #else
    cart.RAM[HAS_SD_ADDR] = 0;
 #endif
-
-   sprintf(curPath, "%d:/", volumeId);
-   cart.RAM[DEV_ADDR] = volumeId;
 
    cart.RAM[DONE_ADDR] = 123;      // release welcome screen
    gpio_put(LED, true);
