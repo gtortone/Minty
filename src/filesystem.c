@@ -9,7 +9,9 @@
 #include "ff.h"
 #include "f_util.h"
 
-#include "pico/sha256.h"
+#if PICO_RP2350
+   #include "pico/sha256.h"
+#endif
 
 extern Cartridge cart;
 
@@ -185,10 +187,11 @@ void load_file(char *filename) {
 
       // handle raw rom file
 
+#if PICO_RP2350
       pico_sha256_state_t state;
       sha256_result_t result;
-
       pico_sha256_start_blocking(&state, SHA256_BIG_ENDIAN, true);
+#endif
 
       // read the file to SRAM
       while (!(f_eof(&fil))) {
@@ -197,19 +200,22 @@ void load_file(char *filename) {
          size++;
       }
 
+#if PICO_RP2350
       pico_sha256_update_blocking(&state, (const uint8_t*)cart.ROM, (size*2) - 1);
       pico_sha256_finish(&state, &result);
       
       printf("SHA256: ");
       for (int i = 0; i < SHA256_RESULT_BYTES; i++)
          printf("%02x", result.bytes[i]);
+      printf("\n");
+#endif
    }
 
    cart.len = size;
    cart.RAM[base + 202] = cart.len;
    f_close(&fil);
 
-   printf("\nload_file: size: %ld\n", cart.len);
+   printf("load_file: size: %ld\n", cart.len);
 }
 
 void load_file_by_id(UINT id, char *path, char *fullpath) {

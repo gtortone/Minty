@@ -56,6 +56,19 @@ if(CONFIG_USB_DEVICE)
    )
 endif()
 
+if(CONFIG_FLASH_STORAGE)
+   target_sources(${PROJECT} PUBLIC
+      ${CMAKE_CURRENT_LIST_DIR}/src/fatfs_disk.c
+      ${CMAKE_CURRENT_LIST_DIR}/src/flash_fs.c
+      ${CMAKE_CURRENT_LIST_DIR}/src/msc_disk.c
+   )
+endif()
+
+if(PICO_RP2350)
+   target_link_libraries(${PROJECT} pico_sha256)
+
+endif()
+
 target_compile_definitions(${PROJECT} PRIVATE "PICO_FLASH_SIZE_BYTES=${PICO_FLASH_SIZE_BYTES}")
 target_compile_definitions(${PROJECT} PRIVATE "PICO_FLASH_SPI_CLKDIV=${PICO_FLASH_SPI_CLKDIV}")
 target_compile_definitions(${PROJECT} PRIVATE "CONFIG_USB_DEVICE=${CONFIG_USB_DEVICE}")
@@ -112,7 +125,6 @@ target_link_libraries(${PROJECT}
    pico_multicore
    pico_rand
    no-OS-FatFS-SD-SDIO-SPI-RPi-Pico
-   pico_sha256
 )
 
 # create map/bin/hex/uf2 file in addition to ELF.

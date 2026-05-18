@@ -5,7 +5,7 @@
 //   parts of code are directly from the A8PicoCart project by Robin Edwards 2023
 */
 
-#if CONFIG_USB_DEVICE
+#if CONFIG_USB_DEVICE && CONFIG_FLASH_STORAGE
 
 #include "fatfs_disk.h"
 #include "flash_fs.h"
@@ -13,7 +13,6 @@
 
 // whether host does safe-eject
 static bool ejected = false;
-
 
 // Invoked when received SCSI_CMD_INQUIRY
 // Application fill vendor id, product id and revision with string up to 8, 16, 4 characters respectively

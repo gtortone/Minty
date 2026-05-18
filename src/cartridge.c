@@ -34,7 +34,12 @@ unsigned char busLookup[8];
 char curPath[256] = "";
 char path[512];
 
-int volumeId = 0;    // flash
+#if CONFIG_FLASH_STORAGE
+int volumeId = 0;    // default flash storage
+#else
+int volumeId = 1;    // default SD storage
+#endif
+
 unsigned char files[256 * 24] = {0};
 
 int filefrom = 0, fileto = 0;
@@ -279,8 +284,10 @@ void __time_critical_func(core1_main()) {
 void IntyMenu(int type) {       // 1=start, 2=next page, 3=prev page, 4=dir up
    int maxfile = 0;
    
+#if CONFIG_FLASH_STORAGE
    if (volumeId == 0)
       mount_fatfs_disk();
+#endif
 
    printf("Mounting %s...\n", curPath);
 
@@ -682,7 +689,7 @@ void Inty_cart_main() {
                DirUp();
                IntyMenu(1);
                break;
-#if CONFIG_SD_STORAGE
+#if CONFIG_SD_STORAGE && CONFIG_FLASH_STORAGE
             case 6:            // change storage device
                volumeId = cart.RAM[DEV_ADDR];
                sprintf(curPath, "%d:/", volumeId);

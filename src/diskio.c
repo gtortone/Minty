@@ -20,9 +20,7 @@
 
 /* Definitions of physical drive number for each drive */
 #define DEV_FLASH    0       /* internal flash */
-#ifdef CONFIG_SD_STORAGE
-   #define DEV_SD       1       /* SD card */
-#endif
+#define DEV_SD       1       /* SD card */
 
 #include "fatfs_disk.h"
 
@@ -32,10 +30,12 @@
 
 DSTATUS disk_status(BYTE pdrv   /* Physical drive number to identify the drive */
    ) {
+#if CONFIG_FLASH_STORAGE
    if (pdrv == DEV_FLASH) {
       return 0;
    } 
-#ifdef CONFIG_SD_STORAGE
+#endif
+#if CONFIG_SD_STORAGE
    if(pdrv == DEV_SD) {
       //TRACE_PRINTF(">>> %s\n", __FUNCTION__);
       sd_card_t *sd_card_p = sd_get_by_num(0);
@@ -54,10 +54,12 @@ DSTATUS disk_status(BYTE pdrv   /* Physical drive number to identify the drive *
 
 DSTATUS disk_initialize(BYTE pdrv       /* Physical drive number to identify the drive */
    ) {
+#if CONFIG_FLASH_STORAGE
    if (pdrv == DEV_FLASH) {
       return 0;
    } 
-#ifdef CONFIG_SD_STORAGE
+#endif
+#if CONFIG_SD_STORAGE
    if(pdrv == DEV_SD) {
       //TRACE_PRINTF(">>> %s\n", __FUNCTION__);
       
@@ -76,7 +78,7 @@ DSTATUS disk_initialize(BYTE pdrv       /* Physical drive number to identify the
    return STA_NOINIT;
 }
 
-#ifdef CONFIG_SD_STORAGE
+#if CONFIG_SD_STORAGE
    static int sdrc2dresult(int sd_rc) {
       switch (sd_rc) {
            case SD_BLOCK_DEVICE_ERROR_NONE:
@@ -110,13 +112,15 @@ DRESULT disk_read(BYTE pdrv,    /* Physical drive number to identify the drive *
    LBA_t sector,                /* Start sector in LBA */
    UINT count                   /* Number of sectors to read */
    ) {
-   DRESULT res;
 
+#if CONFIG_FLASH_STORAGE
+   DRESULT res;
    if (pdrv == DEV_FLASH) {
       res = fatfs_disk_read((uint8_t *) buff, sector, count);
       return res;
    } 
-#ifdef CONFIG_SD_STORAGE
+#endif
+#if CONFIG_SD_STORAGE
    if(pdrv == DEV_SD) {
       //TRACE_PRINTF(">>> %s\n", __FUNCTION__);
       sd_card_t *sd_card_p = sd_get_by_num(0);
@@ -140,13 +144,15 @@ DRESULT disk_write(BYTE pdrv,   /* Physical drive number to identify the drive *
    LBA_t sector,                /* Start sector in LBA */
    UINT count                   /* Number of sectors to write */
    ) {
-   DRESULT res;
 
+#if CONFIG_FLASH_STORAGE
+   DRESULT res;
    if (pdrv == DEV_FLASH) {
       res = fatfs_disk_write((const uint8_t *) buff, sector, count);
       return res;
    } 
-#ifdef CONFIG_SD_STORAGE
+#endif
+#if CONFIG_SD_STORAGE
    if(pdrv == DEV_SD) {
       //TRACE_PRINTF(">>> %s\n", __FUNCTION__);
       sd_card_t *sd_card_p = sd_get_by_num(0);
@@ -169,6 +175,7 @@ DRESULT disk_ioctl(BYTE pdrv,   /* Physical drive number (0..) */
    BYTE cmd,                    /* Control code */
    void *buff                   /* Buffer to send/receive control data */
    ) {
+#if CONFIG_FLASH_STORAGE
    if (pdrv == DEV_FLASH) {
       switch (cmd) {
          case CTRL_SYNC:
@@ -189,7 +196,8 @@ DRESULT disk_ioctl(BYTE pdrv,   /* Physical drive number (0..) */
             return RES_PARERR;
       }
    } 
-#ifdef CONFIG_SD_STORAGE
+#endif
+#if CONFIG_SD_STORAGE
    if(pdrv == DEV_SD) {
 
       //TRACE_PRINTF(">>> %s\n", __FUNCTION__);

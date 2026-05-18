@@ -28,7 +28,7 @@ const unsigned int base = 0x17F;
 
 void init_cart(void) {
 
-   memset(cart.ROM, 0, sizeof(cart.ROM));
+   memset((uint16_t *) cart.ROM, 0, sizeof(cart.ROM));
    memset((uint16_t *) cart.RAM, 0, sizeof(cart.RAM));
 
    cart.ramfrom = 0;

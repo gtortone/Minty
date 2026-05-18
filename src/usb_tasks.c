@@ -51,6 +51,8 @@ void tud_cdc_rx_cb(uint8_t itf) {
 // Device callbacks
 //--------------------------------------------------------------------+
 
+#if CONFIG_FLASH_STORAGE
+
 // Invoked when device is mounted
 void tud_mount_cb(void) {
    printf("Device mounted\n");
@@ -75,5 +77,7 @@ void tud_suspend_cb(bool remote_wakeup_en) {
 void tud_resume_cb(void) {
 //  blink_interval_ms = BLINK_MOUNTED;
 }
+
+#endif
 
 #endif
