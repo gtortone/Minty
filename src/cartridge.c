@@ -22,6 +22,7 @@
 #include "filesystem.h"
 #include "intellicart.h"
 #include "jlpflash.h"
+#include "config.h"
 
 #if CONFIG_USB_DEVICE
    #include "usb_tasks.h"
@@ -53,6 +54,11 @@ extern struct mapEntry slots[NSLOTS];
 extern struct memHack hacks[MAX_HACKS_NUM];
 
 FATFS FatFs;
+
+struct boardConfig cfg = {
+   .version = CONFIG_VERSION,
+   .magicNumber = CONFIG_MAGIC_NUMBER 
+}; 
 
 __attribute__((optimize("O3")))
 void __time_critical_func(core1_main()) {
@@ -336,10 +342,6 @@ void DirUp() {
    }
 }
 
-// flash -> RAM
-// disable optimization here to avoid issues with core "sleep"
-#pragma GCC push_options
-#pragma GCC optimize ("O0")
 void LoadGame(void) {
 
    int numfile = 0;
@@ -357,6 +359,27 @@ void LoadGame(void) {
    } else { 
 
       load_file_by_id(entry[numfile].id, curPath, fullpath);
+
+      // save config file only on SD 
+      if (volumeId == 1) {
+         
+         // save last path to config file
+         strcpy(cfg.lastPath, curPath);
+
+         FIL cfgfile;
+         char filename[32];
+         unsigned int bw;
+
+         sprintf(filename, "%d://%s", volumeId, CONFIG_FILENAME);
+         printf("save cfg file: %s\n", filename);
+
+         if (f_open(&cfgfile, filename, (FA_WRITE | FA_OPEN_ALWAYS)) == FR_OK) {
+            f_write(&cfgfile, &cfg, sizeof(struct boardConfig), &bw);
+            f_close(&cfgfile);
+         } else {
+            printf("E: config file %s not written\n", filename);
+         }
+      }
 
       // ROM file has internal cfg info
       if(!is_rom_file(fullpath))
@@ -646,11 +669,39 @@ void Inty_cart_main() {
    cart.RAM[CMD_ADDR] = 0;
 
    sprintf(curPath, "%d:/", volumeId);
+
+   if (volumeId == 1) {
+      // try to read configuration file
+      FIL cfgfile;
+      char filename[32];
+      FILINFO fno;
+      unsigned int br;
+
+      sprintf(filename, "%d://%s", volumeId, CONFIG_FILENAME);
+      
+      if (f_mount(&FatFs, filename, 1) == FR_OK) {
+         if (f_open(&cfgfile, filename, FA_READ) == FR_OK) {
+
+            f_read(&cfgfile, &cfg, sizeof(struct boardConfig), &br);
+
+            if (cfg.magicNumber == CONFIG_MAGIC_NUMBER) {
+
+               if (f_stat(cfg.lastPath, &fno) == FR_OK) {
+                  strcpy(curPath, cfg.lastPath);
+                  //printf("cfg.lastpath: %s\n", cfg.lastPath);
+               }
+            }
+
+            //printf("cfg.version: 0x%X\n", cfg.version);
+            //printf("cfg.magicNumber: 0x%X\n", cfg.magicNumber);
+
+            f_close(&cfgfile);
+         }
+      }
+   } 
+
    cart.RAM[DEV_ADDR] = volumeId;
 
-   IntyMenu(1);
-   sleep_ms(800);
-   
    // initial conditions 
 #if CONFIG_SD_STORAGE
    cart.RAM[HAS_SD_ADDR] = 1;
@@ -706,5 +757,3 @@ void Inty_cart_main() {
 #endif
    }
 }
-
-#pragma GCC pop_options
