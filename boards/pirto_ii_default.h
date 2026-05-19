@@ -4,7 +4,8 @@
 // PirtoII by aotta (https://github.com/aotta/PiRTOII)
 
 // for board detection
-#define PIRTO_II_DEFAULT 1
+#define PIRTO_II_DEFAULT   1
+#define BOARD_ID           2
 
 #define PICO_BOOT_STAGE2_CHOOSE_W25Q080 1
 

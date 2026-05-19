@@ -620,12 +620,15 @@ void Inty_cart_main() {
    for (int i = 0; i < (sizeof(mintyfw) / 2); i++) 
       cart.ROM[i] = mintyfw[(i * 2) + 1] | (mintyfw[i * 2] << 8);
 
+   cart.RAM[BOARD_ID_ADDR] = BOARD_ID;
+
    /*
     * [mapping]
     * $0000 - $0FFF = $5000
-    * $1000 - $114E = $6000
+    * $1000 - $155B = $6000
     * [memattr]
-    * $8000 - $9FFF = RAM 8
+    * $8000 - $8FFF = RAM 8
+    * $9000 - $9FFF = RAM 8
     */
 
    cleanSlots();
@@ -633,7 +636,8 @@ void Inty_cart_main() {
    cleanHacks();
 
    addSlot(0x0000, 0x0FFF, 0x5000, 0, ROM_SLOT);
-   addSlot(0x1000, 0x1FFF, 0x6000, 0, ROM_SLOT);
+   addSlot(0x1000, 0x155B, 0x6000, 0, ROM_SLOT);
+   addSlot(0x8000, 0x8FFF, 0, 0, RAM8_SLOT);
    addSlot(0x8000, 0x9FFF, 0, 0, RAM8_SLOT);
    getRAMRange(&cart.ramfrom, &cart.ramto, &cart.ramwidth);
 

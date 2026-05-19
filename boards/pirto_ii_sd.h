@@ -4,7 +4,8 @@
 // PirtoII with microSD slot by sukkopera (https://github.com/SukkoPera/PiRTOII)
 
 // for board detection
-#define PIRTO_II_SD 1
+#define PIRTO_II_SD     1
+#define BOARD_ID        3
 
 #define PICO_BOOT_STAGE2_CHOOSE_W25Q080 1
  

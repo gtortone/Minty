@@ -5,6 +5,7 @@
 
 // for board detection
 #define PIRTO_II_DUO 1
+#define BOARD_ID     4
 
 #define PICO_RP2350A 1     // 1 for RP2350A, 0 for RP2350B
 

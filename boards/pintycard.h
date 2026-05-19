@@ -2,7 +2,8 @@
 #define PINTYCARD_H
 
 // for board detection
-#define PINTYCARD 1
+#define PINTYCARD    1
+#define BOARD_ID     5
 
 // internal flash W25Q16JVWI
 #define PICO_BOOT_STAGE2_CHOOSE_W25Q080 1
