@@ -31,8 +31,7 @@ extern Cartridge cart;     // main data structure for cart emulation
 
 unsigned char busLookup[8];
 
-char curPath[256] = "";
-char path[512];
+char curPath[512] = "";
 
 #if CONFIG_FLASH_STORAGE
 int volumeId = 0;    // default flash storage
@@ -40,7 +39,7 @@ int volumeId = 0;    // default flash storage
 int volumeId = 1;    // default SD storage
 #endif
 
-unsigned char files[256 * 24] = {0};
+unsigned char files[512 * 24];
 
 int filefrom = 0, fileto = 0;
 volatile char cmd = 0;
@@ -350,16 +349,15 @@ void LoadGame(void) {
    DIR_ENTRY *entry = (DIR_ENTRY *) & files[0];
 
    if (entry[numfile].isDir) {  // directory
+
       strcat(curPath, "/");
       strcat(curPath, entry[numfile].long_filename);
       IntyMenu(1);
+
    } else { 
-      memset(path, 0, sizeof(path));
-      strcat(path, curPath);
-      strcat(path, "/");
-      strcat(path, entry[numfile].long_filename);
 
       load_file_by_id(entry[numfile].id, curPath, fullpath);
+
       // ROM file has internal cfg info
       if(!is_rom_file(fullpath))
          load_cfg(fullpath);

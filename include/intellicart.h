@@ -20,7 +20,7 @@
    #if CONFIG_FLASH_STORAGE
       #define BINLENGTH 1024*205    // 420 kb         // PintyCard
    #else
-      #define BINLENGTH 1024*220    // 450 kb         // Pirto II Duo
+      #define BINLENGTH 1024*218    // ~450 kb        // Pirto II Duo
    #endif
 #endif
 

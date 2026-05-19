@@ -87,6 +87,7 @@ int read_directory(char *path, unsigned char *list) {
             if (!is_valid_file(fno.fname))
                continue;
          dst->id = id++;
+         // 20 chars to launcher display width
          strncpy(dst->long_filename, fno.fname, 20);
          dst->long_filename[20] = 0;
          //printf("%d) entry: %s\n", dst->id, dst->long_filename);
@@ -251,6 +252,7 @@ void filelist(DIR_ENTRY *en, int from, int to, int num) {
 
    for (int i = 0; i < 20 * 20; i++)
       cart.RAM[base + i * 2] = 0;
+
    for (int n = 0; n < (to - from); n++) {
       if (en[n + from].isDir)
          cart.RAM[0x1000 + n] = 1;
