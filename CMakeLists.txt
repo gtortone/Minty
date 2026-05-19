@@ -32,6 +32,12 @@ FetchContent_Declare(
 )
 
 FetchContent_MakeAvailable(pico_fatfs)
+
+# disable warning on f_util.c
+set_source_files_properties(
+   ${PICO_FATFS_DIR}/src/src/f_util.c
+   PROPERTIES COMPILE_OPTIONS "-Wno-format"
+)
 ###
 
 add_subdirectory(
