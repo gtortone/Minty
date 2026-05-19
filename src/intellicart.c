@@ -81,8 +81,8 @@ void load_cfg(char *filename) {
 
             config_memory(fingerprints[i+1]);
             getRAMRange(&cart.ramfrom, &cart.ramto, &cart.ramwidth);
-            printf("cart.ramfrom: 0x%X, cart.ramto: 0x%X, cart.ramwidth: %d\n",
-                  cart.ramfrom, cart.ramto, cart.ramwidth);
+            //printf("cart.ramfrom: 0x%X, cart.ramto: 0x%X, cart.ramwidth: %d\n",
+            //      cart.ramfrom, cart.ramto, cart.ramwidth);
 
             return;
          }

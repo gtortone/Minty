@@ -10,17 +10,25 @@
 // CONFIG_FLASH_STORAGE allocates some big buffers for FAT wear leveling,
 // on microSD equipped boards this option is disabled and saves some RAM
 
-#if PICO_RP2040
-   #if CONFIG_FLASH_STORAGE
-      #define BINLENGTH 1024*55     // 110 kb         // Pirto II default
-   #else
-      #define BINLENGTH 1024*90     // 180 kb         // Pirto II SD
+#ifdef NDEBUG
+   #if PICO_RP2040
+      #if CONFIG_FLASH_STORAGE
+         #define BINLENGTH 1024*55     // 110 kb         // Pirto II default
+      #else
+         #define BINLENGTH 1024*90     // 180 kb         // Pirto II SD
+      #endif
+   #elif PICO_RP2350
+      #if CONFIG_FLASH_STORAGE
+         #define BINLENGTH 1024*205    // 420 kb         // PintyCard
+      #else
+         #define BINLENGTH 1024*218    // ~450 kb        // Pirto II Duo
+      #endif
    #endif
-#elif PICO_RP2350
-   #if CONFIG_FLASH_STORAGE
-      #define BINLENGTH 1024*205    // 420 kb         // PintyCard
-   #else
-      #define BINLENGTH 1024*218    // ~450 kb        // Pirto II Duo
+#else
+   #if PICO_RP2040
+      #define BINLENGTH 1024*50
+   #elif PICO_RP2350
+      #define BINLENGTH 1024*180
    #endif
 #endif
 
