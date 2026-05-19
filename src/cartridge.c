@@ -665,15 +665,12 @@ void Inty_cart_main() {
 
    IntyMenu(1);
    
-   bool cmd_executing = false;
-
    while (1) {
       cmd = cart.RAM[CMD_ADDR];
 
-      if ((cmd > 0) && !(cmd_executing)) {
+      if (cmd > 0) {
 
-         cmd_executing = true;
-         cart.RAM[DONE_ADDR] = 0;
+         cart.RAM[DONE_ADDR] = 1;
          cart.RAM[CMD_ADDR] = 0;
          printf("cmd: %d\n", cmd);
 
@@ -702,8 +699,7 @@ void Inty_cart_main() {
                break;
 #endif
          }
-         cmd_executing = false;
-         cart.RAM[DONE_ADDR] = 1;
+         cart.RAM[DONE_ADDR] = 0;
       }
 
 #if CONFIG_USB_DEVICE
