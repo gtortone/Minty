@@ -14,7 +14,13 @@
 #include "pico/rand.h"
 
 #include "board.h"
-#include "rom.h"
+
+#ifdef PINTYCARD
+   #include "pintyrom.h"
+#else
+   #include "mintyrom.h"
+#endif
+
 #include "memory.h"
 
 #include "fatfs_disk.h"
@@ -646,7 +652,7 @@ void Inty_cart_main() {
    /*
     * [mapping]
     * $0000 - $0FFF = $5000
-    * $1000 - $155B = $6000
+    * $1000 - $139E = $6000
     * [memattr]
     * $8000 - $8FFF = RAM 8
     * $9000 - $9FFF = RAM 8
@@ -657,7 +663,7 @@ void Inty_cart_main() {
    cleanHacks();
 
    addSlot(0x0000, 0x0FFF, 0x5000, 0, ROM_SLOT);
-   addSlot(0x1000, 0x155B, 0x6000, 0, ROM_SLOT);
+   addSlot(0x1000, 0x139E, 0x6000, 0, ROM_SLOT);
    addSlot(0x8000, 0x8FFF, 0, 0, RAM8_SLOT);
    addSlot(0x8000, 0x9FFF, 0, 0, RAM8_SLOT);
    getRAMRange(&cart.ramfrom, &cart.ramto, &cart.ramwidth);
