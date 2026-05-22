@@ -23,11 +23,10 @@
     INCLUDE "SndPlayer.bas"
 
 	DIM I,J
-    DIM #MEM
     DIM #FROM, #F_FROM, #F_TO, #F_TOTAL
     DIM Input, Debounce
     DIM Selected_Entry, Max_Entry
-    DIM #Disp_Color
+    DIM #Disp_Color, #char
 
 	CONST DEBOUNCE_DELAY  = 5					' Number of cycles to detect button press
 
@@ -45,7 +44,6 @@
     CONST ADDRESS_hw        = $8122
     
     ' PI current status
-    CONST PI_STAT_START     = 123
     CONST PI_STAT_BUZZY     = 1
     CONST PI_STAT_READY     = 0
     ' Commands that can be sent to PI
@@ -109,16 +107,16 @@
     NEXT I
 
     PlaySnd(WelcomeSound)
-    FOR I = 1 TO 60:WAIT:NEXT I
+    FOR I = 1 TO 90:WAIT:NEXT I
     ' Next 10 animation frames for text
     FOR I=1 TO 10 
         DEFINE 48,16,VARPTR text_bitmaps_0(64 * I)
-        FOR J=0 TO 7:WAIT:NEXT J
+        FOR J=0 TO 5:WAIT:NEXT J
     NEXT I
 
 	' Wait for card to be ready and minimum delay
 	I = 30
-    WHILE (PI_STATUS<>PI_STAT_START) OR (I>0)
+    WHILE (PI_STATUS<>PI_STAT_READY) OR (I>0)
         IF I>0 THEN I = I - 1
         WAIT
     WEND
@@ -308,8 +306,6 @@ SELECT_ENTRY: PROCEDURE
 UP_DIRECTORY: PROCEDURE
     PI_CMD(CMD_UPDIRECTORY)
     PlaySnd(InputSound)
-    CLS
-    PRINT AT  43 COLOR CS_TAN,"Up directory"
     GOSUB WAIT_CARD_ANSWER
     Selected_Entry = 0
     END
@@ -326,11 +322,11 @@ WAIT_CARD_ANSWER: PROCEDURE
     END
 
 DISPLAY_FILELIST: PROCEDURE
-    Max_Entry = 9
+    Max_Entry = #f_to - #f_from
 
-    FOR J=0 TO 9
-        #mem = PEEK((ADDRESS_flist)+40*J)
-        IF #mem>0 THEN
+    IF Max_Entry > 1 THEN 
+        Max_Entry = Max_Entry - 1
+        FOR J=0 TO Max_Entry
             IF PI_GET_FTYPE(J)=TYPE_DIR THEN
                 IF J = Selected_Entry THEN #Disp_Color = CS_GREEN ELSE #Disp_Color = CS_BLUE
                 PRINT AT screenpos(0,J+1),  BG20 + CS_YELLOW
@@ -339,16 +335,13 @@ DISPLAY_FILELIST: PROCEDURE
                 PRINT AT screenpos(0,J+1),  BG21 + CS_CYAN
             END IF
             FOR I=0 TO 18
-                #mem = PEEK((ADDRESS_flist+I*2)+40*J)
-                IF #mem<32 THEN #mem=0 ELSE #mem=#mem-32
-                IF #mem=63 THEN #mem=207 ' correct replacement for underscore
-                PRINT #mem*8+#Disp_Color
+                #char = PEEK((ADDRESS_flist+I)+20*J)
+                IF #char=63 THEN #char=207 ' correct replacement for underscore
+                PRINT #char*8+#Disp_Color
             NEXT I
-        ELSE
-            Max_Entry = Max_Entry - 1
-        END IF
-    NEXT J
-  END
+        NEXT J
+    END IF
+    END
 
 '
 ' DATA

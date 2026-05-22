@@ -45,7 +45,6 @@
     CONST ADDRESS_hw        = $8122
     
     ' PI current status
-    CONST PI_STAT_START     = 123
     CONST PI_STAT_BUZZY     = 1
     CONST PI_STAT_READY     = 0
     ' Commands that can be sent to PI
@@ -100,7 +99,7 @@
     NEXT I
 
     PlaySnd(WelcomeSound)
-    FOR I = 1 TO 60:WAIT:NEXT I
+    FOR I = 1 TO 90:WAIT:NEXT I
     ' Next 10 animation frames for text
     FOR I=1 TO 10 
         DEFINE 48,16,VARPTR text_bitmaps_0(64 * I)
@@ -109,7 +108,7 @@
 
     ' Wait for card to be ready and minimum delay
     I = 30
-    WHILE (PI_STATUS<>PI_STAT_START) OR (I>0)
+    WHILE (PI_STATUS<>PI_STAT_READY) OR (I>0)
         IF I>0 THEN I = I - 1
         WAIT
     WEND
