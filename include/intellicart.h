@@ -53,8 +53,8 @@ typedef struct {
    FIL filesave;
 } Cartridge;
 
-#define JLP_FEATURE_ACCEL(status)   (value & (1U << 0))
-#define JLP_FEATURE_FLASH(status)   (value & (1U << 1))
+#define JLP_FEATURE_ACCEL(status)   (status & (1U << 0))
+#define JLP_FEATURE_FLASH(status)   (status & (1U << 1))
 
 #define JLP_FLASH_ROWS_PER_SECTOR    8
 #define JLP_FLASH_ROW_BYTES         96 * 2     // 96 * uint16_t
