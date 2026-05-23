@@ -163,9 +163,9 @@ void load_cfg(char *filename) {
          // $8800 - $8FFF = RAM 8
          
          uint32_t a, b;
-         uint8_t w;
+         int w;
 
-         ret = sscanf(line, "$%lx - $%lx =%*[^R]RAM %hhd", &a, &b, &w);
+         ret = sscanf(line, "$%lx - $%lx =%*[^R]RAM %d", &a, &b, &w);
          if (ret != 3) {
             printf("E: parsing error in line: \n\t %s\n", line);
             return;
@@ -177,28 +177,31 @@ void load_cfg(char *filename) {
 
       } else if (cfgsec == VARS) {
 
-         uint8_t value;
+         int jlp_value;
+         int jlpflash_value;
 
-         if ( sscanf(line, "jlp = %hhd", &value) == 1  ||
-               sscanf(line, "jlp_accel = %hhd", &value) == 1  || 
-               sscanf(line, "jlpaccel = %hhd", &value) == 1 ) {
+         if ( sscanf(line, "jlp = %d", &jlp_value) == 1  ||
+               sscanf(line, "jlp_accel = %d", &jlp_value) == 1  || 
+               sscanf(line, "jlpaccel = %d", &jlp_value) == 1 ) {
 
-            if (value != 0) {
+            if (jlp_value != 0) {
                // JLP required
                cart.JLPSupport = true;
                printf("JLP support ON\n");
 
-               if (JLP_FEATURE_ACCEL(value)) {
+               if (JLP_FEATURE_ACCEL(jlp_value)) {
                   cart.JLPAccel = true;
                   printf("JLP accelerators ON\n");
                }
             }
          }
 
-         if ( sscanf(line, "jlp_flash = %hhd", &cart.JLPFlashSize) == 1  ||
-               sscanf(line, "jlpflash = %hhd", &cart.JLPFlashSize) == 1 ) {
+         if ( sscanf(line, "jlp_flash = %d", &jlpflash_value) == 1  ||
+               sscanf(line, "jlpflash = %d", &jlpflash_value) == 1 ) {
 
-            if ( JLP_FEATURE_FLASH(value) && (cart.JLPFlashSize > 0) ) {
+            cart.JLPFlashSize = jlpflash_value;
+
+            if ( JLP_FEATURE_FLASH(jlp_value) && (cart.JLPFlashSize > 0) ) {
                cart.JLPFlash = true;
                printf("JLP flash ON\n");
                printf("JLP flash size: %d\n", cart.JLPFlashSize);
