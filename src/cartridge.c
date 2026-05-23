@@ -662,9 +662,14 @@ void Inty_cart_main() {
    cleanHoles();
    cleanHacks();
 
-   addSlot(0x0000, 0x0FFF, 0x5000, 0, ROM_SLOT);
-   addSlot(0x1000, 0x139E, 0x6000, 0, ROM_SLOT);
-   addSlot(0x8000, 0x8FFF, 0, 0, RAM8_SLOT);
+	if ((sizeof(mintyfw) / 2) < 0x1000) {
+		addSlot(0x0000, (sizeof(mintyfw) / 2)-1, 0x5000, 0, ROM_SLOT);
+	}
+	else {
+		addSlot(0x0000, 0x0FFF, 0x5000, 0, ROM_SLOT);
+		addSlot(0x1000, (sizeof(mintyfw) / 2)-1, 0x6000, 0, ROM_SLOT);
+   }
+	addSlot(0x8000, 0x8FFF, 0, 0, RAM8_SLOT);
    addSlot(0x8000, 0x9FFF, 0, 0, RAM8_SLOT);
    getRAMRange(&cart.ramfrom, &cart.ramto, &cart.ramwidth);
 
@@ -672,6 +677,7 @@ void Inty_cart_main() {
    resetCart();
    sleep_ms(1200);
 
+   cart.RAM[STATUS_ADDR] = 1;      // block cart access until initialisation is done
    cart.RAM[CMD_ADDR] = 0;
 
    sprintf(curPath, "%d:/", volumeId);
@@ -715,17 +721,18 @@ void Inty_cart_main() {
    cart.RAM[HAS_SD_ADDR] = 0;
 #endif
 
-   cart.RAM[DONE_ADDR] = 123;      // release welcome screen
+   IntyMenu(1);
+ 
+   cart.RAM[STATUS_ADDR] = 0;      // release welcome screen
    gpio_put(LED, true);
 
-   IntyMenu(1);
-   
+  
    while (1) {
       cmd = cart.RAM[CMD_ADDR];
 
       if (cmd > 0) {
 
-         cart.RAM[DONE_ADDR] = 1;
+         cart.RAM[STATUS_ADDR] = 1;
          cart.RAM[CMD_ADDR] = 0;
          printf("cmd: %d\n", cmd);
 
@@ -754,7 +761,7 @@ void Inty_cart_main() {
                break;
 #endif
          }
-         cart.RAM[DONE_ADDR] = 0;
+         cart.RAM[STATUS_ADDR] = 0;
       }
 
 #if CONFIG_USB_DEVICE

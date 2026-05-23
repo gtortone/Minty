@@ -250,20 +250,16 @@ void load_file_by_id(UINT id, char *path, char *fullpath) {
 void filelist(DIR_ENTRY *en, int from, int to, int num) {
    int base = 0x17f;
 
-   for (int i = 0; i < 20 * 20; i++)
-      cart.RAM[base + i * 2] = 0;
-
    for (int n = 0; n < (to - from); n++) {
-      if (en[n + from].isDir)
-         cart.RAM[0x1000 + n] = 1;
-      else
-         cart.RAM[0x1000 + n] = 0;
+      cart.RAM[0x1000 + n] = en[n + from].isDir;
       
       for (int i = 0; i < 20; i++) {
-         int pos = base + i * 2 + (n * 40);
+         int pos = base + i + (n * 20);
          cart.RAM[pos] = en[n + from].long_filename[i];
-         if (cart.RAM[pos] <= 20)
-            cart.RAM[pos] = 32;
+         if (cart.RAM[pos] <= 32)
+            cart.RAM[pos] = 0;
+		 else
+			cart.RAM[pos] -= 32;
       }
    }
    cart.RAM[0x1028] = (from & 0xFF00) >> 8;   // MSB
