@@ -146,8 +146,13 @@ vfs_dir_t* vfs_opendir(const char *path) {
       return NULL;
    
    d->mount = mnt;
-   
-   return mnt->driver->opendir(real, d);
+
+   vfs_dir_t *res = mnt->driver->opendir(real, d);
+
+   if(res == NULL)
+      d->used = 0;
+
+   return res;
 }
 
 int vfs_readdir(vfs_dir_t *dir, vfs_dirent_t *out) {

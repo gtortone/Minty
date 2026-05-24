@@ -29,6 +29,7 @@
 #include "intellicart.h"
 #include "vfs.h"
 #include "fatfs_backend.h"
+#include "littlefs_backend.h"
 
 #if CONFIG_JLP
    #include "jlpflash.h"
@@ -96,6 +97,8 @@ void __time_critical_func(core1_main()) {
 #if CONFIG_JLP
    volatile uint16_t crc = 0;
 #endif
+
+   multicore_lockout_victim_init();
 
    sleep_ms(480);
 
@@ -675,6 +678,8 @@ void Inty_cart_main() {
 #if CONFIG_FLASH_FAT_STORAGE
    mount_fatfs_disk();
    vfs_add_mount(&fatfs_driver, "/fl", 0, NULL);
+#elif CONFIG_FLASH_LFS_STORAGE
+   vfs_add_mount(&littlefs_driver, "/fl", 0, NULL);
 #endif
 
    // init cartridge
@@ -710,7 +715,7 @@ void Inty_cart_main() {
    // set default storage device
 #if CONFIG_SD_STORAGE
    strcpy(curPath, "/sd");
-#elif CONFIG_FLASH_FAT_STORAGE
+#elif (CONFIG_FLASH_FAT_STORAGE || CONFIG_FLASH_LFS_STORAGE)
    strcpy(curPath, "/fl");
 #endif
 
@@ -779,7 +784,7 @@ void Inty_cart_main() {
                DirUp();
                IntyMenu(1);
                break;
-#if CONFIG_SD_STORAGE && CONFIG_FLASH_FAT_STORAGE
+#if CONFIG_SD_STORAGE && (CONFIG_FLASH_FAT_STORAGE || CONFIG_FLASH_LFS_STORAGE)
             case 6:            // change storage device
                volumeId = cart.RAM[DEV_ADDR];
                if (volumeId == 0)

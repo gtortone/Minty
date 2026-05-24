@@ -105,6 +105,11 @@ target_compile_definitions(${PROJECT} PRIVATE "CONFIG_FLASH_FAT_STORAGE=${CONFIG
 target_compile_definitions(${PROJECT} PRIVATE "CONFIG_FLASH_LFS_STORAGE=${CONFIG_FLASH_LFS_STORAGE}")
 target_compile_definitions(${PROJECT} PRIVATE "CONFIG_JLP=${CONFIG_JLP}")
 
+if(CONFIG_FLASH_LFS_STORAGE)
+   #target_compile_definitions(${PROJECT} PRIVATE "LFS_THREADSAFE=1")
+   target_compile_definitions(${PROJECT} PRIVATE "LFS_NO_DEBUG=1")
+endif()
+
 # options to enable FatFS SD debug
 #target_compile_definitions(${PROJECT} PRIVATE "USE_PRINTF=1")
 #target_compile_definitions(${PROJECT} PRIVATE "USE_DBG_PRINTF=1")
@@ -129,6 +134,7 @@ target_sources(${PROJECT} PUBLIC
    ${CMAKE_CURRENT_LIST_DIR}/src/utils.c
    ${CMAKE_CURRENT_LIST_DIR}/src/vfs.c
    ${CMAKE_CURRENT_LIST_DIR}/src/fatfs_backend.c
+   ${CMAKE_CURRENT_LIST_DIR}/src/littlefs_backend.c
 )
 
 target_include_directories(${PROJECT} PUBLIC

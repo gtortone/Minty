@@ -5,3 +5,5 @@ lib/
 spikes/*
 !spikes/*.c
 !spikes/*.h
+data/
+littlefs.bin
