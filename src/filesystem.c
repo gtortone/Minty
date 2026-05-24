@@ -237,20 +237,21 @@ void load_file_by_id(unsigned int id, char *path, char *fullpath) {
          if (vfs_readdir(dir, &ent) <= 0)
             break;
 
-         if ((strcmp(ent.name, ".") == 0 || strcmp(ent.name, "..") == 0))
+         // skip '.', '..' and hidden files
+         if ((strcmp(ent.name, ".") == 0 || strcmp(ent.name, "..") == 0) || ent.name[0] == '.')
             continue;
+
+         if (ent.type != VFS_TYPE_DIR)
+            if (!is_valid_file(ent.name))
+               continue;
 
          sprintf(fullpath, "%s/%s", path, ent.name);
 
-         if (ent.type == VFS_TYPE_FILE) {
-            if (!is_valid_file(ent.name))
-               continue;
-            if (i++ == id) {
-               vfs_closedir(dir);
-               printf("load_file_by_id: id %d, opening %s\n", id, fullpath);
-               load_file(fullpath); 
-               return;
-            }
+         if (i++ == id) {
+            vfs_closedir(dir);
+            printf("load_file_by_id: id %d, opening %s\n", id, fullpath);
+            load_file(fullpath); 
+            return;
          }
       }
       vfs_closedir(dir);
