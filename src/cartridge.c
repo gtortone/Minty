@@ -351,13 +351,17 @@ void IntyMenu(int type) {       // 1=start, 2=next page, 3=prev page, 4=dir up
    filelist((SCREEN_ENTRY *) & files[0], filefrom, fileto, num_dir_entries);
 
    // make path available to launcher
-   for (int i = 0; i < 20; i++) {
-      int pos = PATH_ADDR + i;
-      cart.RAM[pos] = curPath[i+4];
+   while(curPath[path_char]) {
+      int pos = PATH_ADDR + path_char;
+      cart.RAM[pos] = curPath[path_char];
       if (cart.RAM[pos] <= 32)
          cart.RAM[pos] = 0;
       else
          cart.RAM[pos] -= 32;
+      path_char++;
+   }
+   for (int pos = PATH_ADDR + path_char; pos < PATH_ADDR + 20; pos++) {
+      cart.RAM[pos] = 0;
    }
 }
 
