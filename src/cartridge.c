@@ -27,9 +27,12 @@
 #include "interface.h"
 #include "filesystem.h"
 #include "intellicart.h"
-#include "jlpflash.h"
 #include "vfs.h"
 #include "fatfs_backend.h"
+
+#if CONFIG_JLP
+   #include "jlpflash.h"
+#endif
 
 #if CONFIG_SD_STORAGE
    #include "config.h"
@@ -87,9 +90,12 @@ void __time_critical_func(core1_main()) {
    volatile bool deviceAddress = false;
    uint8_t curPageArr[16];        
    volatile uint8_t seg = 0;
-   volatile uint16_t crc = 0;
    volatile uint32_t romaddr;
    volatile uint8_t idx;
+
+#if CONFIG_JLP
+   volatile uint16_t crc = 0;
+#endif
 
    sleep_ms(480);
 
@@ -177,6 +183,7 @@ void __time_critical_func(core1_main()) {
 
             deviceAddress = false;
 
+#if CONFIG_JLP
             // check for JLP support and accelerators/RAM enabled 
             if ( cart.JLPSupport ) {
 
@@ -195,6 +202,7 @@ void __time_critical_func(core1_main()) {
                      continue;
                   }
             } 
+#endif
 
             idx = (addrIn >> 8);
 
@@ -258,6 +266,7 @@ void __time_critical_func(core1_main()) {
 
                if (deviceAddress) {
 
+#if CONFIG_JLP
                   // check for JLP support and accelerators/RAM enabled 
                   if ( cart.JLPSupport ) { 
 
@@ -278,6 +287,7 @@ void __time_critical_func(core1_main()) {
                      } 
 
                   } else {
+#endif
 
                      if ( (addrIn >= cart.ramfrom) && (addrIn <= cart.ramto) ) {
                         if(cart.ramwidth == 8)
@@ -285,7 +295,9 @@ void __time_critical_func(core1_main()) {
                         else  // cart.ramwidth == 16
                            cart.RAM[addrIn - cart.ramfrom] = dataWrite;
                      }
+#if CONFIG_JLP
                   }
+#endif
 
                } else {
                   
@@ -412,6 +424,7 @@ void LoadGame(void) {
 
       resetCart();              // start game !
 
+#if CONFIG_JLP
       volatile uint16_t pbc; 
 
       // initialize random seed with first random number request 
@@ -428,9 +441,11 @@ void LoadGame(void) {
 
       u16_op1 = u16_op2 = 0;
       prev_u16_op1 = prev_u16_op2 = 0;
+#endif
 
       while (1) {
 
+#if CONFIG_JLP
          if (cart.JLPSupport) {
 
             pbc = addrInCopy;
@@ -601,13 +616,17 @@ void LoadGame(void) {
             }
 
          } else { 
+#endif
             
             // JLP off
             gpio_put(LED, true);
             sleep_ms(2000);
             gpio_put(LED, false);
             sleep_ms(2000);
+
+#if CONFIG_JLP
          }
+#endif
 
       }  // end while
    }

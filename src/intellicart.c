@@ -177,6 +177,7 @@ void load_cfg(char *filename) {
 
       } else if (cfgsec == VARS) {
 
+#if CONFIG_JLP
          int jlp_value;
          int jlpflash_value;
 
@@ -207,6 +208,7 @@ void load_cfg(char *filename) {
                printf("JLP flash size: %d\n", cart.JLPFlashSize);
             }
          }
+#endif
 
 
       } else if (cfgsec == MACRO) {
