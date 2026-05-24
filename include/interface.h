@@ -22,6 +22,7 @@
 #define DEV_ADDR        0x120       // 0: flash, 1: SD
 #define HAS_SD_ADDR     0x121       // 0: no SD support, 1: SD support
 #define BOARD_ID_ADDR   0x122       // (see firmware)
+#define PATH_ADDR       0x1100      // current path
 
 #define COMPILER_BARRIER() asm volatile("" ::: "memory")
 

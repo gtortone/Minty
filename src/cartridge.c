@@ -344,6 +344,16 @@ void IntyMenu(int type) {       // 1=start, 2=next page, 3=prev page, 4=dir up
    }
 
    filelist((DIR_ENTRY *) & files[0], filefrom, fileto, num_dir_entries);
+
+   // make path available to launcher
+   for (int i = 0; i < 20; i++) {
+      int pos = PATH_ADDR + i;
+      cart.RAM[pos] = curPath[i+4];
+      if (cart.RAM[pos] <= 32)
+         cart.RAM[pos] = 0;
+      else
+         cart.RAM[pos] -= 32;
+   }
 }
 
 void DirUp() {

@@ -22,7 +22,7 @@
     ' Include Sound player library
     INCLUDE "SndPlayer.bas"
 
-	DIM I,J
+	DIM I,J,K
     DIM #FROM, #F_FROM, #F_TO, #F_TOTAL
     DIM Input, Debounce
     DIM Selected_Entry, Max_Entry
@@ -42,6 +42,7 @@
     CONST ADDRESS_fto       = $9030 ' Last displayed entry
     CONST ADDRESS_ftotal    = $9032 ' Total number of entries
     CONST ADDRESS_hw        = $8122
+    CONST ADDRESS_path      = $9100
     
     ' PI current status
     CONST PI_STAT_BUZZY     = 1
@@ -107,7 +108,7 @@
     NEXT I
 
     PlaySnd(WelcomeSound)
-    FOR I = 1 TO 90:WAIT:NEXT I
+    FOR I = 1 TO 120:WAIT:NEXT I
     ' Next 10 animation frames for text
     FOR I=1 TO 10 
         DEFINE 48,16,VARPTR text_bitmaps_0(64 * I)
@@ -121,42 +122,68 @@
         WAIT
     WEND
 
-    ' Load waiting animation frames into GRAM
     CLS
-    DEFINE 0,10,In_Progress
-    WAIT
-    DEFINE 10,10,VARPTR In_Progress(40)
-    WAIT
     ' load icons into GRAM
-    DEFINE 20,2, Icons
+    DEFINE 0,2,Icons
+    WAIT
+    ' load side slider graphics
+    DEFINE 2,6,Slider
     WAIT
 
     ' Start up with selecting the first entry
     Selected_Entry=0
 
+    'GOSUB test_init
+
 START:
     CLS
-    PRINT AT SCREENPOS(8, 0) COLOR CS_WHITE, "MiNTY"
-
-    ' Display active device
-    IF PI_CURRENTDEVICE = DEV_FLASH THEN
-       PRINT AT SCREENPOS(0, 11) COLOR CS_WHITE, "FL:"
-    ELSE
-       PRINT AT SCREENPOS(0, 11) COLOR CS_WHITE, "SD:"
-    END IF
+    PRINT AT SCREENPOS(0, 0) COLOR CS_WHITE, "MiNTY"
+    PRINT AT SCREENPOS(15, 0) COLOR CS_WHITE, "1:HLP"
 
     ' Get current directory informations
     #f_from  = PI_GET_FFROM
     #f_to    = PI_GET_FTO
-    #f_total = PI_GET_FTOTAL
+    #f_total = PI_GET_FTOTAL  
 
     IF #f_from = #f_to THEN ' empty list
         #from=0
     ELSE
         #from=#f_from+1
-    END IF
+        I = ((78 * #f_from) / #f_total)
+        J = ((78 * #f_to)   / #f_total)
+        IF I > 70 THEN I = 70
+        IF J < I+7  THEN J = I+7
+        
+        K = J-I
 
-    PRINT AT SCREENPOS(3, 11) COLOR CS_WHITE, <3>#from, "-", <3>#f_to, "/", <3>#f_total, " 1:HLP"
+        IF K > 64 THEN
+            SPRITE 3, 160 + VISIBLE, 17 + I + ZOOMY8 + DOUBLEY, SPR02 + SPR_GREY
+            SPRITE 2, 160 + VISIBLE, 17 + J - 64 + ZOOMY8 + DOUBLEY, SPR02 + SPR_GREY
+        ELSEIF K > 32 THEN
+            SPRITE 3, 160 + VISIBLE, 17 + I + ZOOMY8, SPR02 + SPR_GREY
+            SPRITE 2, 160 + VISIBLE, 17 + J - 32 + ZOOMY8, SPR02 + SPR_GREY
+        ELSEIF K > 16 THEN
+            SPRITE 3, 160 + VISIBLE, 17 + I + ZOOMY4, SPR02 + SPR_GREY
+            SPRITE 2, 160 + VISIBLE, 17 + J - 16 + ZOOMY4, SPR02 + SPR_GREY
+        ELSE 
+            SPRITE 3, 160 + VISIBLE, 17 + I + ZOOMY2, SPR02 + SPR_GREY
+            SPRITE 2, 160 + VISIBLE, 17 + J + ZOOMY2, SPR02 + SPR_GREY
+        END IF
+        SPRITE 1, 160 + VISIBLE, 17 + (I+J) / 2 + ZOOMY2, SPR07 + SPR_BLACK
+    END IF
+    #BACKTAB(39) = $0827
+    FOR I=59 TO 199 STEP 20:#BACKTAB(I)=$082F:NEXT I
+    #BACKTAB(219) = $0837
+
+    ' Display active device and current path
+    IF PI_CURRENTDEVICE = DEV_FLASH THEN
+       PRINT AT SCREENPOS(0, 11) COLOR CS_WHITE, "FL:"
+    ELSE
+       PRINT AT SCREENPOS(0, 11) COLOR CS_WHITE, "SD:"
+    END IF
+    FOR I = 0 TO 16
+        PRINT PEEK(ADDRESS_path + I) * 8 + CS_WHITE
+    NEXT I
 
     ' Display file list
     GOSUB DISPLAY_FILELIST
@@ -270,6 +297,9 @@ PREVIOUS_PAGE: PROCEDURE
 HELP_SCREEN: PROCEDURE
     PlaySnd(InputSound)
     CLS
+    ResetSprite(1)
+    ResetSprite(2)
+    ResetSprite(3)
     PRINT AT SCREENPOS(8,0) COLOR CS_GREEN, "HELP"
     PRINT AT SCREENPOS(0,2) COLOR CS_WHITE, "8 or up:   go up"
     PRINT AT SCREENPOS(0,3) COLOR CS_WHITE, "0 or down: go dn"
@@ -313,10 +343,12 @@ UP_DIRECTORY: PROCEDURE
 WAIT_CARD_ANSWER: PROCEDURE
     I = 0
     WHILE PI_STATUS = PI_STAT_BUZZY
-		SPRITE 0, 84 + VISIBLE, 56 + ZOOMY2, SPR00 + I*8 + SPR_RED
+        DEFINE 63,1,VARPTR In_Progress(I * 4)
+        WAIT
+        SPRITE 0, 84 + VISIBLE, 56 + ZOOMY2, SPR63 + SPR_RED
         I = (I+1)
         IF I=20 THEN I=0
-        WAIT:WAIT
+        WAIT
     WEND
 	ResetSprite(0)
     END
@@ -329,12 +361,12 @@ DISPLAY_FILELIST: PROCEDURE
         FOR J=0 TO Max_Entry
             IF PI_GET_FTYPE(J)=TYPE_DIR THEN
                 IF J = Selected_Entry THEN #Disp_Color = CS_GREEN ELSE #Disp_Color = CS_BLUE
-                PRINT AT screenpos(0,J+1),  BG20 + CS_YELLOW
+                PRINT AT screenpos(0,J+1),  BG00 + CS_YELLOW
             ELSE
                 IF J = Selected_Entry THEN #Disp_Color = CS_GREEN ELSE #Disp_Color = CS_TAN
-                PRINT AT screenpos(0,J+1),  BG21 + CS_CYAN
+                PRINT AT screenpos(0,J+1),  BG01 + CS_CYAN
             END IF
-            FOR I=0 TO 18
+            FOR I=0 TO 17
                 #char = PEEK((ADDRESS_flist+I)+20*J)
                 IF #char=63 THEN #char=207 ' correct replacement for underscore
                 PRINT #char*8+#Disp_Color
@@ -342,6 +374,30 @@ DISPLAY_FILELIST: PROCEDURE
         NEXT J
     END IF
     END
+
+'test_init: PROCEDURE
+'    FOR J=0 TO 9
+'        FOR I = 0 TO 19
+'            POKE(ADDRESS_flist+I + 20*J),J + 16
+'            POKE(ADDRESS_ftype+I),TYPE_FILE
+'        NEXT I 
+'    NEXT J
+'    POKE(ADDRESS_ftype+0),TYPE_DIR
+'    POKE(ADDRESS_ftype+1),TYPE_DIR
+'    POKE(ADDRESS_ftype+2),TYPE_DIR
+'
+'    POKE(ADDRESS_path+0),84-32
+'    POKE(ADDRESS_path+1),69-32
+'    POKE(ADDRESS_path+2),83-32
+'    POKE(ADDRESS_path+3),84-32
+'
+'    POKE(ADDRESS_ffrom),0
+'    POKE(ADDRESS_ffrom+1),10
+'    POKE(ADDRESS_fto),0
+'    POKE(ADDRESS_fto+1),20
+'    POKE(ADDRESS_ftotal),0
+'    POKE(ADDRESS_ftotal+1),22
+'    END
 
 '
 ' DATA
@@ -353,6 +409,15 @@ DISPLAY_FILELIST: PROCEDURE
 Icons:
     DATA $FEE0,$82E2,$8282,$00FE
     DATA $4438,$CED6,$54D6,$0038
+
+Slider:
+    DATA $7C7C,$7C7C,$7C7C,$7C7C
+    DATA $7C7C,$7C7C,$7C7C,$7C7C
+    DATA $82FE,$8282,$8282,$8282
+    DATA $8282,$8282,$8282,$8282
+    DATA $8282,$8282,$8282,$FE82
+    DATA $7C00,$7C00,$7C00,$0000
+
 
 In_Progress:
     DATA $002C,$0000,$0000,$0000
