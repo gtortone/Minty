@@ -661,9 +661,6 @@ void Inty_cart_main() {
 
    sleep_ms(800);
 
-   resetHigh();
-   sleep_ms(30);
-   resetLow();
    printf("Inty Pow-ON\n");
 
    gpio_put(LED, true);
@@ -750,12 +747,12 @@ void Inty_cart_main() {
 #endif
 
    IntyMenu(1);
- 
-   cart.RAM[STATUS_ADDR] = 0;      // release welcome screen
-   gpio_put(LED, true);
 
    printf("max size of ROM file: %d bytes\n", BINLENGTH*2);
   
+   cart.RAM[STATUS_ADDR] = 0;      // release welcome screen
+   gpio_put(LED, true);
+
    while (1) {
       cmd = cart.RAM[CMD_ADDR];
 
