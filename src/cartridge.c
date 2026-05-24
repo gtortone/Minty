@@ -304,22 +304,9 @@ void __time_critical_func(core1_main()) {
 }
 
 void IntyMenu(int type) {       // 1=start, 2=next page, 3=prev page, 4=dir up
+
    int maxfile = 0;
    
-#if CONFIG_FLASH_STORAGE
-   if (volumeId == 0)
-      mount_fatfs_disk();
-#endif
-
-   /*
-   printf("Mounting %s...\n", curPath);
-
-   if (f_mount(&FatFs, curPath, 1) != FR_OK)
-      printf("E: mount %s failed\n", curPath);
-   else
-      printf("I: mount %s ok\n", curPath);
-   */
-
    switch (type) {
       case 1:
          num_dir_entries = read_directory(curPath, files);
@@ -362,7 +349,7 @@ void IntyMenu(int type) {       // 1=start, 2=next page, 3=prev page, 4=dir up
 void DirUp() {
    int len = strlen(curPath);
 
-   if(len == 3)      // e.g. "0:/"
+   if ( (strcmp(curPath, "/sd") == 0) || (strcmp(curPath, "/fl") == 0) )
       return;
 
    if (len > 0) {
@@ -669,6 +656,11 @@ void Inty_cart_main() {
    vfs_add_mount(&fatfs_driver, "/sd", 1, NULL);
 #endif
 
+#if CONFIG_FLASH_STORAGE
+   mount_fatfs_disk();
+   vfs_add_mount(&fatfs_driver, "/fl", 0, NULL);
+#endif
+
    // init cartridge
    init_cart();
 
@@ -703,7 +695,7 @@ void Inty_cart_main() {
 #if CONFIG_SD_STORAGE
    strcpy(curPath, "/sd");
 #elif CONFIG_FLASH_STORAGE
-   strcpy(curPath, "/flash");
+   strcpy(curPath, "/fl");
 #endif
 
 #if CONFIG_SD_STORAGE
@@ -775,7 +767,7 @@ void Inty_cart_main() {
             case 6:            // change storage device
                volumeId = cart.RAM[DEV_ADDR];
                if (volumeId == 0)
-                  strcpy(curPath, "/flash");
+                  strcpy(curPath, "/fl");
                else if(volumeId == 1)
                   strcpy(curPath, "/sd");
                IntyMenu(1);

@@ -13,15 +13,15 @@
 #ifdef NDEBUG
    #if PICO_RP2040
       #if CONFIG_FLASH_STORAGE
-         #define BINLENGTH 1024*55     // 110 kb         // Pirto II default
+         #define BINLENGTH 1024*50     // 100 kb         // Pirto II default
       #else
-         #define BINLENGTH 1024*90     // 180 kb         // Pirto II SD
+         #define BINLENGTH 1024*85     // 175 kb         // Pirto II SD
       #endif
    #elif PICO_RP2350
       #if CONFIG_FLASH_STORAGE
          #define BINLENGTH 1024*205    // 420 kb         // PintyCard
       #else
-         #define BINLENGTH 1024*218    // ~450 kb        // Pirto II Duo
+         #define BINLENGTH 1024*210    // ~430 kb        // Pirto II Duo
       #endif
    #endif
 #else
