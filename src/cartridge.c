@@ -28,6 +28,9 @@
 #include "filesystem.h"
 #include "intellicart.h"
 #include "jlpflash.h"
+#include "vfs.h"
+#include "fatfs_backend.h"
+
 #if CONFIG_SD_STORAGE
    #include "config.h"
 #endif
@@ -61,13 +64,11 @@ volatile uint16_t addrInCopy;
 extern struct mapEntry slots[NSLOTS];
 extern struct memHack hacks[MAX_HACKS_NUM];
 
-FATFS FatFs;
-
 #if CONFIG_SD_STORAGE
 // config file
-FIL cfgfile;
+vfs_file_t *cfgfile;
+vfs_stat_t st;
 char filename[32];
-FILINFO fno;
 unsigned int br, bw;
 
 struct boardConfig cfg = {
@@ -310,12 +311,14 @@ void IntyMenu(int type) {       // 1=start, 2=next page, 3=prev page, 4=dir up
       mount_fatfs_disk();
 #endif
 
+   /*
    printf("Mounting %s...\n", curPath);
 
    if (f_mount(&FatFs, curPath, 1) != FR_OK)
       printf("E: mount %s failed\n", curPath);
    else
       printf("I: mount %s ok\n", curPath);
+   */
 
    switch (type) {
       case 1:
@@ -343,7 +346,7 @@ void IntyMenu(int type) {       // 1=start, 2=next page, 3=prev page, 4=dir up
          break;
    }
 
-   filelist((DIR_ENTRY *) & files[0], filefrom, fileto, num_dir_entries);
+   filelist((SCREEN_ENTRY *) & files[0], filefrom, fileto, num_dir_entries);
 
    // make path available to launcher
    for (int i = 0; i < 20; i++) {
@@ -374,12 +377,12 @@ void LoadGame(void) {
 
    numfile = cart.RAM[0x899] + filefrom - 1;
 
-   DIR_ENTRY *entry = (DIR_ENTRY *) & files[0];
+   SCREEN_ENTRY *entry = (SCREEN_ENTRY *) & files[0];
 
    if (entry[numfile].isDir) {  // directory
 
       strcat(curPath, "/");
-      strcat(curPath, entry[numfile].long_filename);
+      strcat(curPath, entry[numfile].filename);
       IntyMenu(1);
 
    } else { 
@@ -393,12 +396,12 @@ void LoadGame(void) {
          // save last path to config file
          strcpy(cfg.lastPath, curPath);
 
-         sprintf(filename, "%d://%s", volumeId, CONFIG_FILENAME);
+         sprintf(filename, "/sd/%s", CONFIG_FILENAME);
          printf("save cfg file: %s\n", filename);
 
-         if (f_open(&cfgfile, filename, (FA_WRITE | FA_OPEN_ALWAYS)) == FR_OK) {
-            f_write(&cfgfile, &cfg, sizeof(struct boardConfig), &bw);
-            f_close(&cfgfile);
+         if ( (cfgfile = vfs_open(filename, "w")) != NULL) {
+            vfs_write(cfgfile, &cfg, sizeof(struct boardConfig));
+            vfs_close(cfgfile);
          } else {
             printf("E: config file %s not written\n", filename);
          }
@@ -659,6 +662,13 @@ void Inty_cart_main() {
 
    gpio_put(LED, true);
 
+   // init filesystems
+   vfs_init();
+
+#if CONFIG_SD_STORAGE
+   vfs_add_mount(&fatfs_driver, "/sd", 1, NULL);
+#endif
+
    // init cartridge
    init_cart();
 
@@ -666,15 +676,6 @@ void Inty_cart_main() {
       cart.ROM[i] = mintyfw[(i * 2) + 1] | (mintyfw[i * 2] << 8);
 
    cart.RAM[BOARD_ID_ADDR] = BOARD_ID;
-
-   /*
-    * [mapping]
-    * $0000 - $0FFF = $5000
-    * $1000 - $139E = $6000
-    * [memattr]
-    * $8000 - $8FFF = RAM 8
-    * $9000 - $9FFF = RAM 8
-    */
 
    cleanSlots();
    cleanHoles();
@@ -698,27 +699,32 @@ void Inty_cart_main() {
    cart.RAM[STATUS_ADDR] = 1;      // block cart access until initialisation is done
    cart.RAM[CMD_ADDR] = 0;
 
-   sprintf(curPath, "%d:/", volumeId);
+   // set default storage device
+#if CONFIG_SD_STORAGE
+   strcpy(curPath, "/sd");
+#elif CONFIG_FLASH_STORAGE
+   strcpy(curPath, "/flash");
+#endif
 
 #if CONFIG_SD_STORAGE
    if (volumeId == 1) {
       // try to read configuration file
-
-      sprintf(filename, "%d://%s", volumeId, CONFIG_FILENAME);
+      sprintf(filename, "/sd/%s", CONFIG_FILENAME);
       
-      if (f_mount(&FatFs, filename, 1) == FR_OK) {
-         if (f_open(&cfgfile, filename, FA_READ) == FR_OK) {
+      if ( (cfgfile = vfs_open(filename, "r")) != NULL) {
 
-            f_read(&cfgfile, &cfg, sizeof(struct boardConfig), &br);
+         vfs_read(cfgfile, &cfg, sizeof(struct boardConfig));
 
-            if (cfg.magicNumber == CONFIG_MAGIC_NUMBER) {
+         printf("cfg.lastpath: %s\n", cfg.lastPath);
 
-               if (f_stat(cfg.lastPath, &fno) == FR_OK)
-                  strcpy(curPath, cfg.lastPath);
-            }
+         if (cfg.magicNumber == CONFIG_MAGIC_NUMBER) {
 
-            f_close(&cfgfile);
+            vfs_stat(cfg.lastPath, &st);
+            if (st.type == VFS_TYPE_DIR) 
+               strcpy(curPath, cfg.lastPath);
          }
+
+         vfs_close(cfgfile);
       }
    } 
 #endif
@@ -768,7 +774,10 @@ void Inty_cart_main() {
 #if CONFIG_SD_STORAGE && CONFIG_FLASH_STORAGE
             case 6:            // change storage device
                volumeId = cart.RAM[DEV_ADDR];
-               sprintf(curPath, "%d:/", volumeId);
+               if (volumeId == 0)
+                  strcpy(curPath, "/flash");
+               else if(volumeId == 1)
+                  strcpy(curPath, "/sd");
                IntyMenu(1);
                break;
 #endif

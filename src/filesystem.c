@@ -6,8 +6,7 @@
 #include "filesystem.h"
 #include "intellicart.h"
 #include "memory.h"
-#include "ff.h"
-#include "f_util.h"
+#include "vfs.h"
 
 #if PICO_RP2350
    #include "pico/sha256.h"
@@ -20,15 +19,15 @@ extern struct mapEntry slots[NSLOTS];
 extern const unsigned int base;
 
 int entry_compare(const void *p1, const void *p2) {
-   DIR_ENTRY *e1 = (DIR_ENTRY *) p1;
-   DIR_ENTRY *e2 = (DIR_ENTRY *) p2;
+   SCREEN_ENTRY *e1 = (SCREEN_ENTRY *) p1;
+   SCREEN_ENTRY *e2 = (SCREEN_ENTRY *) p2;
 
    if (e1->isDir && !e2->isDir)
       return -1;
    else if (!e1->isDir && e2->isDir)
       return 1;
    else
-      return strcasecmp(e1->long_filename, e2->long_filename);
+      return strcasecmp(e1->filename, e2->filename);
 }
 
 char *get_filename_ext(char *filename) {
@@ -40,18 +39,16 @@ char *get_filename_ext(char *filename) {
 }
 
 int is_rom_file(char *filename) {
-   FIL fil;
-   FRESULT fr;
-   UINT br;
    char inputBuffer[3];
+   vfs_file_t *f;
 
-   if ( (fr = f_open(&fil, filename, FA_READ)) != FR_OK ) {
-      printf("load_file %s error (%s)!\n", filename, FRESULT_str(fr));
+   if ( (f = vfs_open(filename, "r")) == NULL) {
+      printf("load_file %s error\n", filename);
+      return -1;
    }
 
-   f_read(&fil, inputBuffer, sizeof(inputBuffer), &br);
-
-   f_close(&fil);
+   vfs_read(f, inputBuffer, sizeof(inputBuffer));
+   vfs_close(f);
 
    return !((inputBuffer[0] != 0xA8 && (inputBuffer[0] & ~0x20) != 0x41) ||
          (inputBuffer[1] ^ inputBuffer[2]) != 0xFF);
@@ -67,50 +64,55 @@ int is_valid_file(char *filename) {
 }
 
 int read_directory(char *path, unsigned char *list) {
-   UINT id = 0;
-   FILINFO fno;
 
+   unsigned int id = 0;
    int n = 0;
-   DIR_ENTRY *dst = (DIR_ENTRY *) & list[0];
+   SCREEN_ENTRY *dst = (SCREEN_ENTRY *) & list[0];
+   vfs_dirent_t ent;
 
-   DIR dir;
-   FRESULT fr;
+   vfs_dir_t *dir = vfs_opendir(path);
+   if (!dir) {
+      printf("read_directory: vfs_opendir error (%s)\n", path);
+      return 0;
+   };
 
-   if ((fr = f_opendir(&dir, path)) == FR_OK) {
-      while (1) {
-         if (f_readdir(&dir, &fno) != FR_OK || fno.fname[0] == 0)
-            break;
-         if (fno.fattrib & (AM_HID | AM_SYS))
+   while (vfs_readdir(dir, &ent) > 0) {
+
+      if ((strcmp(ent.name, ".") == 0 || strcmp(ent.name, "..") == 0))
+         continue;
+
+      dst->isDir = (ent.type == VFS_TYPE_DIR) ? 1 : 0;
+
+      if (!dst->isDir)
+         if (!is_valid_file(ent.name))
             continue;
-         dst->isDir = fno.fattrib & AM_DIR ? 1 : 0;
-         if (!dst->isDir)
-            if (!is_valid_file(fno.fname))
-               continue;
-         dst->id = id++;
-         // 20 chars to launcher display width
-         strncpy(dst->long_filename, fno.fname, 20);
-         dst->long_filename[20] = 0;
-         //printf("%d) entry: %s\n", dst->id, dst->long_filename);
-         dst++;
-         n++;
-      }
-      f_closedir(&dir);
-   } 
 
-   qsort((DIR_ENTRY *) & list[0], n, sizeof(DIR_ENTRY), entry_compare);
+      dst->id = id++;
+      // 20 chars to launcher display width
+      strncpy(dst->filename, ent.name, 20);
+      dst->filename[20] = 0;
+
+      dst++;
+      n++;
+   }
+   vfs_closedir(dir);
+
+   qsort((SCREEN_ENTRY *) & list[0], n, sizeof(SCREEN_ENTRY), entry_compare);
    
    return n;
 }
 
 void load_file(char *filename) {
-   UINT br, size = 0;
-   unsigned char byteread[2];
-   int bytes_to_read = 2;
-   FIL fil;
-   FRESULT fr;
 
-   if ( (fr = f_open(&fil, filename, FA_READ)) != FR_OK ) {
-      printf("load_file %s error (%s)!\n", filename, FRESULT_str(fr));
+   unsigned int size = 0;
+   unsigned char buf[2];
+
+   printf("load_file(): filename %s\n", filename);
+   vfs_file_t *f = vfs_open(filename, "r");
+
+   if (f == NULL) {
+      printf("load_file %s error\n", filename);
+      return;
    }
   
    // init cartridge
@@ -123,16 +125,17 @@ void load_file(char *filename) {
       uint16_t prev_size, target;
       char inputBuffer[3];
 
-      f_read(&fil, inputBuffer, sizeof(inputBuffer), &br);
+      vfs_read(f, inputBuffer, sizeof(inputBuffer));
       
       // read number of segments
       int slots = inputBuffer[1];
 
       for(int i=0; i<slots; i++) {
 
-         f_read(&fil, byteread, bytes_to_read, &br);
-         int lo = byteread[0] << 8;
-         int hi = (byteread[1] << 8) + 0x100;
+         vfs_read(f, inputBuffer, 2);
+
+         int lo = inputBuffer[0] << 8;
+         int hi = (inputBuffer[1] << 8) + 0x100;
 
          target = lo;
          if (i == 0)
@@ -147,19 +150,19 @@ void load_file(char *filename) {
 
          for (int j = lo; j < hi; j++) {
 
-            f_read(&fil, byteread, bytes_to_read, &br);
-            cart.ROM[size] = byteread[1] | (byteread[0] << 8);
+            vfs_read(f, inputBuffer, 2);
+            cart.ROM[size] = inputBuffer[1] | (inputBuffer[0] << 8);
             size++;
          }
 
          // skip CRC (2 bytes)
-         f_read(&fil, byteread, bytes_to_read, &br);
+         vfs_read(f, inputBuffer, 2);
       }
 
       // read memory block (2Kb) attributes
       char memattr[50];
 
-      f_read(&fil, memattr, sizeof(memattr), &br);
+      vfs_read(f, memattr, sizeof(memattr));
 
       for (int i = 0; i < 32; i++) {
          
@@ -195,9 +198,9 @@ void load_file(char *filename) {
 #endif
 
       // read the file to SRAM
-      while (!(f_eof(&fil))) {
-         f_read(&fil, byteread, bytes_to_read, &br);
-         cart.ROM[size] = byteread[1] | (byteread[0] << 8);
+      while (!(vfs_eof(f))) {
+         vfs_read(f, buf, sizeof(buf));
+         cart.ROM[size] = buf[1] | (buf[0] << 8);
          size++;
       }
 
@@ -214,40 +217,47 @@ void load_file(char *filename) {
 
    cart.len = size;
    cart.RAM[base + 202] = cart.len;
-   f_close(&fil);
+   vfs_close(f);
 
    printf("load_file: size: %ld bytes\n", cart.len*2);
 }
 
-void load_file_by_id(UINT id, char *path, char *fullpath) {
-   DIR dir;
-   UINT i = 0;
-   FILINFO fno;
+void load_file_by_id(unsigned int id, char *path, char *fullpath) {
 
-   if (f_opendir(&dir, path) == FR_OK) {
+   unsigned int i = 0;
+   vfs_dir_t *dir;
+   vfs_dirent_t ent;
+
+   printf("id: %d, path: %s\n", id, path);
+
+   if ( (dir = vfs_opendir(path)) != NULL) {
+
       while (1) {
-         if (f_readdir(&dir, &fno) != FR_OK || fno.fname[0] == 0)
+
+         if (vfs_readdir(dir, &ent) <= 0)
             break;
-         if (fno.fattrib & (AM_HID | AM_SYS))
+
+         if ((strcmp(ent.name, ".") == 0 || strcmp(ent.name, "..") == 0))
             continue;
-         if (!(fno.fattrib & AM_DIR))
-            if (!is_valid_file(fno.fname))
+
+         sprintf(fullpath, "%s/%s", path, ent.name);
+
+         if (ent.type == VFS_TYPE_FILE) {
+            if (!is_valid_file(ent.name))
                continue;
-         if (i++ == id) {
-            f_closedir(&dir);
-            strcat(fullpath, path);
-            strcat(fullpath, "/");
-            strcat(fullpath, fno.fname);
-            printf("load_file_by_id: id %d, opening %s\n", id, fullpath);
-            load_file(fullpath); 
-            return;
+            if (i++ == id) {
+               vfs_closedir(dir);
+               printf("load_file_by_id: id %d, opening %s\n", id, fullpath);
+               load_file(fullpath); 
+               return;
+            }
          }
       }
-      f_closedir(&dir);
+      vfs_closedir(dir);
    } 
 }
 
-void filelist(DIR_ENTRY *en, int from, int to, int num) {
+void filelist(SCREEN_ENTRY *en, int from, int to, int num) {
    int base = 0x17f;
 
    for (int n = 0; n < (to - from); n++) {
@@ -255,7 +265,7 @@ void filelist(DIR_ENTRY *en, int from, int to, int num) {
       
       for (int i = 0; i < 20; i++) {
          int pos = base + i + (n * 20);
-         cart.RAM[pos] = en[n + from].long_filename[i];
+         cart.RAM[pos] = en[n + from].filename[i];
          if (cart.RAM[pos] <= 32)
             cart.RAM[pos] = 0;
 		 else

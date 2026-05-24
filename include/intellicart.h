@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "ff.h"
+#include "vfs.h"
 
 // CONFIG_FLASH_STORAGE allocates some big buffers for FAT wear leveling,
 // on microSD equipped boards this option is disabled and saves some RAM
@@ -50,7 +50,7 @@ typedef struct {
    uint8_t JLPFlashSize;   // number of 1.5KB JLP flash sectors
    bool JLPAccel;
    char flashfile[512];
-   FIL filesave;
+   vfs_file_t *filesave;
 } Cartridge;
 
 #define JLP_FEATURE_ACCEL(status)   (status & (1U << 0))

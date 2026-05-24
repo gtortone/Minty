@@ -4,12 +4,12 @@
 #include <stdbool.h>
 #include <string.h>
 
-#include "ff.h"
 #include "memory.h"
 #include "cartridge.h"
 #include "fingerprints.h"
 #include "intellicart.h"
 #include "utils.h"
+#include "vfs.h"
 
 typedef enum {
    NONE,
@@ -48,8 +48,8 @@ void load_cfg(char *filename) {
 
    char line[80];
    char cfgfile[512] = {0};
-   FIL fil;
    cfgSection cfgsec; 
+   vfs_file_t *f;
    int ret;
 
    char *dot = strrchr(filename, '.');
@@ -57,7 +57,7 @@ void load_cfg(char *filename) {
    strcat(cfgfile, ".cfg");
 
    // config file not available, try to config memory using fingerprint
-   if (f_open(&fil, cfgfile, FA_READ) != FR_OK) {
+   if ((f = vfs_open(cfgfile, "r")) == NULL) {
       int fp = 0;
 
       for (int i = 0; i < 128; i++)
@@ -101,9 +101,9 @@ void load_cfg(char *filename) {
 
    cfgsec = NONE;
 
-   while (!(f_eof(&fil))) {
+   while (!(vfs_eof(f))) {
 
-      f_gets(line, sizeof(line), &fil);
+      vfs_gets(f, line, sizeof(line));
       strcpy(line, trim(line));
 
       //printf("line: %s, len: %d\n", line, strlen(line));
@@ -225,36 +225,26 @@ void load_cfg(char *filename) {
       }
    }
 
-   f_close(&fil);
+   vfs_close(f);
 
    if (cart.JLPFlash) {
 
       strncpy(cart.flashfile, filename, (dot - filename));
       strcat(cart.flashfile, ".save");
 
-      FILINFO fno;
-      FRESULT res;
-
       // check if JLP flash file exists
-      res = f_stat(cart.flashfile, &fno);
+      vfs_stat_t st;
+      vfs_stat(cart.flashfile, &st);
 
-      if(res == FR_NO_FILE) {
+      if(st.type != VFS_TYPE_FILE) {
 
          uint8_t buffer[JLP_FLASH_SECTOR_BYTES];
          uint32_t size = cart.JLPFlashSize * JLP_FLASH_SECTOR_BYTES;
          
          // create JLP flash file
-         res = f_open(&fil, cart.flashfile, FA_CREATE_ALWAYS | FA_WRITE);
-         if (res != FR_OK) {
+         f = vfs_open(cart.flashfile, "w");
+         if (f == NULL) {
             printf("E: file create error\n");
-            f_close(&fil);
-            return;
-         }
-
-         res = f_expand(&fil, size, 1);
-         if (res != FR_OK) {
-            printf("E: expand error\n");
-            f_close(&fil);
             return;
          }
 
@@ -265,23 +255,21 @@ void load_cfg(char *filename) {
          uint32_t remaining = size;
          unsigned int written = 0;
 
-         f_lseek(&fil, 0);
-
          while (remaining) {
             uint32_t chunk = (remaining > sizeof(buffer)) ? sizeof(buffer) : remaining;
 
-            res = f_write(&fil, buffer, chunk, &written);
+            written = vfs_write(f, buffer, chunk);
 
-            if (res != FR_OK || written != chunk) {
+            if (written != chunk) {
                printf("E: write error\n");
-               f_close(&fil);
+               vfs_close(f);
                break;
             }
 
             remaining -= written;
          }
 
-         f_close(&fil);
+         vfs_close(f);
       }
 
       printf("I: use available JLP flash file: %s\n", cart.flashfile);
