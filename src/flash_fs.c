@@ -5,7 +5,7 @@
 //   parts of code are directly from the A8PicoCart project by Robin Edwards 2023
 */
 
-#if CONFIG_FLASH_STORAGE
+#if CONFIG_FLASH_FAT_STORAGE
 
 #include "pico/stdlib.h"
 #include "hardware/flash.h"

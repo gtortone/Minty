@@ -48,7 +48,7 @@ unsigned char busLookup[8];
 
 char curPath[512] = "";
 
-#if CONFIG_FLASH_STORAGE
+#if CONFIG_FLASH_FAT_STORAGE
 int volumeId = 0;    // default flash storage
 #else
 int volumeId = 1;    // default SD storage
@@ -672,7 +672,7 @@ void Inty_cart_main() {
    vfs_add_mount(&fatfs_driver, "/sd", 1, NULL);
 #endif
 
-#if CONFIG_FLASH_STORAGE
+#if CONFIG_FLASH_FAT_STORAGE
    mount_fatfs_disk();
    vfs_add_mount(&fatfs_driver, "/fl", 0, NULL);
 #endif
@@ -710,7 +710,7 @@ void Inty_cart_main() {
    // set default storage device
 #if CONFIG_SD_STORAGE
    strcpy(curPath, "/sd");
-#elif CONFIG_FLASH_STORAGE
+#elif CONFIG_FLASH_FAT_STORAGE
    strcpy(curPath, "/fl");
 #endif
 
@@ -779,7 +779,7 @@ void Inty_cart_main() {
                DirUp();
                IntyMenu(1);
                break;
-#if CONFIG_SD_STORAGE && CONFIG_FLASH_STORAGE
+#if CONFIG_SD_STORAGE && CONFIG_FLASH_FAT_STORAGE
             case 6:            // change storage device
                volumeId = cart.RAM[DEV_ADDR];
                if (volumeId == 0)

@@ -30,7 +30,7 @@
 
 DSTATUS disk_status(BYTE pdrv   /* Physical drive number to identify the drive */
    ) {
-#if CONFIG_FLASH_STORAGE
+#if CONFIG_FLASH_FAT_STORAGE
    if (pdrv == DEV_FLASH) {
       return 0;
    } 
@@ -54,7 +54,7 @@ DSTATUS disk_status(BYTE pdrv   /* Physical drive number to identify the drive *
 
 DSTATUS disk_initialize(BYTE pdrv       /* Physical drive number to identify the drive */
    ) {
-#if CONFIG_FLASH_STORAGE
+#if CONFIG_FLASH_FAT_STORAGE
    if (pdrv == DEV_FLASH) {
       return 0;
    } 
@@ -113,7 +113,7 @@ DRESULT disk_read(BYTE pdrv,    /* Physical drive number to identify the drive *
    UINT count                   /* Number of sectors to read */
    ) {
 
-#if CONFIG_FLASH_STORAGE
+#if CONFIG_FLASH_FAT_STORAGE
    DRESULT res;
    if (pdrv == DEV_FLASH) {
       res = fatfs_disk_read((uint8_t *) buff, sector, count);
@@ -145,7 +145,7 @@ DRESULT disk_write(BYTE pdrv,   /* Physical drive number to identify the drive *
    UINT count                   /* Number of sectors to write */
    ) {
 
-#if CONFIG_FLASH_STORAGE
+#if CONFIG_FLASH_FAT_STORAGE
    DRESULT res;
    if (pdrv == DEV_FLASH) {
       res = fatfs_disk_write((const uint8_t *) buff, sector, count);
@@ -175,7 +175,7 @@ DRESULT disk_ioctl(BYTE pdrv,   /* Physical drive number (0..) */
    BYTE cmd,                    /* Control code */
    void *buff                   /* Buffer to send/receive control data */
    ) {
-#if CONFIG_FLASH_STORAGE
+#if CONFIG_FLASH_FAT_STORAGE
    if (pdrv == DEV_FLASH) {
       switch (cmd) {
          case CTRL_SYNC:

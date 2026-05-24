@@ -51,7 +51,7 @@ void tud_cdc_rx_cb(uint8_t itf) {
 // Device callbacks
 //--------------------------------------------------------------------+
 
-#if CONFIG_FLASH_STORAGE
+#if CONFIG_FLASH_FAT_STORAGE
 
 // Invoked when device is mounted
 void tud_mount_cb(void) {

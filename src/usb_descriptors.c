@@ -34,7 +34,7 @@
  *   [MSB]         HID | MSC | CDC          [LSB]
  */
 #define _PID_MAP(itf, n)  ( (CFG_TUD_##itf) << (n) )
-#if CONFIG_FLASH_STORAGE
+#if CONFIG_FLASH_FAT_STORAGE
 #define USB_PID           (0x4000 | _PID_MAP(CDC, 0) | _PID_MAP(MSC, 1) | _PID_MAP(HID, 2) | \
                            _PID_MAP(MIDI, 3) | _PID_MAP(VENDOR, 4) )
 #else
@@ -82,7 +82,7 @@ uint8_t const *tud_descriptor_device_cb(void) {
 // Configuration Descriptor
 //--------------------------------------------------------------------+
 
-#if CONFIG_FLASH_STORAGE
+#if CONFIG_FLASH_FAT_STORAGE
 enum {
    ITF_NUM_CDC = 0,
    ITF_NUM_CDC_DATA,
@@ -149,7 +149,7 @@ enum {
 
 #endif
 
-#if CONFIG_FLASH_STORAGE
+#if CONFIG_FLASH_FAT_STORAGE
    #define CONFIG_TOTAL_LEN    (TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN + TUD_MSC_DESC_LEN)
 #else
    #define CONFIG_TOTAL_LEN    (TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN)
@@ -163,7 +163,7 @@ uint8_t const desc_fs_configuration[] = {
    // Interface number, string index, EP notification address and size, EP data address (out, in) and size.
    TUD_CDC_DESCRIPTOR(ITF_NUM_CDC, 4, EPNUM_CDC_NOTIF, 8, EPNUM_CDC_OUT, EPNUM_CDC_IN, 64),
 
-#if CONFIG_FLASH_STORAGE
+#if CONFIG_FLASH_FAT_STORAGE
    // Interface number, string index, EP Out & EP In address, EP size
    TUD_MSC_DESCRIPTOR(ITF_NUM_MSC, 5, EPNUM_MSC_OUT, EPNUM_MSC_IN, 64),
 #endif
@@ -180,7 +180,7 @@ uint8_t const desc_hs_configuration[] = {
    // Interface number, string index, EP notification address and size, EP data address (out, in) and size.
    TUD_CDC_DESCRIPTOR(ITF_NUM_CDC, 4, EPNUM_CDC_NOTIF, 8, EPNUM_CDC_OUT, EPNUM_CDC_IN, 512),
 
-#if CONFIG_FLASH_STORAGE
+#if CONFIG_FLASH_FAT_STORAGE
    // Interface number, string index, EP Out & EP In address, EP size
    TUD_MSC_DESCRIPTOR(ITF_NUM_MSC, 5, EPNUM_MSC_OUT, EPNUM_MSC_IN, 512),
 #endif

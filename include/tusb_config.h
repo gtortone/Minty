@@ -92,7 +92,7 @@ extern "C" {
 
 //------------- CLASS -------------//
 #define CFG_TUD_CDC              1
-#if CONFIG_FLASH_STORAGE
+#if CONFIG_FLASH_FAT_STORAGE
    #define CFG_TUD_MSC              1
 #else
    #define CFG_TUD_MSC              0

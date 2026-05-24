@@ -40,8 +40,24 @@ set_source_files_properties(
 )
 ###
 
+#
+# fetch LittleFS library
+#
+set(LITTLEFS_DIR ${CMAKE_SOURCE_DIR}/lib/littlefs)
+
+FetchContent_Declare(
+    littlefs
+    GIT_REPOSITORY https://github.com/littlefs-project/littlefs.git
+    GIT_TAG master
+    SOURCE_DIR ${LITTLEFS_DIR}
+)
+
+FetchContent_MakeAvailable(littlefs)
+###
+
 add_subdirectory(
    ${PICO_FATFS_DIR}/src
+   ${LITTLEFS_DIR}
 )
 
 add_executable(${PROJECT})
@@ -62,11 +78,17 @@ if(CONFIG_USB_DEVICE)
    )
 endif()
 
-if(CONFIG_FLASH_STORAGE)
+if(CONFIG_FLASH_FAT_STORAGE)
    target_sources(${PROJECT} PUBLIC
       ${CMAKE_CURRENT_LIST_DIR}/src/fatfs_disk.c
       ${CMAKE_CURRENT_LIST_DIR}/src/flash_fs.c
       ${CMAKE_CURRENT_LIST_DIR}/src/msc_disk.c
+   )
+elseif(CONFIG_FLASH_LFS_STORAGE)
+   target_sources(${PROJECT} PUBLIC
+      ${CMAKE_CURRENT_LIST_DIR}/lib/littlefs/lfs.c
+      ${CMAKE_CURRENT_LIST_DIR}/lib/littlefs/lfs_util.c
+      ${CMAKE_CURRENT_LIST_DIR}/src/pico_lfs.c
    )
 endif()
 
@@ -79,7 +101,8 @@ target_compile_definitions(${PROJECT} PRIVATE "PICO_FLASH_SIZE_BYTES=${PICO_FLAS
 target_compile_definitions(${PROJECT} PRIVATE "PICO_FLASH_SPI_CLKDIV=${PICO_FLASH_SPI_CLKDIV}")
 target_compile_definitions(${PROJECT} PRIVATE "CONFIG_USB_DEVICE=${CONFIG_USB_DEVICE}")
 target_compile_definitions(${PROJECT} PRIVATE "CONFIG_SD_STORAGE=${CONFIG_SD_STORAGE}")
-target_compile_definitions(${PROJECT} PRIVATE "CONFIG_FLASH_STORAGE=${CONFIG_FLASH_STORAGE}")
+target_compile_definitions(${PROJECT} PRIVATE "CONFIG_FLASH_FAT_STORAGE=${CONFIG_FLASH_FAT_STORAGE}")
+target_compile_definitions(${PROJECT} PRIVATE "CONFIG_FLASH_LFS_STORAGE=${CONFIG_FLASH_LFS_STORAGE}")
 target_compile_definitions(${PROJECT} PRIVATE "CONFIG_JLP=${CONFIG_JLP}")
 
 # options to enable FatFS SD debug
