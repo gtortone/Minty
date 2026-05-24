@@ -153,7 +153,6 @@ START:
         J = ((78 * #f_to)   / #f_total)
         IF I > 70 THEN I = 70
         IF J < I+7  THEN J = I+7
-        
         K = J-I
 
         IF K > 64 THEN
@@ -167,22 +166,17 @@ START:
             SPRITE 2, 160 + VISIBLE, 17 + J - 16 + ZOOMY4, SPR02 + SPR_GREY
         ELSE 
             SPRITE 3, 160 + VISIBLE, 17 + I + ZOOMY2, SPR02 + SPR_GREY
-            SPRITE 2, 160 + VISIBLE, 17 + J + ZOOMY2, SPR02 + SPR_GREY
+            SPRITE 2, 160 + VISIBLE, 17 + J - 8 + ZOOMY2, SPR02 + SPR_GREY
         END IF
-        SPRITE 1, 160 + VISIBLE, 17 + (I+J) / 2 + ZOOMY2, SPR07 + SPR_BLACK
+        SPRITE 1, 160 + VISIBLE, 17 - 2 + (I+J) / 2 + ZOOMY2, SPR07 + SPR_BLACK
     END IF
     #BACKTAB(39) = $0827
     FOR I=59 TO 199 STEP 20:#BACKTAB(I)=$082F:NEXT I
     #BACKTAB(219) = $0837
 
-    ' Display active device and current path
-    IF PI_CURRENTDEVICE = DEV_FLASH THEN
-       PRINT AT SCREENPOS(0, 11) COLOR CS_WHITE, "FL:"
-    ELSE
-       PRINT AT SCREENPOS(0, 11) COLOR CS_WHITE, "SD:"
-    END IF
-    FOR I = 0 TO 16
-        PRINT PEEK(ADDRESS_path + I) * 8 + CS_WHITE
+    ' Display current path
+    FOR I = 0 TO 19
+        PRINT AT SCREENPOS(I, 11),PEEK(ADDRESS_path + I) * 8 + CS_WHITE
     NEXT I
 
     ' Display file list
@@ -356,7 +350,7 @@ WAIT_CARD_ANSWER: PROCEDURE
 DISPLAY_FILELIST: PROCEDURE
     Max_Entry = #f_to - #f_from
 
-    IF Max_Entry > 1 THEN 
+    IF Max_Entry > 0 THEN 
         Max_Entry = Max_Entry - 1
         FOR J=0 TO Max_Entry
             IF PI_GET_FTYPE(J)=TYPE_DIR THEN
@@ -396,7 +390,7 @@ DISPLAY_FILELIST: PROCEDURE
 '    POKE(ADDRESS_fto),0
 '    POKE(ADDRESS_fto+1),20
 '    POKE(ADDRESS_ftotal),0
-'    POKE(ADDRESS_ftotal+1),22
+'    POKE(ADDRESS_ftotal+1),32
 '    END
 
 '
@@ -416,7 +410,7 @@ Slider:
     DATA $82FE,$8282,$8282,$8282
     DATA $8282,$8282,$8282,$8282
     DATA $8282,$8282,$8282,$FE82
-    DATA $7C00,$7C00,$7C00,$0000
+    DATA $7C00,$7C00,$0000,$0000
 
 
 In_Progress:
