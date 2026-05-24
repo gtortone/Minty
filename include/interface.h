@@ -18,7 +18,7 @@
 
 // Inty RAM addresses shared with cart firmware
 #define CMD_ADDR        0x889
-#define DONE_ADDR       0x119       // 0: cart wait, 1: cart run
+#define STATUS_ADDR     0x119       // 0: cart wait, 1: cart run
 #define DEV_ADDR        0x120       // 0: flash, 1: SD
 #define HAS_SD_ADDR     0x121       // 0: no SD support, 1: SD support
 #define BOARD_ID_ADDR   0x122       // (see firmware)

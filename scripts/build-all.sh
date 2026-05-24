@@ -2,7 +2,7 @@
 
 rm -rf build
 
-boards=("pintycard" "pirto_ii_default" "pirto_ii_duo" "pirto_ii_sd")
+boards=("pintycard" "pirto_ii_default" "pirto_ii_duo" "pirto_ii_sd" "pirto")
 
 for board in "${boards[@]}"; do
 

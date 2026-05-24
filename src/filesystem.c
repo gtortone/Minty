@@ -216,7 +216,7 @@ void load_file(char *filename) {
    cart.RAM[base + 202] = cart.len;
    f_close(&fil);
 
-   printf("load_file: size: %ld\n", cart.len);
+   printf("load_file: size: %ld bytes\n", cart.len*2);
 }
 
 void load_file_by_id(UINT id, char *path, char *fullpath) {

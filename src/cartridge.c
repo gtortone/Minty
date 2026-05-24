@@ -28,7 +28,9 @@
 #include "filesystem.h"
 #include "intellicart.h"
 #include "jlpflash.h"
-#include "config.h"
+#if CONFIG_SD_STORAGE
+   #include "config.h"
+#endif
 
 #if CONFIG_USB_DEVICE
    #include "usb_tasks.h"
@@ -61,10 +63,18 @@ extern struct memHack hacks[MAX_HACKS_NUM];
 
 FATFS FatFs;
 
+#if CONFIG_SD_STORAGE
+// config file
+FIL cfgfile;
+char filename[32];
+FILINFO fno;
+unsigned int br, bw;
+
 struct boardConfig cfg = {
    .version = CONFIG_VERSION,
    .magicNumber = CONFIG_MAGIC_NUMBER 
 }; 
+#endif
 
 __attribute__((optimize("O3")))
 void __time_critical_func(core1_main()) {
@@ -366,15 +376,12 @@ void LoadGame(void) {
 
       load_file_by_id(entry[numfile].id, curPath, fullpath);
 
+#if CONFIG_SD_STORAGE
       // save config file only on SD 
       if (volumeId == 1) {
          
          // save last path to config file
          strcpy(cfg.lastPath, curPath);
-
-         FIL cfgfile;
-         char filename[32];
-         unsigned int bw;
 
          sprintf(filename, "%d://%s", volumeId, CONFIG_FILENAME);
          printf("save cfg file: %s\n", filename);
@@ -386,6 +393,7 @@ void LoadGame(void) {
             printf("E: config file %s not written\n", filename);
          }
       }
+#endif
 
       // ROM file has internal cfg info
       if(!is_rom_file(fullpath))
@@ -541,7 +549,7 @@ void LoadGame(void) {
                   }
                   break;
 
-                  // non­deterministic hardware random number generator
+                  // nondeterministic hardware random number generator
                   case 0x9FFE: {
                      cart.RAM[0x1FFE] = get_rand_32() & 0xFFFF;
                   }
@@ -682,12 +690,9 @@ void Inty_cart_main() {
 
    sprintf(curPath, "%d:/", volumeId);
 
+#if CONFIG_SD_STORAGE
    if (volumeId == 1) {
       // try to read configuration file
-      FIL cfgfile;
-      char filename[32];
-      FILINFO fno;
-      unsigned int br;
 
       sprintf(filename, "%d://%s", volumeId, CONFIG_FILENAME);
       
@@ -698,19 +703,15 @@ void Inty_cart_main() {
 
             if (cfg.magicNumber == CONFIG_MAGIC_NUMBER) {
 
-               if (f_stat(cfg.lastPath, &fno) == FR_OK) {
+               if (f_stat(cfg.lastPath, &fno) == FR_OK)
                   strcpy(curPath, cfg.lastPath);
-                  //printf("cfg.lastpath: %s\n", cfg.lastPath);
-               }
             }
-
-            //printf("cfg.version: 0x%X\n", cfg.version);
-            //printf("cfg.magicNumber: 0x%X\n", cfg.magicNumber);
 
             f_close(&cfgfile);
          }
       }
    } 
+#endif
 
    cart.RAM[DEV_ADDR] = volumeId;
 
@@ -726,6 +727,7 @@ void Inty_cart_main() {
    cart.RAM[STATUS_ADDR] = 0;      // release welcome screen
    gpio_put(LED, true);
 
+   printf("max size of ROM file: %d bytes\n", BINLENGTH*2);
   
    while (1) {
       cmd = cart.RAM[CMD_ADDR];
