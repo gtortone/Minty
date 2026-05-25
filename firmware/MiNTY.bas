@@ -176,7 +176,9 @@ START:
 
     ' Display current path
     FOR I = 0 TO 19
-        PRINT AT SCREENPOS(I, 11),PEEK(ADDRESS_path + I) * 8 + CS_WHITE
+        #char = PEEK(ADDRESS_path + I)
+        IF #char=63 THEN #char=207 ' correct replacement for underscore
+        PRINT AT SCREENPOS(I, 11),#char * 8 + CS_WHITE
     NEXT I
 
     ' Display file list
