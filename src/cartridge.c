@@ -66,6 +66,7 @@ char fullpath[512];              // full path of current file
 volatile uint16_t addrInCopy;
 
 extern struct mapEntry slots[NSLOTS];
+extern struct mapHole holes[NSLOTS];
 extern struct memHack hacks[MAX_HACKS_NUM];
 
 #if CONFIG_SD_STORAGE
@@ -209,7 +210,7 @@ void __time_critical_func(core1_main()) {
 
             idx = (addrIn >> 8);
 
-            if (slots[idx].filled) {
+            if (slots[idx].usedmask) {
 
                deviceAddress = true;
 
@@ -218,6 +219,12 @@ void __time_critical_func(core1_main()) {
                   //if ( (addrIn - slots[idx].target) <= slots[idx].size[0] ) { 
 
                      romaddr = slots[idx].from[0] + (addrIn - slots[idx].target);
+
+                     if (holes[idx].filled) {
+                        if(addrIn > holes[idx].from)
+                           romaddr -= holes[idx].size;
+                     }
+
                      dataOut = cart.ROM[romaddr];
                   //}
 
@@ -228,7 +235,7 @@ void __time_critical_func(core1_main()) {
                      seg = addrIn >> 12;
                      uint8_t page = curPageArr[seg];
 
-                     if (slots[idx].size[page] != 0) {    // page is filled
+                     if (slots[idx].usedmask & (1<<page)) {    // page is filled
                         romaddr = slots[idx].from[page] + (addrIn - slots[idx].target);
                         dataOut = cart.ROM[romaddr];
                      } else dataOut = 0xFFFF;
@@ -672,14 +679,27 @@ void Inty_cart_main() {
    vfs_init();
 
 #if CONFIG_SD_STORAGE
-   vfs_add_mount(&fatfs_driver, "/sd", 1, NULL);
+   printf("mount SD storage...");
+   if (vfs_add_mount(&fatfs_driver, "/sd", 1, NULL) != -1)
+      printf(" OK\n");
+   else
+      printf(" FAIL\n");
 #endif
 
 #if CONFIG_FLASH_FAT_STORAGE
    mount_fatfs_disk();
-   vfs_add_mount(&fatfs_driver, "/fl", 0, NULL);
+   printf("mount flash FAT storage...");
+   if (vfs_add_mount(&fatfs_driver, "/fl", 0, NULL) != -1)
+      printf(" OK\n");
+   else
+      printf(" FAIL\n");
+
 #elif CONFIG_FLASH_LFS_STORAGE
-   vfs_add_mount(&littlefs_driver, "/fl", 0, NULL);
+   printf("mount flash LittleFs storage...");
+   if (vfs_add_mount(&littlefs_driver, "/fl", 0, NULL) != -1)
+      printf(" OK\n");
+   else
+      printf(" FAIL\n");
 #endif
 
    // init cartridge

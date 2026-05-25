@@ -23,15 +23,15 @@ void printSlot(uint8_t idx, uint8_t page) {
 
    printf("slot #0x%X: type: %d, from: 0x%lX, to: 0x%lX, target: 0x%X, page: 0x%X, [%s]\n",
          idx, slots[idx].type, slots[idx].from[page], slots[idx].from[page]+slots[idx].size[page],
-         slots[idx].target, page, slots[idx].filled?"FILLED":"EMPTY");
+         slots[idx].target, page, (slots[idx].usedmask) & (1<<page)?"FILLED":"EMPTY");
 }
 
 void printFilledSlots(void) {
 
    for(int i=0; i<NSLOTS; i++) {
-      if (slots[i].filled) {
+      if (slots[i].usedmask) {
          for(int page=0; page<NPAGES; page++) {
-            if(slots[i].size[page]) {
+            if(slots[i].usedmask & (1<<page)) {
                printf("%X) $%lX - $%lX = $%X PAGE %d\n",
                      i, slots[i].from[page], slots[i].from[page]+slots[i].size[page],
                      slots[i].target, page);
@@ -50,7 +50,7 @@ void cleanSlots(void) {
       }
       slots[i].target = 0;
       slots[i].type = 0;
-      slots[i].filled = false;
+      slots[i].usedmask = 0;
    }
 }
 
@@ -94,7 +94,7 @@ void addSlot(uint32_t from, uint32_t to, uint16_t target, uint8_t page, mapType 
       baseslot = (from >> 8);
 
    // detect collision  (only for ROM type for not paged addresses)
-   if ( (type == ROM_SLOT) && slots[baseslot].filled && (page == 0)) {
+   if ( (type == ROM_SLOT) && ((slots[baseslot].usedmask) & (1<<page)) && (page == 0)) {
 
       uint32_t from_in = slots[baseslot].from[page];
       uint32_t to_in = slots[baseslot].from[page] + slots[baseslot].size[page];
@@ -157,7 +157,7 @@ void addSlot(uint32_t from, uint32_t to, uint16_t target, uint8_t page, mapType 
       else
          slots[i].target = 0;
       slots[i].type = type;
-      slots[i].filled = true;
+      slots[i].usedmask |= (1 << page);
 
       //printf("## FILL ## ");
       //printSlot(i, page);
@@ -171,14 +171,14 @@ bool mapSlot(uint16_t addr, uint8_t page, uint8_t *slot) {
 
    if ( (slots[idx].type == ROM_SLOT) || (slots[idx].type == ROM_PAGE_SLOT) ) {
 
-      if ( (slots[idx].filled) && ((addr - slots[idx].target) <= slots[idx].size[page]) ) {
+      if ( (slots[idx].usedmask & (1<<page)) && ((addr - slots[idx].target) <= slots[idx].size[page]) ) {
          *slot = idx;
          return true;
       }
 
    } else {    // RAM8 or RAM16
    
-      if ( (slots[idx].filled) && ((addr - slots[idx].from[0]) <= slots[idx].size[0]) ) {
+      if ( (slots[idx].usedmask & (1<<page)) && ((addr - slots[idx].from[0]) <= slots[idx].size[0]) ) {
          *slot = idx;
          return true;
       }

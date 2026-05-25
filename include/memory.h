@@ -32,7 +32,7 @@ struct mapEntry {
    uint16_t size[NPAGES];
    uint16_t target;
    mapType type;
-   bool filled;
+   uint16_t usedmask;
 };
 
 struct mapHole {
