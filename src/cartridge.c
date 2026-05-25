@@ -737,7 +737,7 @@ void Inty_cart_main() {
          if (cfg.magicNumber == CONFIG_MAGIC_NUMBER) {
 
             vfs_stat(cfg.lastPath, &st);
-            if (st.type == VFS_TYPE_DIR) 
+            if (st.type & VFS_TYPE_DIR) 
                strcpy(curPath, cfg.lastPath);
          }
 

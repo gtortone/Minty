@@ -17,9 +17,9 @@ typedef struct vfs_driver vfs_driver_t;
 
 /* entry type */
 typedef enum {
-    VFS_TYPE_UNKNOWN = 0,
-    VFS_TYPE_FILE,
-    VFS_TYPE_DIR
+    VFS_TYPE_DIR = 1,
+    VFS_TYPE_HIDDEN = 2,
+    VFS_TYPE_SYSTEM = 4
 } vfs_type_t;
 
 /* directory entry */
@@ -95,12 +95,4 @@ int vfs_close(vfs_file_t *f);
 
 static inline int vfs_eof(vfs_file_t *f) {
    return f->eof;
-}
-
-static inline int vfs_is_file(const vfs_stat_t *st) {
-    return st->type == VFS_TYPE_FILE;
-}
-
-static inline int vfs_is_dir(const vfs_stat_t *st) {
-    return st->type == VFS_TYPE_DIR;
 }

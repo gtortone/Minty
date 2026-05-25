@@ -205,7 +205,10 @@ static int littlefs_readdir(vfs_dir_t *vd, vfs_dirent_t *out) {
    strncpy(out->name, d->info.name, sizeof(out->name));
    out->name[sizeof(out->name)-1] = 0;
 
-   out->type = (d->info.type == LFS_TYPE_DIR) ? VFS_TYPE_DIR : VFS_TYPE_FILE;
+   out->type = 0;
+
+   if (d->info.type == LFS_TYPE_DIR)
+      out->type |= VFS_TYPE_DIR;
 
    return 1;
 }
@@ -230,7 +233,10 @@ static int littlefs_stat(const char *path, vfs_stat_t *st, const vfs_mount_t *mn
 
    st->size = info.size;
 
-   st->type = (info.type == LFS_TYPE_DIR) ? VFS_TYPE_DIR : VFS_TYPE_FILE;
+   st->type = 0;
+
+   if (info.type == LFS_TYPE_DIR)
+      st->type |= VFS_TYPE_DIR;
 
    return 0;
 }

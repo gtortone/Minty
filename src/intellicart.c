@@ -231,14 +231,13 @@ void load_cfg(char *filename) {
 
    if (cart.JLPFlash) {
 
+      // check if JLP flash file exists
+      vfs_stat_t st;
+
       strncpy(cart.flashfile, filename, (dot - filename));
       strcat(cart.flashfile, ".save");
 
-      // check if JLP flash file exists
-      vfs_stat_t st;
-      vfs_stat(cart.flashfile, &st);
-
-      if(st.type != VFS_TYPE_FILE) {
+      if(vfs_stat(cart.flashfile, &st) == -1) {
 
          uint8_t buffer[JLP_FLASH_SECTOR_BYTES];
          uint32_t size = cart.JLPFlashSize * JLP_FLASH_SECTOR_BYTES;
