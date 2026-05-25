@@ -17,18 +17,23 @@ void vfs_init(void) {
 
 int vfs_add_mount(const vfs_driver_t *drv, const char *mount_point, int drive_id, void *ctx) {
 
-   for (int i = 0; i < VFS_MAX_MOUNTS; i++) {
+   for (int i=0; i<VFS_MAX_MOUNTS; i++) {
       if (!mounts[i].used) {
-         mounts[i].used = 1;
-         mounts[i].mount_point = mount_point;
          mounts[i].driver = drv;
-         mounts[i].drive_id = drive_id;
-         mounts[i].ctx = ctx;
-         if (mounts[i].driver->init(drive_id))
+         if (mounts[i].driver->init(drive_id)) {
+            mounts[i].used = 1;
+            mounts[i].mount_point = mount_point;
+            mounts[i].drive_id = drive_id;
+            mounts[i].ctx = ctx;
             return 0;
+         } else {
+            mounts[i].driver = 0;
+            return -1;
+         }
       }
    }
 
+   // no mount slot available
    return -1;
 }
 
@@ -88,8 +93,10 @@ vfs_file_t* vfs_open(const char *path, const char *mode) {
       return NULL;
    
    vfs_file_t *f= alloc_file();
-   if (!f) 
+   if (!f) {
+      printf("E: no VFS file slot available\n");
       return NULL;
+   }
    
    f->mount = mnt;
    

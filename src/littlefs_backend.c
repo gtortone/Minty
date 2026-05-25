@@ -45,17 +45,17 @@ static int littlefs_init(const int drive_id) {
       printf("LFS: init filesystem\n");
       if (lfs_format(&lfs, lfs_cfg) != LFS_ERR_OK) {
          printf("LFS: failed to format filesystem\n"); 
-         return 1;
+         return 0;
       }
       if (lfs_mount(&lfs, lfs_cfg) != LFS_ERR_OK) {
          printf("LFS: failed to mount filesystem\n");
-         return 1;
+         return 0;
       }
    }
 
    printf("LFS: filesystem ready\n");
 
-   return 0;
+   return 1;
 }
 
 static vfs_file_t* littlefs_open(const char *path, const char *mode, vfs_file_t *out) {
