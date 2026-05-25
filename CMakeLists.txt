@@ -108,6 +108,7 @@ target_compile_definitions(${PROJECT} PRIVATE "CONFIG_JLP=${CONFIG_JLP}")
 if(CONFIG_FLASH_LFS_STORAGE)
    #target_compile_definitions(${PROJECT} PRIVATE "LFS_THREADSAFE=1")
    target_compile_definitions(${PROJECT} PRIVATE "LFS_NO_DEBUG=1")
+   target_compile_definitions(${PROJECT} PRIVATE "LFS_THREADSAFE=1")
 endif()
 
 # options to enable FatFS SD debug

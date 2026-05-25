@@ -28,8 +28,6 @@
 
 #include "pico_lfs.h"
 
-
-
 static int pico_block_device_read(const struct lfs_config *c, lfs_block_t block,
 				lfs_off_t off, void *buffer, lfs_size_t size)
 {
@@ -45,7 +43,6 @@ static int pico_block_device_read(const struct lfs_config *c, lfs_block_t block,
 	return LFS_ERR_OK;
 }
 
-
 static int pico_block_device_prog(const struct lfs_config *c, lfs_block_t block,
 				lfs_off_t off, const void *buffer, lfs_size_t size)
 {
@@ -59,21 +56,20 @@ static int pico_block_device_prog(const struct lfs_config *c, lfs_block_t block,
 	LFS_ASSERT(off + size <= c->block_size); /* Write must be within a block. */
 
 	/* Program flash block */
-#ifdef LIB_PICO_MULTICORE
-	if (ctx->multicore_lockout_enabled)
-		multicore_lockout_start_blocking();
-#endif
+//#ifdef LIB_PICO_MULTICORE
+//	if (ctx->multicore_lockout_enabled)
+//		multicore_lockout_start_blocking();
+//#endif
 	ints = save_and_disable_interrupts();
 	flash_range_program(ctx->base + block * c->block_size + off, buffer, size);
 	restore_interrupts(ints);
-#ifdef LIB_PICO_MULTICORE
-	if (ctx->multicore_lockout_enabled)
-		multicore_lockout_end_blocking();
-#endif
+//#ifdef LIB_PICO_MULTICORE
+//	if (ctx->multicore_lockout_enabled)
+//		multicore_lockout_end_blocking();
+//#endif
 
 	return LFS_ERR_OK;
 }
-
 
 static int pico_block_device_erase(const struct lfs_config *c, lfs_block_t block)
 {
@@ -84,27 +80,25 @@ static int pico_block_device_erase(const struct lfs_config *c, lfs_block_t block
 	LFS_ASSERT(block < c->block_count);
 
 	/* Erase flash block */
-#ifdef LIB_PICO_MULTICORE
-	if (ctx->multicore_lockout_enabled)
-		multicore_lockout_start_blocking();
-#endif
+//#ifdef LIB_PICO_MULTICORE
+//	if (ctx->multicore_lockout_enabled)
+//		multicore_lockout_start_blocking();
+//#endif
 	ints = save_and_disable_interrupts();
 	flash_range_erase(ctx->base + block * c->block_size, c->block_size);
 	restore_interrupts(ints);
-#ifdef LIB_PICO_MULTICORE
-	if (ctx->multicore_lockout_enabled)
-		multicore_lockout_end_blocking();
-#endif
+//#ifdef LIB_PICO_MULTICORE
+//	if (ctx->multicore_lockout_enabled)
+//		multicore_lockout_end_blocking();
+//#endif
 
 	return LFS_ERR_OK;
 }
-
 
 static int pico_block_device_sync(const struct lfs_config *c)
 {
 	return LFS_ERR_OK;
 }
-
 
 #ifdef LFS_THREADSAFE
 static int pico_block_device_lock(const struct lfs_config *c)
@@ -115,7 +109,6 @@ static int pico_block_device_lock(const struct lfs_config *c)
 
 	return LFS_ERR_OK;
 }
-
 
 static int pico_block_device_unlock(const struct lfs_config *c)
 {
@@ -177,7 +170,6 @@ struct lfs_config* pico_lfs_init(size_t offset, size_t size)
 
 	return c;
 }
-
 
 void pico_lfs_destroy(struct lfs_config *c)
 {

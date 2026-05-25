@@ -24,6 +24,8 @@
 
 #include "lfs.h"
 
+#include "pico/mutex.h"
+
 #ifdef __cplusplus
 extern "C"
 {

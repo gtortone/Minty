@@ -66,7 +66,7 @@ static int fat_read(vfs_file_t *vf, void *buf, size_t len) {
    
    if (f_read(fil, buf, len, &br) != FR_OK)
       return -1;
-   
+
    if (br == 0 || f_eof(fil))
       vf->eof = 1;
    
@@ -141,7 +141,16 @@ static int fat_readdir(vfs_dir_t *vd, vfs_dirent_t *out) {
    strncpy(out->name, d->info.fname, sizeof(out->name));
    out->name[sizeof(out->name)-1] = 0;
 
-   out->type = d->info.fattrib & AM_DIR ? VFS_TYPE_DIR : VFS_TYPE_FILE;
+   out->type = 0;
+
+   if (d->info.fattrib & AM_DIR)
+      out->type |= VFS_TYPE_DIR;
+
+   if (d->info.fattrib & AM_SYS)
+      out->type |= VFS_TYPE_SYSTEM;
+
+   if (d->info.fattrib & AM_HID)
+      out->type |= VFS_TYPE_HIDDEN;
    
    return 1;
 }
@@ -168,10 +177,16 @@ static int fat_stat(const char *path, vfs_stat_t *st, const vfs_mount_t *mnt) {
 
    st->size = info.fsize;
 
+   st->type = 0;
+
    if (info.fattrib & AM_DIR)
-      st->type = VFS_TYPE_DIR;
-   else
-      st->type = VFS_TYPE_FILE;
+      st->type |= VFS_TYPE_DIR;
+
+   if (info.fattrib & AM_SYS)
+      st->type |= VFS_TYPE_SYSTEM;
+
+   if (info.fattrib & AM_HID)
+      st->type |= VFS_TYPE_HIDDEN;
 
    return 0;
 }
