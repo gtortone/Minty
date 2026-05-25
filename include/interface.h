@@ -1,8 +1,13 @@
 #ifndef INTERFACE_H_
 #define INTERFACE_H_
 
-#define resetLow()  gpio_set_dir(RESET,true); gpio_put(RESET,true);    // Minty to INTV BUS ; RESET Output set to 0
-#define resetHigh() gpio_set_dir(RESET,true); gpio_put(RESET,false);   // RESET is INPUT; B->A, INTV BUS to Pico
+#if defined(PIRTO)
+   #define resetLow()  gpio_set_dir(RESET,true); gpio_put(RESET,false);  // Minty to INTV BUS ; RESET Output set to 0
+   #define resetHigh() gpio_set_dir(RESET,true); gpio_put(RESET,true);   // RESET is INPUT; B->A, INTV BUS to Pico
+#else
+   #define resetLow()  gpio_set_dir(RESET,true); gpio_put(RESET,true);    // Minty to INTV BUS ; RESET Output set to 0
+   #define resetHigh() gpio_set_dir(RESET,true); gpio_put(RESET,false);   // RESET is INPUT; B->A, INTV BUS to Pico
+#endif
 
 #define GPIO_GET_LOW_32(v)    pico_default_asm_volatile ("mrc p0, #0, %0, c0, c8" : "=r" (v));
 
