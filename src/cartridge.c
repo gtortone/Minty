@@ -321,6 +321,7 @@ void __time_critical_func(core1_main()) {
 void IntyMenu(int type) {       // 1=start, 2=next page, 3=prev page, 4=dir up
 
    int maxfile = 0;
+   int path_char = 0;
    
    switch (type) {
       case 1:
