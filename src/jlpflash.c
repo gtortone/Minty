@@ -10,25 +10,25 @@ extern Cartridge cart;
 
 void readFlash(int row, uint16_t addr) {
 
-   unsigned int br = 0;
    int c;
+   unsigned int br = 0;
    uint32_t offset = row * JLP_FLASH_ROW_BYTES;
-   uint8_t temp[2];
+   volatile uint8_t temp[2];
 
    if ( (cart.filesave = vfs_open(cart.flashfile, "r")) == NULL) {
       printf("E: JLP flash read - open error\n");
       return;
    }
 
-   vfs_lseek(cart.filesave, 0);
    vfs_lseek(cart.filesave, offset);
 
    //printf("ROW:%d\n", row);
    for(int i=0; i<(JLP_FLASH_ROW_BYTES/2); i++) {
-      c = vfs_read(cart.filesave, temp, 2); 
+      c = vfs_read(cart.filesave, (uint8_t *) temp, 2); 
       //printf("R[%d]: %X %X\n", i, temp[0], temp[1]);
-      if ( (c == -1) || (c < 2) ) {
-         printf("E: JLP flash read - chunk read error %d/2\n", c);
+      if (c == -1) {
+         printf("E: JLP flash read row: %d - chunk read error %d/2 (i=%d) (offset=%ld)\n", 
+               row, c, i, offset);
          vfs_close(cart.filesave);
          return;
       }
@@ -52,14 +52,13 @@ void writeFlash(int row, uint16_t addr) {
    int c;
    unsigned int bw = 0;
    uint32_t offset = row * JLP_FLASH_ROW_BYTES;
-   uint8_t temp[2];
+   volatile uint8_t temp[2];
 
    if ( (cart.filesave = vfs_open(cart.flashfile, "w")) == NULL) {
       printf("E: JLP flash write - open error\n");
       return;
    }
 
-   vfs_lseek(cart.filesave, 0);
    vfs_lseek(cart.filesave, offset);
 
    //printf("ROW:%d\n", row);
@@ -67,9 +66,10 @@ void writeFlash(int row, uint16_t addr) {
       temp[0] = (cart.RAM[(addr - 0x8000) + i] >> 8) & 0xFF;
       temp[1] = cart.RAM[(addr - 0x8000) + i] & 0xFF;
       //printf("W[%d]: %X %X\n", i, temp[0], temp[1]);
-      c = vfs_write(cart.filesave, temp, 2);
-      if ( (c == -1) || (c < 2) ) {
-         printf("E: JLP flash write - chunk write error %d/2\n", c);
+      c = vfs_write(cart.filesave, (uint8_t *) temp, 2);
+      if (c == -1) {
+         printf("E: JLP flash write row: %d - chunk write error %d/2 (i=%d) (offset=%ld)\n", 
+               row, c, i, offset);
          vfs_close(cart.filesave);
          return;
       }

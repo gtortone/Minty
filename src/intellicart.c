@@ -254,9 +254,10 @@ void load_cfg(char *filename) {
          memset(buffer, 0xFF, sizeof(buffer));
 
          uint32_t remaining = size;
-         unsigned int written = 0;
+         uint32_t written = 0;
 
          while (remaining) {
+
             uint32_t chunk = (remaining > sizeof(buffer)) ? sizeof(buffer) : remaining;
 
             written = vfs_write(f, buffer, chunk);

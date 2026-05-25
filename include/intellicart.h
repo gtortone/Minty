@@ -28,7 +28,7 @@
    #if PICO_RP2040
       #define BINLENGTH 1024*50
    #elif PICO_RP2350
-      #define BINLENGTH 1024*180
+      #define BINLENGTH 1024*205
    #endif
 #endif
 
