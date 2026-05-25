@@ -712,6 +712,10 @@ void Inty_cart_main() {
 
    sleep_ms(200);
    resetCart();
+#if defined(PIRTO)
+   sleep_ms(200);
+   resetCart();
+#endif
    sleep_ms(1200);
 
    cart.RAM[STATUS_ADDR] = 1;      // block cart access until initialisation is done
