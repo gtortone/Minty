@@ -193,14 +193,16 @@ void __time_critical_func(core1_main()) {
 
                   if ( (cart.JLPAccel || cart.JLPFlash) && ((addrIn >= 0x8000) && (addrIn <= 0x9FFF)) ) {
 
-                     deviceAddress = true;
 
                      if ((cart.JLPFlash) && (addrIn == 0x8023)) {
                         dataOut = 0;
+                        deviceAddress = true;
                      } else if ((cart.JLPFlash) && addrIn == 0x8024) {
                         dataOut = (cart.JLPFlashSize * JLP_FLASH_ROWS_PER_SECTOR) - 1;
+                        deviceAddress = true;
                      } else {
                         dataOut = cart.RAM[addrIn - 0x8000];
+                        deviceAddress = true;
                      }
 
                      continue;
@@ -211,8 +213,6 @@ void __time_critical_func(core1_main()) {
             idx = (addrIn >> 8);
 
             if (slots[idx].usedmask) {
-
-               deviceAddress = true;
 
                if (slots[idx].type == ROM_SLOT) {
 
@@ -226,8 +226,9 @@ void __time_critical_func(core1_main()) {
                      }
 
                      dataOut = cart.ROM[romaddr];
+                     deviceAddress = true;
 
-                  } else dataOut = 0xFFFF;
+                  } 
 
                } else if (slots[idx].type == ROM_PAGE_SLOT) {
 
@@ -240,6 +241,7 @@ void __time_critical_func(core1_main()) {
 
                         romaddr = slots[idx].from[page] + (addrIn - slots[idx].target);
                         dataOut = cart.ROM[romaddr];
+                        deviceAddress = true;
                      } 
 
                   } //else printf("A:0x%X, S:%d, P:%d\n", addrIn, seg, page);
@@ -250,8 +252,9 @@ void __time_critical_func(core1_main()) {
 
                      romaddr = (addrIn - slots[idx].from[0]);
                      dataOut = cart.RAM[romaddr];
+                     deviceAddress = true;
                   }
-               }
+               } 
             }
 
          } else {
