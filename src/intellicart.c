@@ -280,6 +280,8 @@ void load_cfg(char *filename) {
 
    getRAMRange(&cart.ramfrom, &cart.ramto, &cart.ramwidth);
 
+   //printFilledSlots();
+
    printf("load_cfg done\n");
 }
 

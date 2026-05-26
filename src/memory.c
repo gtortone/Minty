@@ -23,22 +23,16 @@ void printSlot(uint8_t idx, uint8_t page) {
 
    printf("slot #0x%X: type: %d, from: 0x%lX, to: 0x%lX, target: 0x%X, page: 0x%X, [%s]\n",
          idx, slots[idx].type, slots[idx].from[page], slots[idx].from[page]+slots[idx].size[page],
-         slots[idx].target, page, (slots[idx].usedmask) & (1<<page)?"FILLED":"EMPTY");
+         slots[idx].target, page, (slots[idx].usedmask) & (1<<page)?"F":"E");
 }
 
 void printFilledSlots(void) {
 
-   for(int i=0; i<NSLOTS; i++) {
-      if (slots[i].usedmask) {
-         for(int page=0; page<NPAGES; page++) {
-            if(slots[i].usedmask & (1<<page)) {
-               printf("%X) $%lX - $%lX = $%X PAGE %d\n",
-                     i, slots[i].from[page], slots[i].from[page]+slots[i].size[page],
-                     slots[i].target, page);
-            }
-         }
-      }
-   }
+   for(int i=0; i<NSLOTS; i++) 
+      if (slots[i].usedmask) 
+         for(int page=0; page<NPAGES; page++) 
+            if(slots[i].usedmask & (1<<page)) 
+               printSlot(i, page);
 }
 
 void cleanSlots(void) {
