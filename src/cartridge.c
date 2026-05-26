@@ -90,7 +90,7 @@ void __time_critical_func(core1_main()) {
    volatile uint32_t dataWrite = 0;
    volatile unsigned char busBit;
    volatile bool deviceAddress = false;
-   uint8_t curPageArr[16];        
+   volatile uint8_t curPageArr[16];        
    volatile uint8_t seg = 0;
    volatile uint32_t romaddr;
    volatile uint8_t idx;
@@ -113,7 +113,7 @@ void __time_critical_func(core1_main()) {
 
    // Initial conditions
    SET_DATA_MODE_IN;
-   memset(curPageArr, 0, sizeof(curPageArr));
+   memset((uint8_t *) curPageArr, 0, sizeof(curPageArr));
 
    while (1) {
       // Wait for the bus state to change
@@ -234,14 +234,15 @@ void __time_critical_func(core1_main()) {
                   seg = addrIn >> 12;
                   uint8_t page = curPageArr[seg];
 
-                  if ( (addrIn - slots[idx].target) <= slots[idx].size[page] ) { 
+                  if (slots[idx].usedmask & (1<<page)) {    // page is filled
 
-                     if (slots[idx].usedmask & (1<<page)) {    // page is filled
+                     if ( (addrIn - slots[idx].target) <= slots[idx].size[page] ) { 
+
                         romaddr = slots[idx].from[page] + (addrIn - slots[idx].target);
                         dataOut = cart.ROM[romaddr];
-                     } else dataOut = 0xFFFF;
+                     } 
 
-                  } 
+                  } //else printf("A:0x%X, S:%d, P:%d\n", addrIn, seg, page);
 
                } else { // RAM8_SLOT or RAM16_SLOT
                
