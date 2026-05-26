@@ -428,7 +428,8 @@ void LoadGame(void) {
 
       for (int i=0; i<getHacksNum(); i++) {
          uint32_t romaddr;
-         mapAddress(hacks[i].address, 0, &romaddr, ROM_SLOT);
+         mapType type;
+         mapAddress(hacks[i].address, 0, &romaddr, &type);
          cart.ROM[romaddr] = hacks[i].value;
       }
 

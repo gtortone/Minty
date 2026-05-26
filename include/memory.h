@@ -21,7 +21,7 @@
  */
 
 typedef enum {
-    ROM_SLOT,
+    ROM_SLOT = 1,
     ROM_PAGE_SLOT,
     RAM8_SLOT,
     RAM16_SLOT
