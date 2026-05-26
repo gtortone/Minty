@@ -216,7 +216,7 @@ void __time_critical_func(core1_main()) {
 
                if (slots[idx].type == ROM_SLOT) {
 
-                  //if ( (addrIn - slots[idx].target) <= slots[idx].size[0] ) { 
+                  if ( (addrIn - slots[idx].target) <= slots[idx].size[0] ) { 
 
                      romaddr = slots[idx].from[0] + (addrIn - slots[idx].target);
 
@@ -226,28 +226,30 @@ void __time_critical_func(core1_main()) {
                      }
 
                      dataOut = cart.ROM[romaddr];
-                  //}
+
+                  } else dataOut = 0xFFFF;
 
                } else if (slots[idx].type == ROM_PAGE_SLOT) {
 
-                  //if ( (addrIn - slots[idx].target) <= slots[idx].size[curPageArr[seg]] ) { 
+                  seg = addrIn >> 12;
+                  uint8_t page = curPageArr[seg];
 
-                     seg = addrIn >> 12;
-                     uint8_t page = curPageArr[seg];
+                  if ( (addrIn - slots[idx].target) <= slots[idx].size[page] ) { 
 
                      if (slots[idx].usedmask & (1<<page)) {    // page is filled
                         romaddr = slots[idx].from[page] + (addrIn - slots[idx].target);
                         dataOut = cart.ROM[romaddr];
                      } else dataOut = 0xFFFF;
-                  //}
+
+                  } 
 
                } else { // RAM8_SLOT or RAM16_SLOT
                
-                  //if ( (addrIn - slots[idx].from[0]) <= slots[idx].size[0] ) {
+                  if ( (addrIn - slots[idx].from[0]) <= slots[idx].size[0] ) {
 
                      romaddr = (addrIn - slots[idx].from[0]);
                      dataOut = cart.RAM[romaddr];
-                  //}
+                  }
                }
             }
 
