@@ -76,7 +76,8 @@ int read_directory(char *path, unsigned char *list) {
       return 0;
    };
 
-   while (vfs_readdir(dir, &ent) > 0) {
+   // stop at 256 entries to avoid overflowing the buffer
+   while ((vfs_readdir(dir, &ent) > 0) & (n<256)) {
 
       if ((strcmp(ent.name, ".") == 0 || strcmp(ent.name, "..") == 0))
          continue;
@@ -91,9 +92,9 @@ int read_directory(char *path, unsigned char *list) {
             continue;
 
       dst->id = id++;
-      // 20 chars to launcher display width
-      strncpy(dst->filename, ent.name, 20);
-      dst->filename[20] = 0;
+      // 64 chars to launcher display width
+      strncpy(dst->filename, ent.name, 64);
+      dst->filename[64] = 0;
 
       dst++;
       n++;
@@ -267,11 +268,11 @@ void filelist(SCREEN_ENTRY *en, int from, int to, int num) {
    for (int n = 0; n < (to - from); n++) {
       cart.RAM[0x1000 + n] = en[n + from].isDir;
       
-      for (int i = 0; i < 20; i++) {
-         int pos = base + i + (n * 20);
+      for (int i = 0; i < 64; i++) {
+         int pos = base + i + (n * 64);
          cart.RAM[pos] = en[n + from].filename[i];
          if (cart.RAM[pos] <= 32)
-            cart.RAM[pos] = 0;
+            cart.RAM[pos] = 255;
 		 else
 			cart.RAM[pos] -= 32;
       }

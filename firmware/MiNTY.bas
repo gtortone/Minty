@@ -22,11 +22,12 @@
     ' Include Sound player library
     INCLUDE "SndPlayer.bas"
 
-	DIM I,J,K
-    DIM #FROM, #F_FROM, #F_TO, #F_TOTAL
+	DIM I,J,K,WaveFrame
+    DIM #F_FROM, #F_TO, #F_TOTAL
     DIM Input, Debounce
     DIM Selected_Entry, Max_Entry
-    DIM #Disp_Color, #char
+    DIM #Disp_Color, #tmp
+    DIM SelEnt_Start,SelEnt_Length
 
 	CONST DEBOUNCE_DELAY  = 5					' Number of cycles to detect button press
 
@@ -36,11 +37,11 @@
     CONST ADDRESS_has_sd    = $8121
     CONST ADDRESS_dev       = $8120
     CONST ADDRESS_Select    = $8899
-    CONST ADDRESS_flist     = $817F
+    CONST ADDRESS_flist     = $817F ' 10 files * 64 characters per file (640 bytes), end address is $83FF
     CONST ADDRESS_ftype     = $9000
-    CONST ADDRESS_ffrom     = $9028 ' First displyed entry
-    CONST ADDRESS_fto       = $9030 ' Last displayed entry
-    CONST ADDRESS_ftotal    = $9032 ' Total number of entries
+    CONST ADDRESS_ffrom     = $9028 ' First displayed entry (16 bits)
+    CONST ADDRESS_fto       = $9030 ' Last displayed entry (16 bits)
+    CONST ADDRESS_ftotal    = $9032 ' Total number of entries (16 bits)
     CONST ADDRESS_hw        = $8122
     CONST ADDRESS_path      = $9100
     
@@ -69,6 +70,8 @@
     CONST PI_HW_PIRTO2DUO   = 4
     CONST PI_HW_PINTY       = 5
 
+    CONST FNAME_LENGTH      = 64
+
     DEF FN PI_STATUS = PEEK(ADDRESS_status)
     DEF FN PI_CMD(command) = POKE(ADDRESS_cmd),command
     DEF FN PI_HAS_SD = PEEK(ADDRESS_has_sd)
@@ -94,13 +97,20 @@
 
     ' Display detected HW
     I = PI_GET_HW
-    IF I=0 THEN PRINT AT SCREENPOS(0, 11) COLOR CS_WHITE,"HW : Unknown"
-    IF I=1 THEN PRINT AT SCREENPOS(0, 11) COLOR CS_WHITE,"HW : PiRTO"
-    IF I=2 THEN PRINT AT SCREENPOS(0, 11) COLOR CS_WHITE,"HW : PiRTO2"
-    IF I=3 THEN PRINT AT SCREENPOS(0, 11) COLOR CS_WHITE,"HW : PiRTO2+SD"
-    IF I=4 THEN PRINT AT SCREENPOS(0, 11) COLOR CS_WHITE,"HW : PiRTO2-DUO"
-    IF I=5 THEN PRINT AT SCREENPOS(0, 11) COLOR CS_WHITE,"HW : PiNTY"
-
+    IF I=1 THEN 
+        PRINT AT SCREENPOS(0, 11) COLOR CS_WHITE,"HW : PiRTO"
+    ELSEIF I=2 THEN 
+        PRINT AT SCREENPOS(0, 11) COLOR CS_WHITE,"HW : PiRTO2"
+    ELSEIF I=3 THEN 
+        PRINT AT SCREENPOS(0, 11) COLOR CS_WHITE,"HW : PiRTO2+SD"
+    ELSEIF I=4 THEN
+        PRINT AT SCREENPOS(0, 11) COLOR CS_WHITE,"HW : PiRTO2-DUO"
+    ELSEIF I=5 THEN 
+        PRINT AT SCREENPOS(0, 11) COLOR CS_WHITE,"HW : PiNTY"
+    ELSE 
+        PRINT AT SCREENPOS(0, 11) COLOR CS_WHITE,"HW : Unknown"
+    END IF
+    
     ' Display text
     DEFINE 48,16,text_bitmaps_0
     FOR I=0 TO 15
@@ -108,7 +118,7 @@
     NEXT I
 
     PlaySnd(WelcomeSound)
-    FOR I = 1 TO 120:WAIT:NEXT I
+    FOR I = 1 TO 90:WAIT:NEXT I
     ' Next 10 animation frames for text
     FOR I=1 TO 10 
         DEFINE 48,16,VARPTR text_bitmaps_0(64 * I)
@@ -123,63 +133,84 @@
     WEND
 
     CLS
+    MODE 0,6,0,7,0
     ' load icons into GRAM
     DEFINE 0,2,Icons
     WAIT
     ' load side slider graphics
-    DEFINE 2,6,Slider
+    DEFINE 2,4,Slider
     WAIT
+    ' load title wave
+    DEFINE 6,1,Title_wave
+    WAIT
+    ' load title text graphics
+    DEFINE 7,7,Title_text
+    WAIT
+    ' load help graphics
+    DEFINE 14,3,Help_text
+    WAIT
+
+    ' GRAM 17 to 22 are free
+
+    ' load font into grams (23 to 63 are occupied)
+    GOSUB Init_font
 
     ' Start up with selecting the first entry
     Selected_Entry=0
 
-    'GOSUB test_init
+'    GOSUB test_init
 
 START:
     CLS
-    PRINT AT SCREENPOS(0, 0) COLOR CS_WHITE, "MiNTY"
-    PRINT AT SCREENPOS(15, 0) COLOR CS_WHITE, "1:HLP"
+    SCREEN Title_cards,0,0,8,1,8
+    SPRITE 4,  8 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
+    SPRITE 5, 24 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
+    SPRITE 6, 40 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
+    SPRITE 7, 56 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
+    WaveFrame = 0
 
-    ' Get current directory informations
+    SCREEN Help_Cards,0,17,3,1,3
+
+    ' Display current path
+    #tmp = PEEK(ADDRESS_path + 1) AND $7F
+    ' First letter need to change Color Stack
+    #BACKTAB(20) = ASCII_table(#tmp) + CS_GREEN + $2000
+    FOR I = 1 TO 19
+        #tmp = PEEK(ADDRESS_path + I + 1) AND $7F
+        #BACKTAB(20+I) = ASCII_table(#tmp) + CS_GREEN
+    NEXT I
+
+    ' Get current directory informations and disply slider
     #f_from  = PI_GET_FFROM
     #f_to    = PI_GET_FTO
     #f_total = PI_GET_FTOTAL  
 
-    IF #f_from = #f_to THEN ' empty list
-        #from=0
-    ELSE
-        #from=#f_from+1
-        I = ((78 * #f_from) / #f_total)
-        J = ((78 * #f_to)   / #f_total)
-        IF I > 70 THEN I = 70
+    IF #f_from < #f_to THEN ' Not an Empty list
+        I = ((79 * #f_from) / #f_total)
+        J = ((79 * #f_to)   / #f_total)
+        IF I > 71   THEN I = 71
         IF J < I+7  THEN J = I+7
         K = J-I
 
         IF K > 64 THEN
-            SPRITE 3, 160 + VISIBLE, 17 + I + ZOOMY8 + DOUBLEY, SPR02 + SPR_GREY
-            SPRITE 2, 160 + VISIBLE, 17 + J - 64 + ZOOMY8 + DOUBLEY, SPR02 + SPR_GREY
+            SPRITE 3, 160 + VISIBLE, 24      + I + ZOOMY8 + DOUBLEY, SPR02 + SPR_GREY
+            SPRITE 2, 160 + VISIBLE, 24 - 64 + J + ZOOMY8 + DOUBLEY, SPR02 + SPR_GREY
         ELSEIF K > 32 THEN
-            SPRITE 3, 160 + VISIBLE, 17 + I + ZOOMY8, SPR02 + SPR_GREY
-            SPRITE 2, 160 + VISIBLE, 17 + J - 32 + ZOOMY8, SPR02 + SPR_GREY
+            SPRITE 3, 160 + VISIBLE, 24       + I + ZOOMY8, SPR02 + SPR_GREY
+            SPRITE 2, 160 + VISIBLE, 24  - 32 + J + ZOOMY8, SPR02 + SPR_GREY
         ELSEIF K > 16 THEN
-            SPRITE 3, 160 + VISIBLE, 17 + I + ZOOMY4, SPR02 + SPR_GREY
-            SPRITE 2, 160 + VISIBLE, 17 + J - 16 + ZOOMY4, SPR02 + SPR_GREY
-        ELSE 
-            SPRITE 3, 160 + VISIBLE, 17 + I + ZOOMY2, SPR02 + SPR_GREY
-            SPRITE 2, 160 + VISIBLE, 17 + J - 8 + ZOOMY2, SPR02 + SPR_GREY
+            SPRITE 3, 160 + VISIBLE, 24      + I + ZOOMY4, SPR02 + SPR_GREY
+            SPRITE 2, 160 + VISIBLE, 24 - 16 + J + ZOOMY4, SPR02 + SPR_GREY
+        ELSE
+            SPRITE 3, 160 + VISIBLE, 24     + I + ZOOMY2, SPR02 + SPR_GREY
+            SPRITE 2, 160 + VISIBLE, 24 - 8 + J + ZOOMY2, SPR02 + SPR_GREY
         END IF
-        SPRITE 1, 160 + VISIBLE, 17 - 2 + (I+J) / 2 + ZOOMY2, SPR07 + SPR_BLACK
-    END IF
-    #BACKTAB(39) = $0827
-    FOR I=59 TO 199 STEP 20:#BACKTAB(I)=$082F:NEXT I
-    #BACKTAB(219) = $0837
 
-    ' Display current path
-    FOR I = 0 TO 19
-        #char = PEEK(ADDRESS_path + I)
-        IF #char=63 THEN #char=207 ' correct replacement for underscore
-        PRINT AT SCREENPOS(I, 11),#char * 8 + CS_WHITE
-    NEXT I
+        SPRITE 1, 160 + VISIBLE, 24 - 4 + (I+J) / 2 + ZOOMY2,  $20E8 'Using "=" character from GROM
+    END IF
+
+    FOR I=59 TO 219 STEP 20:#BACKTAB(I)=$0827:NEXT I
+    #BACKTAB(239) = $082F
 
     ' Display file list
     GOSUB DISPLAY_FILELIST
@@ -187,6 +218,16 @@ START:
 MENU_LOOP:
     WAIT
     IF Debounce>0 THEN Debounce = Debounce-1:GOTO MENU_LOOP
+    ' Update animation frame
+    IF FRAME%8 = 0 THEN
+        WaveFrame = (WaveFrame+1)%4
+        DEFINE 6,1,VARPTR Title_wave(WaveFrame * 4)
+    END IF
+
+    ' Update selected file display is length > display size
+    IF FRAME%16 = 0 THEN
+        GOSUB DISPLAY_SELECTED_ENTRY
+    END IF
 
     Input = CONT
 
@@ -296,18 +337,27 @@ HELP_SCREEN: PROCEDURE
     ResetSprite(1)
     ResetSprite(2)
     ResetSprite(3)
-    PRINT AT SCREENPOS(8,0) COLOR CS_GREEN, "HELP"
-    PRINT AT SCREENPOS(0,2) COLOR CS_WHITE, "8 or up:   go up"
-    PRINT AT SCREENPOS(0,3) COLOR CS_WHITE, "0 or down: go dn"
-    PRINT AT SCREENPOS(0,4) COLOR CS_WHITE, "7 or b-up: page up"
-    PRINT AT SCREENPOS(0,5) COLOR CS_WHITE, "9 or b-dn: page dn"
+    SCREEN Title_cards,0,0,8,1,8
+    SPRITE 4,  8 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
+    SPRITE 5, 24 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
+    SPRITE 6, 40 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
+    SPRITE 7, 56 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
+    PRINT AT SCREENPOS(9,0) COLOR CS_YELLOW, "Help screen"
+    PRINT AT SCREENPOS(0,2) COLOR CS_TAN, "8 or up:   go up"
+    PRINT AT SCREENPOS(0,3) COLOR CS_TAN, "0 or down: go dn"
+    PRINT AT SCREENPOS(0,4) COLOR CS_TAN, "7 or b-up: page up"
+    PRINT AT SCREENPOS(0,5) COLOR CS_TAN, "9 or b-dn: page dn"
     IF PI_HAS_SD=1 THEN
-        PRINT AT SCREENPOS(0,7) COLOR CS_WHITE, "3:         sw FL/SD"
+        PRINT AT SCREENPOS(0,7) COLOR CS_TAN, "3:         sw FL/SD"
     END IF
-    PRINT AT SCREENPOS(0,8) COLOR CS_WHITE, "CLEAR:     dir up"
-    PRINT AT SCREENPOS(0,9) COLOR CS_WHITE, "ENTER:     select"
+    PRINT AT SCREENPOS(0,8) COLOR CS_TAN, "CLEAR:     dir up"
+    PRINT AT SCREENPOS(0,9) COLOR CS_TAN, "ENTER:     select"
     PRINT AT SCREENPOS(0,11) COLOR CS_YELLOW, "  <CLEAR> to exit"
     WHILE (CONT <> $88)  'CLEAR
+        IF FRAME%8 = 0 THEN
+            WaveFrame = (WaveFrame+1)%4
+            DEFINE 6,1,VARPTR Title_wave(WaveFrame * 4)
+        END IF
         WAIT
     WEND
     END
@@ -355,42 +405,83 @@ DISPLAY_FILELIST: PROCEDURE
     IF Max_Entry > 0 THEN 
         Max_Entry = Max_Entry - 1
         FOR J=0 TO Max_Entry
-            IF PI_GET_FTYPE(J)=TYPE_DIR THEN
-                IF J = Selected_Entry THEN #Disp_Color = CS_GREEN ELSE #Disp_Color = CS_BLUE
-                PRINT AT screenpos(0,J+1),  BG00 + CS_YELLOW
+            ' First icon needs also to change colorstack
+            IF J = 0 THEN #tmp = $2000 else #tmp = 0
+            IF PI_GET_FTYPE(J) = TYPE_DIR THEN
+                #Disp_Color = CS_DARKGREEN
+                #BACKTAB(J*20 + 40) = BG00 + CS_YELLOW + #tmp
             ELSE
-                IF J = Selected_Entry THEN #Disp_Color = CS_GREEN ELSE #Disp_Color = CS_TAN
-                PRINT AT screenpos(0,J+1),  BG01 + CS_CYAN
+                #Disp_Color = CS_TAN
+                #BACKTAB(J*20 + 40) = BG01 + CS_CYAN + #tmp
             END IF
+            IF J = Selected_Entry THEN #Disp_Color = CS_GREEN
             FOR I=0 TO 17
-                #char = PEEK((ADDRESS_flist+I)+20*J)
-                IF #char=63 THEN #char=207 ' correct replacement for underscore
-                PRINT #char*8+#Disp_Color
+                #tmp = PEEK((ADDRESS_flist+I)+FNAME_LENGTH*J)
+                IF #tmp = 255 THEN #tmp = 0
+                #BACKTAB(41 + J*20 + I) = ASCII_table(#tmp) + #Disp_Color
             NEXT I
         NEXT J
+    END IF
+    SelEnt_Length = 0
+    WHILE ((PEEK((ADDRESS_flist+SelEnt_Length)+FNAME_LENGTH*Selected_Entry)<>255) AND (SelEnt_Length<FNAME_LENGTH))
+        SelEnt_Length = SelEnt_Length + 1 
+    WEND
+    SelEnt_Start = 0
+    END
+
+DISPLAY_SELECTED_ENTRY: PROCEDURE
+    ' Scroll selected entry display if it doesn't fit on screen
+    IF SelEnt_Length > 18 THEN
+        SelEnt_Start = SelEnt_Start + 1
+        IF SelEnt_Start > SelEnt_Length THEN SelEnt_Start = 0
+        FOR I = 0 TO 17
+            #tmp = SelEnt_Start + I
+            IF #tmp = SelEnt_Length THEN
+                #BACKTAB(41 + Selected_Entry*20 + I) = ASCII_table(0) + CS_GREEN
+            ELSE
+                IF #tmp > SelEnt_Length THEN #tmp = #tmp - SelEnt_Length -1
+                #tmp = PEEK((ADDRESS_flist+#tmp)+FNAME_LENGTH*Selected_Entry)
+                #BACKTAB(41 + Selected_Entry*20 + I) = ASCII_table(#tmp) + CS_GREEN
+            END IF
+        NEXT I
     END IF
     END
 
 'test_init: PROCEDURE
+'    K = 0
+'    
 '    FOR J=0 TO 9
-'        FOR I = 0 TO 19
-'            POKE(ADDRESS_flist+I + 20*J),J + 16
-'            POKE(ADDRESS_ftype+I),TYPE_FILE
-'        NEXT I 
+'        POKE(ADDRESS_ftype+K),TYPE_FILE
+'        FOR I = 0 TO FNAME_LENGTH-4*J
+'            POKE(ADDRESS_flist+I + FNAME_LENGTH*J),K+16
+'            K = K+1
+'            IF K = 10 THEN K = 0
+'        NEXT I
+'        POKE(ADDRESS_flist+I + FNAME_LENGTH*J),255
 '    NEXT J
+'
 '    POKE(ADDRESS_ftype+0),TYPE_DIR
 '    POKE(ADDRESS_ftype+1),TYPE_DIR
 '    POKE(ADDRESS_ftype+2),TYPE_DIR
 '
-'    POKE(ADDRESS_path+0),84-32
-'    POKE(ADDRESS_path+1),69-32
-'    POKE(ADDRESS_path+2),83-32
-'    POKE(ADDRESS_path+3),84-32
-'
+'    POKE(ADDRESS_path+0), 15
+'    POKE(ADDRESS_path+1), 51
+'    POKE(ADDRESS_path+2), 36
+'    POKE(ADDRESS_path+3), 15
+'    POKE(ADDRESS_path+4), 36
+'    POKE(ADDRESS_path+5), 41
+'    POKE(ADDRESS_path+6), 50
+'    POKE(ADDRESS_path+7), 17
+'    POKE(ADDRESS_path+8), 15
+'    POKE(ADDRESS_path+9), 36
+'    POKE(ADDRESS_path+10),41
+'    POKE(ADDRESS_path+11),50
+'    POKE(ADDRESS_path+12),18
+'    
 '    POKE(ADDRESS_ffrom),0
-'    POKE(ADDRESS_ffrom+1),10
+'    POKE(ADDRESS_ffrom+1),0
 '    POKE(ADDRESS_fto),0
-'    POKE(ADDRESS_fto+1),20
+'    POKE(ADDRESS_fto+1),10
 '    POKE(ADDRESS_ftotal),0
 '    POKE(ADDRESS_ftotal+1),32
 '    END
@@ -401,19 +492,18 @@ DISPLAY_FILELIST: PROCEDURE
     INCLUDE "Minty_logo.bas"
     INCLUDE "text.bas"
     INCLUDE "Sounds.bas"
+    INCLUDE "font.bas"
 
 Icons:
-    DATA $FEE0,$82E2,$8282,$00FE
-    DATA $4438,$CED6,$54D6,$0038
+    DATA $E000,$E2FE,$8282,$00FE
+DATA $3800,$D644,$54CE,$0038
+'    DATA $4438,$CED6,$54D6,$0038
 
 Slider:
     DATA $7C7C,$7C7C,$7C7C,$7C7C
     DATA $7C7C,$7C7C,$7C7C,$7C7C
-    DATA $82FE,$8282,$8282,$8282
     DATA $8282,$8282,$8282,$8282
     DATA $8282,$8282,$8282,$FE82
-    DATA $7C00,$7C00,$0000,$0000
-
 
 In_Progress:
     DATA $002C,$0000,$0000,$0000
@@ -436,3 +526,29 @@ In_Progress:
     DATA $4020,$8000,$0000,$0000
     DATA $0030,$0080,$0000,$0000
     DATA $4018,$0000,$0000,$0000
+
+Title_text:
+	DATA $183C,$2400,$3C3C,$FF3C
+	DATA $9193,$90F0,$9392,$FF93
+	DATA $9090,$1C9C,$1C1C,$FF9C
+	DATA $2327,$F8F0,$FCFC,$FFFC
+	DATA $1E9E,$7E3E,$FEFE,$FFFE
+	DATA $0909,$3C79,$7E3C,$FF7E
+	DATA $F3F3,$A7F3,$0FA7,$FF4F
+
+Title_Wave:
+    DATA $F3C0,$FFFF,$FFFF,$FFFF
+    DATA $FC30,$FFFF,$FFFF,$FFFF
+    DATA $3F0C,$FFFF,$FFFF,$FFFF
+    DATA $CF03,$FFFF,$FFFF,$FFFF
+
+Title_cards:
+	DATA $0838,$0840,$0848,$0850,$0858,$0860,$0868,$22F8
+
+Help_text:
+	DATA $1808,$080A,$000A,$0000
+	DATA $A8AE,$A8EC,$00AE,$0000
+	DATA $8A8E,$888E,$00E8,$0000
+
+Help_cards:
+	DATA $1872,$187A,$1882

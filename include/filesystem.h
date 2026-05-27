@@ -5,8 +5,8 @@
 typedef struct {
    unsigned int id;
    char isDir;
-   char filename[21];            // limit filename to 20 chars for Inty display
-} SCREEN_ENTRY;                  // 24 bytes = 256 entries in ~6kb
+   char filename[65];            // limit filename to 64 chars + null terminator for Inty display
+} SCREEN_ENTRY;                  // 70 bytes = 10 entries in ~700 bytes
 
 int entry_compare(const void *p1, const void *p2);
 char *get_filename_ext(char *filename);

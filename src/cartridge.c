@@ -55,7 +55,7 @@ int volumeId = 0;    // default flash storage
 int volumeId = 1;    // default SD storage
 #endif
 
-unsigned char files[512 * 24];
+unsigned char files[256 * 70];   // buffer for directory entries (70 bytes per entry)
 
 int filefrom = 0, fileto = 0;
 volatile char cmd = 0;

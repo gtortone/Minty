@@ -99,7 +99,7 @@
     NEXT I
 
     PlaySnd(WelcomeSound)
-    FOR I = 1 TO 90:WAIT:NEXT I
+    FOR I = 1 TO 120:WAIT:NEXT I
     ' Next 10 animation frames for text
     FOR I=1 TO 10 
         DEFINE 48,16,VARPTR text_bitmaps_0(64 * I)
