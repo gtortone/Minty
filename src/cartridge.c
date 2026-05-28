@@ -85,6 +85,9 @@ struct boardConfig cfg = {
 }; 
 #endif
 
+volatile uint8_t curPageArr[16];        
+volatile uint8_t seg = 0;
+
 __attribute__((optimize("O3")))
 void __time_critical_func(core1_main()) {
    volatile unsigned int lastBusState, busState;
@@ -93,8 +96,8 @@ void __time_critical_func(core1_main()) {
    volatile uint32_t dataIn = 0;
    volatile unsigned char busBit;
    volatile bool deviceAddress = false;
-   volatile uint8_t curPageArr[16];        
-   volatile uint8_t seg = 0;
+   //volatile uint8_t curPageArr[16];        
+   //volatile uint8_t seg = 0;
    volatile uint32_t romaddr;
    volatile uint8_t idx;
 
@@ -116,6 +119,8 @@ void __time_critical_func(core1_main()) {
 
    // Initial conditions
    SET_DATA_MODE_IN;
+
+   seg = 0;
    memset((uint8_t *) curPageArr, 0, sizeof(curPageArr));
 
    while (1) {
@@ -255,7 +260,10 @@ void __time_critical_func(core1_main()) {
                         deviceAddress = true;
                      } 
 
-                  } //else printf("A:0x%X, S:%d, P:%d\n", addrIn, seg, page);
+                  } else {
+                     deviceAddress = true;
+                     dataOut = 0xFFFF;
+                  }
 
                } else { // RAM8_SLOT or RAM16_SLOT
                
@@ -282,7 +290,7 @@ void __time_critical_func(core1_main()) {
 
                if (cart.pagingSupport) {
                   if ((addrIn & 0xFFF) == 0xFFF) {
-                     if ( (dataIn & 0x0A50) == 0x0A50 ) {
+                     if ( ((dataIn >> 4) & 0x00FF) == 0xA5 ) {
                         // read segment
                         seg = (addrIn >> 12) & 0xF;
                         // set page
