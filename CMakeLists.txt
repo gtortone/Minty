@@ -27,11 +27,19 @@ set(PICO_FATFS_DIR ${CMAKE_SOURCE_DIR}/lib/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico)
 FetchContent_Declare(
     pico_fatfs
     GIT_REPOSITORY https://github.com/carlk3/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico
-    GIT_TAG main
+    GIT_TAG v3.6.2
     SOURCE_DIR ${PICO_FATFS_DIR}
 )
 
 FetchContent_MakeAvailable(pico_fatfs)
+
+#
+# overwrite sd_card_spi.c to support SD <=2GB
+#
+file(COPY
+    ${CMAKE_SOURCE_DIR}/src/sd_card_spi.c
+    DESTINATION ${PICO_FATFS_DIR}/src/sd_driver/SPI
+)
 
 # disable warning on f_util.c
 set_source_files_properties(
@@ -128,7 +136,6 @@ target_sources(${PROJECT} PUBLIC
    ${CMAKE_CURRENT_LIST_DIR}/src/intellicart.c
    ${CMAKE_CURRENT_LIST_DIR}/src/jlpflash.c
    ${CMAKE_CURRENT_LIST_DIR}/src/memory.c
-   #${CMAKE_CURRENT_LIST_DIR}/src/diskio.c
    ${CMAKE_CURRENT_LIST_DIR}/src/fatfs_disk.c
    ${CMAKE_CURRENT_LIST_DIR}/src/flash_fs.c
    ${CMAKE_CURRENT_LIST_DIR}/src/hw_config.c
@@ -155,6 +162,7 @@ add_custom_target(ffconf.h
    COMMAND ${CMAKE_COMMAND} -E rm -f
    ${PICO_FATFS_DIR}/src/include/ffconf.h
 )
+
 
 add_dependencies(${PROJECT} ffconf.h glue.c)
 
