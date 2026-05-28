@@ -245,6 +245,9 @@ void load_file_by_id(unsigned int id, char *path, char *fullpath) {
          if ((strcmp(ent.name, ".") == 0 || strcmp(ent.name, "..") == 0) || ent.name[0] == '.')
             continue;
 
+         if ( (ent.type & VFS_TYPE_HIDDEN) || (ent.type & VFS_TYPE_SYSTEM) )
+            continue;
+
          if ( !(ent.type & VFS_TYPE_DIR) )
             if (!is_valid_file(ent.name))
                continue;

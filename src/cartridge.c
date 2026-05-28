@@ -55,7 +55,10 @@ int volumeId = 0;    // default flash storage
 int volumeId = 1;    // default SD storage
 #endif
 
-unsigned char files[256 * 70];   // buffer for directory entries (70 bytes per entry)
+// unsigned char files[512 * 24];
+// recycle cartridge ROM to allocate temporary buffers
+// start from 0x4000 to allow launcher ROM size <= 16Kb
+unsigned char *files = (unsigned char *) (cart.ROM + 0x2000);
 
 int filefrom = 0, fileto = 0;
 volatile char cmd = 0;
@@ -82,16 +85,19 @@ struct boardConfig cfg = {
 }; 
 #endif
 
+volatile uint8_t curPageArr[16];        
+volatile uint8_t seg = 0;
+
 __attribute__((optimize("O3")))
 void __time_critical_func(core1_main()) {
    volatile unsigned int lastBusState, busState;
    volatile uint16_t addrIn;
    volatile uint16_t dataOut;
-   volatile uint32_t dataWrite = 0;
+   volatile uint32_t dataIn = 0;
    volatile unsigned char busBit;
    volatile bool deviceAddress = false;
-   volatile uint8_t curPageArr[16];        
-   volatile uint8_t seg = 0;
+   //volatile uint8_t curPageArr[16];        
+   //volatile uint8_t seg = 0;
    volatile uint32_t romaddr;
    volatile uint8_t idx;
 
@@ -113,6 +119,8 @@ void __time_critical_func(core1_main()) {
 
    // Initial conditions
    SET_DATA_MODE_IN;
+
+   seg = 0;
    memset((uint8_t *) curPageArr, 0, sizeof(curPageArr));
 
    while (1) {
@@ -221,8 +229,16 @@ void __time_critical_func(core1_main()) {
                      romaddr = slots[idx].from[0] + (addrIn - slots[idx].target);
 
                      if (holes[idx].filled) {
-                        if(addrIn > holes[idx].from)
+                        if ( (addrIn > holes[idx].from) && (addrIn <= (holes[idx].from + holes[idx].size)) ) {
+                           // address inside hole - ignore it
+                           dataOut = 0xFFFF;
+                           deviceAddress = true;
+                           continue;
+                        } 
+
+                        if ( addrIn > (holes[idx].from + holes[idx].size) ) {
                            romaddr -= holes[idx].size;
+                        } 
                      }
 
                      dataOut = cart.ROM[romaddr];
@@ -244,7 +260,10 @@ void __time_critical_func(core1_main()) {
                         deviceAddress = true;
                      } 
 
-                  } //else printf("A:0x%X, S:%d, P:%d\n", addrIn, seg, page);
+                  } else {
+                     deviceAddress = true;
+                     dataOut = 0xFFFF;
+                  }
 
                } else { // RAM8_SLOT or RAM16_SLOT
                
@@ -267,15 +286,15 @@ void __time_critical_func(core1_main()) {
                
                SET_DATA_MODE_IN;
                
-               dataWrite = sio_hw->gpio_in & 0xFFFF;
+               dataIn = sio_hw->gpio_in & 0xFFFF;
 
                if (cart.pagingSupport) {
                   if ((addrIn & 0xFFF) == 0xFFF) {
-                     if ( (dataWrite & 0x0A50) == 0x0A50 ) {
+                     if ( ((dataIn >> 4) & 0x00FF) == 0xA5 ) {
                         // read segment
                         seg = (addrIn >> 12) & 0xF;
                         // set page
-                        curPageArr[seg] = dataWrite & 0xF;
+                        curPageArr[seg] = dataIn & 0xF;
                      }
                   }
                }              
@@ -291,7 +310,7 @@ void __time_critical_func(core1_main()) {
                         // JLP CRC-16 accelerator function
                         if (addrIn == 0x9FFC) { 
                            crc = cart.RAM[0x1FFD];
-                           crc ^= dataWrite;
+                           crc ^= dataIn;
                            for (int i=0; i<16; i++)
                               crc = (crc >> 1) ^ (crc & 1 ? 0xAD52 : 0);
                            cart.RAM[0x1FFD] = crc;
@@ -299,7 +318,7 @@ void __time_critical_func(core1_main()) {
                         }
 
                         // JLP RAM addressing
-                        cart.RAM[addrIn - 0x8000] = dataWrite;
+                        cart.RAM[addrIn - 0x8000] = dataIn;
                      } 
 
                   } else {
@@ -307,9 +326,9 @@ void __time_critical_func(core1_main()) {
 
                      if ( (addrIn >= cart.ramfrom) && (addrIn <= cart.ramto) ) {
                         if(cart.ramwidth == 8)
-                           cart.RAM[addrIn - cart.ramfrom] = dataWrite & 0xFF;
+                           cart.RAM[addrIn - cart.ramfrom] = dataIn & 0xFF;
                         else  // cart.ramwidth == 16
-                           cart.RAM[addrIn - cart.ramfrom] = dataWrite;
+                           cart.RAM[addrIn - cart.ramfrom] = dataIn;
                      }
 #if CONFIG_JLP
                   }
