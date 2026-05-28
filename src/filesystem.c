@@ -27,7 +27,7 @@ int entry_compare(const void *p1, const void *p2) {
    else if (!e1->isDir && e2->isDir)
       return 1;
    else
-      return strcasecmp(e1->filename, e2->filename);
+      return strncasecmp(e1->filename, e2->filename, 64 );
 }
 
 char *get_filename_ext(char *filename) {
@@ -76,8 +76,8 @@ int read_directory(char *path, unsigned char *list) {
       return 0;
    };
 
-   // stop at 256 entries to avoid overflowing the buffer
-   while ((vfs_readdir(dir, &ent) > 0) & (n<256)) {
+   // stop at 512 entries to avoid overflowing the buffer
+   while ((vfs_readdir(dir, &ent) > 0) & (n<512)) {
 
       if ((strcmp(ent.name, ".") == 0 || strcmp(ent.name, "..") == 0))
          continue;
@@ -94,7 +94,6 @@ int read_directory(char *path, unsigned char *list) {
       dst->id = id++;
       // 64 chars to launcher display width
       strncpy(dst->filename, ent.name, 64);
-      dst->filename[64] = 0;
 
       dst++;
       n++;
@@ -274,7 +273,7 @@ void filelist(SCREEN_ENTRY *en, int from, int to, int num) {
       for (int i = 0; i < 64; i++) {
          int pos = base + i + (n * 64);
          cart.RAM[pos] = en[n + from].filename[i];
-         if (cart.RAM[pos] <= 32)
+         if (cart.RAM[pos] < 32)
             cart.RAM[pos] = 255;
 		 else
 			cart.RAM[pos] -= 32;
