@@ -143,6 +143,7 @@ target_sources(${PROJECT} PUBLIC
    ${CMAKE_CURRENT_LIST_DIR}/src/vfs.c
    ${CMAKE_CURRENT_LIST_DIR}/src/fatfs_backend.c
    ${CMAKE_CURRENT_LIST_DIR}/src/littlefs_backend.c
+   ${CMAKE_CURRENT_LIST_DIR}/src/launcher.c
 )
 
 target_include_directories(${PROJECT} PUBLIC

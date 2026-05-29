@@ -12,7 +12,7 @@ int entry_compare(const void *p1, const void *p2);
 char *get_filename_ext(char *filename);
 int is_rom_file(char *filename);
 int is_valid_file(char *filename);
-int read_directory(char *path, unsigned char *list);
+int read_directory(char *path, SCREEN_ENTRY *dst);
 void load_file(char *filename);
 void load_file_by_id(unsigned int id, char *path, char *fullpath);
 void filelist(SCREEN_ENTRY *en, int da, int a, int num);

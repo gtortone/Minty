@@ -7,6 +7,7 @@
 #include "intellicart.h"
 #include "memory.h"
 #include "vfs.h"
+#include "launcher.h"
 
 #if PICO_RP2350
    #include "pico/sha256.h"
@@ -63,11 +64,11 @@ int is_valid_file(char *filename) {
          strcasecmp(ext, "ITV") == 0 || strcasecmp(ext, "ROM") == 0);
 }
 
-int read_directory(char *path, unsigned char *list) {
+int read_directory(char *path, SCREEN_ENTRY *dst) {
 
    unsigned int id = 0;
    int n = 0;
-   SCREEN_ENTRY *dst = (SCREEN_ENTRY *) & list[0];
+   SCREEN_ENTRY *orig_dst = dst;
    vfs_dirent_t ent;
 
    vfs_dir_t *dir = vfs_opendir(path);
@@ -100,7 +101,7 @@ int read_directory(char *path, unsigned char *list) {
    }
    vfs_closedir(dir);
 
-   qsort((SCREEN_ENTRY *) & list[0], n, sizeof(SCREEN_ENTRY), entry_compare);
+   qsort(orig_dst, n, sizeof(SCREEN_ENTRY), entry_compare);
    
    return n;
 }
@@ -265,25 +266,26 @@ void load_file_by_id(unsigned int id, char *path, char *fullpath) {
 }
 
 void filelist(SCREEN_ENTRY *en, int from, int to, int num) {
-   int base = 0x17f;
-
    for (int n = 0; n < (to - from); n++) {
-      cart.RAM[0x1000 + n] = en[n + from].isDir;
+      cart.RAM[ENTRY_TYPE_ADDR + n] = en[n + from].isDir;
       
       for (int i = 0; i < 64; i++) {
-         int pos = base + i + (n * 64);
+         int pos = ENTRY_LIST_ADDR + i + (n * 64);
          cart.RAM[pos] = en[n + from].filename[i];
          if (cart.RAM[pos] < 32)
+            // 255 to indicate end of string if shorter than 64
             cart.RAM[pos] = 255;
-		 else
-			cart.RAM[pos] -= 32;
+		   else
+            // convert to INTY numbering here (much faster than on INTY side)
+            // only ascii chars from 32 to 127 are displayed and are mapped to 0 - 95 in lookup table
+			   cart.RAM[pos] = (cart.RAM[pos] & 0x7F) - 32;
       }
    }
-   cart.RAM[0x1028] = (from & 0xFF00) >> 8;   // MSB
-   cart.RAM[0x1029] = (from & 0x00FF);        // LSB
-   cart.RAM[0x1030] = (to & 0xFF00) >> 8;    // MSB
-   cart.RAM[0x1031] = (to & 0x00FF);         // LSB
-   cart.RAM[0x1032] = (num & 0xFF00) >> 8;  // MSB
-   cart.RAM[0x1033] = (num & 0x00FF);       // LSB
+   cart.RAM[FFROM_HI_ADDR] = (from & 0xFF00) >> 8;  // MSB
+   cart.RAM[FFROM_LO_ADDR] = (from & 0x00FF);       // LSB
+   cart.RAM[FTO_HI_ADDR  ] = (to   & 0xFF00) >> 8;  // MSB
+   cart.RAM[FTO_LO_ADDR  ] = (to   & 0x00FF);       // LSB
+   cart.RAM[FTOT_HI_ADDR ] = (num  & 0xFF00) >> 8;  // MSB
+   cart.RAM[FTOT_LO_ADDR ] = (num  & 0x00FF);       // LSB
 }
 

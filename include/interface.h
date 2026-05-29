@@ -21,14 +21,6 @@
 #define BUS_DTB   0b110         //6
 #define BUS_INTAK 0b111         //7
 
-// Inty RAM addresses shared with cart firmware
-#define CMD_ADDR        0x889
-#define STATUS_ADDR     0x119       // 0: cart wait, 1: cart run
-#define DEV_ADDR        0x120       // 0: flash, 1: SD
-#define HAS_SD_ADDR     0x121       // 0: no SD support, 1: SD support
-#define BOARD_ID_ADDR   0x122       // (see firmware)
-#define PATH_ADDR       0x1100      // current path
-
 #define COMPILER_BARRIER() asm volatile("" ::: "memory")
 
 #define BDIR_MASK   ((uint32_t)1 << BDIR)

@@ -15,7 +15,7 @@
       #if CONFIG_FLASH_FAT_STORAGE
          #define BINLENGTH 1024*50     // 100 kb         // Pirto II default
       #else
-         #define BINLENGTH 1024*85     // 175 kb         // Pirto II SD
+         #define BINLENGTH 1024*90     // 180 kb         // Pirto and Pirto II SD
       #endif
    #elif PICO_RP2350
       #if CONFIG_FLASH_FAT_STORAGE
