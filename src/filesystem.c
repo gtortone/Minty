@@ -226,7 +226,7 @@ void load_file(char *filename) {
    printf("load_file: size: %ld bytes\n", cart.len*2);
 }
 
-void load_file_by_id(unsigned int id, char *path, char *fullpath) {
+void load_file_by_id(unsigned int id, char *path) {
 
    unsigned int i = 0;
    vfs_dir_t *dir;
@@ -252,12 +252,13 @@ void load_file_by_id(unsigned int id, char *path, char *fullpath) {
             if (!is_valid_file(ent.name))
                continue;
 
-         sprintf(fullpath, "%s/%s", path, ent.name);
-
          if (i++ == id) {
+            strcat(path, "/");
+            strcat(path, ent.name);
+
             vfs_closedir(dir);
-            printf("load_file_by_id: id %d, opening %s\n", id, fullpath);
-            load_file(fullpath); 
+            printf("load_file_by_id: id %d, opening %s\n", id, path);
+            load_file(path); 
             return;
          }
       }

@@ -49,7 +49,6 @@ extern struct mapHole holes[NSLOTS];
 extern struct memHack hacks[MAX_HACKS_NUM];
 
 char curPath[512] = "";
-char fullpath[512] = "";
 
 #if CONFIG_FLASH_FAT_STORAGE
 int volumeId = 0;    // default flash storage
@@ -92,11 +91,11 @@ int LoadGame(int entry_num) {
    }
 #endif
 
-   load_file_by_id(screen_entries[entry_num].id, curPath, fullpath);
+   load_file_by_id(screen_entries[entry_num].id, curPath);
 
    // ROM file has internal cfg info
-   if(!is_rom_file(fullpath))
-      load_cfg(fullpath);
+   if(!is_rom_file(curPath))
+      load_cfg(curPath);
 
    for (int i=0; i<getHacksNum(); i++) {
       uint32_t romaddr;

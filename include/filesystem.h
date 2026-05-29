@@ -14,7 +14,7 @@ int is_rom_file(char *filename);
 int is_valid_file(char *filename);
 int read_directory(char *path, SCREEN_ENTRY *dst);
 void load_file(char *filename);
-void load_file_by_id(unsigned int id, char *path, char *fullpath);
+void load_file_by_id(unsigned int id, char *path);
 void filelist(SCREEN_ENTRY *en, int da, int a, int num);
 
 #endif
