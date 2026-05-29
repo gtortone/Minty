@@ -387,7 +387,7 @@ void IntyMenu(int type) {       // 1=start, 2=next page, 3=prev page, 4=dir up
    while(curPath[path_char]) {
       int pos = PATH_ADDR + path_char;
       cart.RAM[pos] = curPath[path_char];
-      if (cart.RAM[pos] <= 32)
+      if (cart.RAM[pos] < 32)
          cart.RAM[pos] = 0;
       else
          cart.RAM[pos] -= 32;
