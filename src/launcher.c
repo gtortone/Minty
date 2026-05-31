@@ -97,6 +97,34 @@ int LoadGame(int entry_num) {
    if(!is_rom_file(curPath))
       load_cfg(curPath);
 
+   /*
+   // test
+
+   cleanSlots();
+   cleanHoles();
+   cleanHacks();
+
+   addSlot(0x8000, 0x800D, 0x4800, 0, ROM_SLOT);
+   addSlot(0x800E, 0x801E, 0x4810, 0, ROM_SLOT);
+   //addSlot(0x800E, 0x811E, 0x4810, 0, ROM_SLOT);
+
+   printFilledSlots();
+
+   uint16_t addr = 0x47F8;
+   uint32_t romaddr;
+   mapType type = ROM_SLOT;
+
+   while (addr <= 0x4828) {
+      if (mapAddress(addr, 0, &romaddr, &type))
+         printf("R:0x%lX  A:0x%X\n", romaddr, addr);
+      else
+         printf("R: (n/a)  A:0x%X\n", addr);
+      addr++;
+   }
+      
+   // test
+   */
+
    for (int i=0; i<getHacksNum(); i++) {
       uint32_t romaddr;
       mapType type;

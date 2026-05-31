@@ -39,9 +39,6 @@ extern struct mapEntry slots[NSLOTS];
 extern struct mapHole holes[NSLOTS];
 extern struct memHack hacks[MAX_HACKS_NUM];
 
-volatile uint8_t curPageArr[16];        
-volatile uint8_t seg = 0;
-
 __attribute__((optimize("O3")))
 void __time_critical_func(core1_main()) {
    volatile unsigned int lastBusState, busState;
@@ -50,8 +47,8 @@ void __time_critical_func(core1_main()) {
    volatile uint32_t dataIn = 0;
    volatile unsigned char busBit;
    volatile bool deviceAddress = false;
-   //volatile uint8_t curPageArr[16];        
-   //volatile uint8_t seg = 0;
+   volatile uint8_t curPageArr[16];        
+   volatile uint8_t seg = 0;
    volatile uint32_t romaddr;
    volatile uint8_t idx;
 
@@ -178,26 +175,24 @@ void __time_critical_func(core1_main()) {
 
                if (slots[idx].type == ROM_SLOT) {
 
-                  if ( (addrIn - slots[idx].target) <= slots[idx].size[0] ) { 
+                  if ( (addrIn - slots[idx].target) <= (slots[idx].size[0] + holes[idx].size) ) { 
 
                      romaddr = slots[idx].from[0] + (addrIn - slots[idx].target);
 
                      if (holes[idx].filled) {
+
                         if ( (addrIn > holes[idx].from) && (addrIn <= (holes[idx].from + holes[idx].size)) ) {
-                           // address inside hole - ignore it
                            dataOut = 0xFFFF;
                            deviceAddress = true;
                            continue;
                         } 
 
-                        if ( addrIn > (holes[idx].from + holes[idx].size) ) {
-                           romaddr -= holes[idx].size;
-                        } 
-                     }
+                        if ( addrIn > (holes[idx].from) )
+                           romaddr -= (holes[idx].size + 1);
+                     } 
 
                      dataOut = cart.ROM[romaddr];
                      deviceAddress = true;
-
                   } 
 
                } else if (slots[idx].type == ROM_PAGE_SLOT) {
@@ -207,7 +202,7 @@ void __time_critical_func(core1_main()) {
 
                   if (slots[idx].usedmask & (1<<page)) {    // page is filled
 
-                     if ( (addrIn - slots[idx].target) <= slots[idx].size[page] ) { 
+                     if ( (addrIn - slots[idx].target) < slots[idx].size[page] ) { 
 
                         romaddr = slots[idx].from[page] + (addrIn - slots[idx].target);
                         dataOut = cart.ROM[romaddr];
@@ -221,7 +216,8 @@ void __time_critical_func(core1_main()) {
 
                } else { // RAM8_SLOT or RAM16_SLOT
                
-                  if ( (addrIn - slots[idx].from[0]) <= slots[idx].size[0] ) {
+                  //if ( (addrIn - slots[idx].from[0]) <= (slots[idx].size[0] - 1) ) {
+                  if ( (addrIn - slots[idx].from[0]) <= (slots[idx].size[0]) ) {
 
                      romaddr = (addrIn - slots[idx].from[0]);
                      dataOut = cart.RAM[romaddr];
