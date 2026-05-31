@@ -175,13 +175,26 @@ void __time_critical_func(core1_main()) {
 
                if (slots[idx].type == ROM_SLOT) {
 
-                  if ( (addrIn - slots[idx].target) <= (slots[idx].size[0] + holes[idx].size) ) { 
+                  if (addrIn < slots[idx].target) {
+                     dataOut = 0xFFFF;
+                     deviceAddress = true;
+                     continue;
+                  }
+
+                  uint16_t size;
+                  
+                  if (holes[idx].filled)
+                     size = slots[idx].size[0] + holes[idx].size + 1;
+                  else
+                     size = slots[idx].size[0];
+
+                  if ( (addrIn - slots[idx].target) < size ) { 
 
                      romaddr = slots[idx].from[0] + (addrIn - slots[idx].target);
 
                      if (holes[idx].filled) {
 
-                        if ( (addrIn > holes[idx].from) && (addrIn <= (holes[idx].from + holes[idx].size)) ) {
+                        if ( (addrIn >= holes[idx].from) && (addrIn <= (holes[idx].from + holes[idx].size)) ) {
                            dataOut = 0xFFFF;
                            deviceAddress = true;
                            continue;

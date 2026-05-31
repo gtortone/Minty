@@ -198,6 +198,7 @@ bool mapSlot(uint16_t addr, uint8_t page, uint8_t *slot) {
 bool mapAddress(uint16_t addr, uint8_t page, uint32_t *romaddr, mapType *type) {
 
    uint8_t slot;
+   uint16_t size;
 
    if ( mapSlot(addr, page, &slot) ) {
 
@@ -205,7 +206,15 @@ bool mapAddress(uint16_t addr, uint8_t page, uint32_t *romaddr, mapType *type) {
 
       if ( (*type == ROM_SLOT) || (*type == ROM_PAGE_SLOT) ) {
 
-         if ( (addr - slots[slot].target) <= (slots[slot].size[page] + holes[slot].size) ) {    
+         if (addr < slots[slot].target)
+            return false;
+
+         if (holes[slot].filled)
+            size = slots[slot].size[page] + holes[slot].size + 1;
+         else
+            size = slots[slot].size[page];
+
+         if ( (addr - slots[slot].target) < size) {    
 
             *romaddr = slots[slot].from[page] + (addr - slots[slot].target);
          
