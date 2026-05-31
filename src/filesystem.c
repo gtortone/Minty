@@ -265,7 +265,15 @@ int load_file_by_id(unsigned int id, char *path) {
 
             vfs_closedir(dir);
             printf("load_file_by_id: id %d, opening %s\n", id, path);
-            return load_file(path);
+            int result = load_file(path);
+            if (result != 0) {
+               printf("load_file_by_id: failed to load %s\n", path);
+               // need to remove the file from the path since it was not loaded successfully
+               char *last_slash = strrchr(path, '/');
+               if (last_slash)                  
+                  *last_slash = 0; 
+            }
+            return result;
          }
       }
       vfs_closedir(dir);
