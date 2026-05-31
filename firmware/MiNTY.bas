@@ -388,13 +388,19 @@ SELECT_ENTRY: PROCEDURE
             
             ' If error is file to big, display error message and wait for user to press clear
             IF PI_GET_ERROR = ERR_FILE_TO_BIG THEN
+                PRINT AT SCREENPOS(0,4)  COLOR CS_RED, "                   "
                 PRINT AT SCREENPOS(0,5)  COLOR CS_RED, "   File too big!   "
+                PRINT AT SCREENPOS(0,6)  COLOR CS_RED, "                   "
+                PRINT AT SCREENPOS(0,10)  COLOR CS_RED, "                   "
                 PRINT AT SCREENPOS(0,11) COLOR CS_RED, "  CLEAR to return  "
                 WHILE (CONT <> $88)  'CLEAR
                     WAIT
                 WEND
             ELSEIF PI_GET_ERROR = ERR_COULD_NOT_OPEN_FILE THEN
+                PRINT AT SCREENPOS(0,4)  COLOR CS_RED, "                   "
                 PRINT AT SCREENPOS(0,5)  COLOR CS_RED, "Couldn't open file!"
+                PRINT AT SCREENPOS(0,6)  COLOR CS_RED, "                   "
+                PRINT AT SCREENPOS(0,10)  COLOR CS_RED, "                   "
                 PRINT AT SCREENPOS(0,11) COLOR CS_RED, "  CLEAR to return  "
                 WHILE (CONT <> $88)  'CLEAR
                     WAIT
