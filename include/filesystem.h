@@ -13,8 +13,8 @@ char *get_filename_ext(char *filename);
 int is_rom_file(char *filename);
 int is_valid_file(char *filename);
 int read_directory(char *path, SCREEN_ENTRY *dst);
-void load_file(char *filename);
-void load_file_by_id(unsigned int id, char *path);
+int load_file(char *filename);
+int load_file_by_id(unsigned int id, char *path);
 void filelist(SCREEN_ENTRY *en, int da, int a, int num);
 
 #endif

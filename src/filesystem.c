@@ -17,8 +17,6 @@ extern Cartridge cart;
 
 extern struct mapEntry slots[NSLOTS];
 
-extern const unsigned int base;
-
 int entry_compare(const void *p1, const void *p2) {
    SCREEN_ENTRY *e1 = (SCREEN_ENTRY *) p1;
    SCREEN_ENTRY *e2 = (SCREEN_ENTRY *) p2;
@@ -106,19 +104,28 @@ int read_directory(char *path, SCREEN_ENTRY *dst) {
    return n;
 }
 
-void load_file(char *filename) {
+int load_file(char *filename) {
 
    unsigned int size = 0;
    unsigned char buf[2];
+   vfs_stat_t st;
 
+   if (vfs_stat(filename, &st) == 0) {
+      printf("file size: %d bytes\n", st.size);
+      if (st.size > BINLENGTH*2) {
+         printf("file size exceeds maximum supported size of %d bytes\n", BINLENGTH*2);
+         return -2;
+      }
+   }
+   
    printf("load_file(): filename %s\n", filename);
    vfs_file_t *f = vfs_open(filename, "r");
 
    if (f == NULL) {
       printf("load_file %s error\n", filename);
-      return;
+      return -1;
    }
-  
+
    // init cartridge
    init_cart();
 
@@ -220,13 +227,13 @@ void load_file(char *filename) {
    }
 
    cart.len = size;
-   cart.RAM[base + 202] = cart.len;
    vfs_close(f);
 
    printf("load_file: size: %ld bytes\n", cart.len*2);
+   return 0;
 }
 
-void load_file_by_id(unsigned int id, char *path) {
+int load_file_by_id(unsigned int id, char *path) {
 
    unsigned int i = 0;
    vfs_dir_t *dir;
@@ -258,12 +265,12 @@ void load_file_by_id(unsigned int id, char *path) {
 
             vfs_closedir(dir);
             printf("load_file_by_id: id %d, opening %s\n", id, path);
-            load_file(path); 
-            return;
+            return load_file(path);
          }
       }
       vfs_closedir(dir);
-   } 
+   }
+   return -1;
 }
 
 void filelist(SCREEN_ENTRY *en, int from, int to, int num) {
