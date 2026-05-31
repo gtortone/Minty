@@ -205,7 +205,7 @@ bool mapAddress(uint16_t addr, uint8_t page, uint32_t *romaddr, mapType *type) {
 
       if ( (*type == ROM_SLOT) || (*type == ROM_PAGE_SLOT) ) {
 
-         if ( (addr - slots[slot].target) < (slots[slot].size[page] + holes[slot].size) ) {    
+         if ( (addr - slots[slot].target) <= (slots[slot].size[page] + holes[slot].size) ) {    
 
             *romaddr = slots[slot].from[page] + (addr - slots[slot].target);
          

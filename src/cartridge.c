@@ -175,7 +175,7 @@ void __time_critical_func(core1_main()) {
 
                if (slots[idx].type == ROM_SLOT) {
 
-                  if ( (addrIn - slots[idx].target) < (slots[idx].size[0] + holes[idx].size) ) { 
+                  if ( (addrIn - slots[idx].target) <= (slots[idx].size[0] + holes[idx].size) ) { 
 
                      romaddr = slots[idx].from[0] + (addrIn - slots[idx].target);
 
