@@ -295,7 +295,7 @@ void RunLauncher() {
          cart.RAM[STATUS_ADDR] = 1;
          cart.RAM[CMD_ADDR] = 0;
          cart.RAM[ERROR_ADDR] = 0;
-         
+
          printf("cmd: %d\n", cmd);
 
          switch (cmd) {
@@ -317,6 +317,7 @@ void RunLauncher() {
                      } else {
                         // loading game failed => tell inty launcher to show error message
                         cart.RAM[ERROR_ADDR] = -result;   // error codes are negative, convert to positive for launcher
+                        IntyMenu(UP_DIR);
                      }
                   }
                }
