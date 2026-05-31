@@ -96,6 +96,13 @@ static int fat_lseek(vfs_file_t *vf, size_t offset) {
    return 0;
 }
 
+static int fat_tell(vfs_file_t *vf) {
+
+   FIL *fil = (FIL*)vf->backend;
+
+   return f_tell(fil);
+}
+
 static int fat_write(vfs_file_t *vf, const void *buf, size_t len) {
 
    FIL *fil = &((fat_file_t*)vf->backend)->fil;
@@ -198,6 +205,7 @@ const vfs_driver_t fatfs_driver = {
     .read = fat_read,
     .gets = fat_gets,
     .lseek = fat_lseek,
+    .tell = fat_tell,
     .write = fat_write,
     .close = fat_close,
     .opendir = fat_opendir,

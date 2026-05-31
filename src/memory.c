@@ -27,7 +27,7 @@ void printSlot(uint8_t idx, uint8_t page) {
          idx, 
          slots[idx].type, 
          slots[idx].from[page], 
-         slots[idx].from[page]+slots[idx].size[page],
+         slots[idx].from[page]+slots[idx].size[page]-1,
          slots[idx].size[page], 
          slots[idx].target, 
          page, 

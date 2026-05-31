@@ -50,6 +50,7 @@ typedef struct vfs_driver {
    int (*read)(vfs_file_t *f, void *buf, size_t len);
    char* (*gets)(vfs_file_t *f, void *buf, size_t len);
    int (*lseek)(vfs_file_t *f, size_t offset);
+   int (*tell)(vfs_file_t *f);
    int (*write)(vfs_file_t *f, const void *buf, size_t len);
    int (*close)(vfs_file_t *f);
 } vfs_fs_t;
@@ -90,6 +91,7 @@ int vfs_stat(const char *path, vfs_stat_t *st);
 int vfs_read(vfs_file_t *f, void *buf, size_t len);
 char* vfs_gets(vfs_file_t *f, void *buf, size_t len);
 int vfs_lseek(vfs_file_t *f, size_t offset);
+int vfs_tell(vfs_file_t *f);
 int vfs_write(vfs_file_t *f, const void *buf, size_t len);
 int vfs_close(vfs_file_t *f);
 

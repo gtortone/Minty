@@ -156,6 +156,13 @@ static int littlefs_lseek(vfs_file_t *vf, size_t offset) {
    return 0;
 }
 
+static int littlefs_tell(vfs_file_t *vf) {
+
+   lfs_file_t *fil = (lfs_file_t *)vf->backend;
+
+   return lfs_file_tell(&lfs, fil);
+}
+
 static int littlefs_write(vfs_file_t *vf, const void *buf, size_t len) {
 
    lfs_file_t *fil = (lfs_file_t *)vf->backend;
@@ -248,6 +255,7 @@ const vfs_driver_t littlefs_driver = {
     .read = littlefs_read,
     .gets = littlefs_gets,
     .lseek = littlefs_lseek,
+    .tell = littlefs_tell,
     .write = littlefs_write,
     .close = littlefs_close,
     .opendir = littlefs_opendir,

@@ -127,6 +127,10 @@ int vfs_lseek(vfs_file_t *f, size_t offset) {
     return f->mount->driver->lseek(f, offset);
 }
 
+int vfs_tell(vfs_file_t *f) {
+   return f->mount->driver->tell(f);
+}
+
 int vfs_write(vfs_file_t *f, const void *buf, size_t len) {
     return f->mount->driver->write(f, buf, len);
 }

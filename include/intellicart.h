@@ -64,5 +64,6 @@ typedef struct {
 
 void init_cart(void);
 void load_cfg(char *filename);
+void config_jlp(int jlp_value, int jlpflash_value, char *filename);
 
 #endif

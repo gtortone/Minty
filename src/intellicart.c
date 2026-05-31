@@ -44,6 +44,79 @@ void init_cart(void) {
    cart.flashfile[0] = '\0';
 }
 
+void config_jlp(int jlp_value, int jlpflash_value, char *filename) {
+
+   if (jlp_value != 0) {
+      // JLP required
+      cart.JLPSupport = true;
+      printf("JLP support ON\n");
+
+      if (JLP_FEATURE_ACCEL(jlp_value)) {
+         cart.JLPAccel = true;
+         printf("JLP accelerators ON\n");
+      }
+   }
+
+   cart.JLPFlashSize = jlpflash_value;
+
+   if ( JLP_FEATURE_FLASH(jlp_value) && (cart.JLPFlashSize > 0) ) {
+      cart.JLPFlash = true;
+      printf("JLP flash ON\n");
+      printf("JLP flash size: %d\n", cart.JLPFlashSize);
+   }
+
+   if (cart.JLPFlash) {
+
+      // check if JLP flash file exists
+      vfs_file_t *f;
+      vfs_stat_t st;
+      char *dot = strrchr(filename, '.');
+
+      strncpy(cart.flashfile, filename, (dot - filename));
+      strcat(cart.flashfile, ".save");
+
+      if(vfs_stat(cart.flashfile, &st) == -1) {
+
+         uint8_t buffer[JLP_FLASH_SECTOR_BYTES];
+         uint32_t size = cart.JLPFlashSize * JLP_FLASH_SECTOR_BYTES;
+         
+         // create JLP flash file
+         f = vfs_open(cart.flashfile, "w");
+         if (f == NULL) {
+            printf("E: file create error\n");
+            return;
+         }
+
+         printf("creating JLP flash file: %s, size: %ld\n", cart.flashfile, size);
+
+         memset(buffer, 0xFF, sizeof(buffer));
+
+         uint32_t remaining = size;
+         uint32_t written = 0;
+
+         while (remaining) {
+
+            uint32_t chunk = (remaining > sizeof(buffer)) ? sizeof(buffer) : remaining;
+
+            written = vfs_write(f, buffer, chunk);
+
+            if (written != chunk) {
+               printf("E: write error\n");
+               vfs_close(f);
+               break;
+            }
+
+            remaining -= written;
+         }
+
+         vfs_close(f);
+      }
+
+      printf("I: use available JLP flash file: %s\n", cart.flashfile);
+
+   }  // end if(JLPFlash)
+}
+
 void load_cfg(char *filename) {
 
    char line[80];
@@ -51,6 +124,11 @@ void load_cfg(char *filename) {
    cfgSection cfgsec; 
    vfs_file_t *f;
    int ret;
+
+#if CONFIG_JLP
+   int jlp_value;
+   int jlpflash_value;
+#endif
 
    char *dot = strrchr(filename, '.');
    strncpy(cfgfile, filename, (dot - filename));
@@ -178,38 +256,18 @@ void load_cfg(char *filename) {
       } else if (cfgsec == VARS) {
 
 #if CONFIG_JLP
-         int jlp_value;
-         int jlpflash_value;
-
          if ( sscanf(line, "jlp = %d", &jlp_value) == 1  ||
                sscanf(line, "jlp_accel = %d", &jlp_value) == 1  || 
                sscanf(line, "jlpaccel = %d", &jlp_value) == 1 ) {
-
-            if (jlp_value != 0) {
-               // JLP required
-               cart.JLPSupport = true;
-               printf("JLP support ON\n");
-
-               if (JLP_FEATURE_ACCEL(jlp_value)) {
-                  cart.JLPAccel = true;
-                  printf("JLP accelerators ON\n");
-               }
-            }
+            printf("JLP config found\n");
          }
 
          if ( sscanf(line, "jlp_flash = %d", &jlpflash_value) == 1  ||
                sscanf(line, "jlpflash = %d", &jlpflash_value) == 1 ) {
 
-            cart.JLPFlashSize = jlpflash_value;
-
-            if ( JLP_FEATURE_FLASH(jlp_value) && (cart.JLPFlashSize > 0) ) {
-               cart.JLPFlash = true;
-               printf("JLP flash ON\n");
-               printf("JLP flash size: %d\n", cart.JLPFlashSize);
-            }
+            printf("JLP flash config found\n");
          }
 #endif
-
 
       } else if (cfgsec == MACRO) {
          // example: 
@@ -229,54 +287,9 @@ void load_cfg(char *filename) {
 
    vfs_close(f);
 
-   if (cart.JLPFlash) {
-
-      // check if JLP flash file exists
-      vfs_stat_t st;
-
-      strncpy(cart.flashfile, filename, (dot - filename));
-      strcat(cart.flashfile, ".save");
-
-      if(vfs_stat(cart.flashfile, &st) == -1) {
-
-         uint8_t buffer[JLP_FLASH_SECTOR_BYTES];
-         uint32_t size = cart.JLPFlashSize * JLP_FLASH_SECTOR_BYTES;
-         
-         // create JLP flash file
-         f = vfs_open(cart.flashfile, "w");
-         if (f == NULL) {
-            printf("E: file create error\n");
-            return;
-         }
-
-         printf("creating JLP flash file: %s, size: %ld\n", cart.flashfile, size);
-
-         memset(buffer, 0xFF, sizeof(buffer));
-
-         uint32_t remaining = size;
-         uint32_t written = 0;
-
-         while (remaining) {
-
-            uint32_t chunk = (remaining > sizeof(buffer)) ? sizeof(buffer) : remaining;
-
-            written = vfs_write(f, buffer, chunk);
-
-            if (written != chunk) {
-               printf("E: write error\n");
-               vfs_close(f);
-               break;
-            }
-
-            remaining -= written;
-         }
-
-         vfs_close(f);
-      }
-
-      printf("I: use available JLP flash file: %s\n", cart.flashfile);
-
-   }  // end if(JLPFlash)
+#if CONFIG_JLP
+   config_jlp(jlp_value, jlpflash_value, filename);
+#endif
 
    getRAMRange(&cart.ramfrom, &cart.ramto, &cart.ramwidth);
 

@@ -91,8 +91,11 @@ int read_directory(char *path, SCREEN_ENTRY *dst) {
             continue;
 
       dst->id = id++;
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-truncation"
       // 64 chars to launcher display width
       strncpy(dst->filename, ent.name, 64);
+#pragma GCC diagnostic pop
 
       dst++;
       n++;
@@ -136,6 +139,10 @@ int load_file(char *filename) {
       uint16_t prev_size, target;
       char inputBuffer[3];
 
+      cleanSlots();
+      cleanHoles();
+      cleanHacks();
+
       vfs_read(f, inputBuffer, sizeof(inputBuffer));
       
       // read number of segments
@@ -158,6 +165,7 @@ int load_file(char *filename) {
          prev_from = from;
 
          addSlot(from, from + (hi - lo) - 1, target, 0, ROM_SLOT);
+         //printf("from: 0x%lX  to: 0x%lX  target: 0x%X\n", from, from + (hi - lo) - 1, target);
 
          for (int j = lo; j < hi; j++) {
 
@@ -197,6 +205,64 @@ int load_file(char *filename) {
       }
 
       getRAMRange(&cart.ramfrom, &cart.ramto, &cart.ramwidth);
+
+      // check for metadata section 
+      if (!vfs_eof(f)) {
+
+         printf("ROM has metadata section @%d\n", size);
+         //printf("current file position: %d\n", vfs_tell(f));
+
+         while (!vfs_eof(f)) {
+
+            vfs_read(f, inputBuffer, 1);
+
+            // find number of bytes in length
+            int nb = inputBuffer[0] >> 6;
+
+            // get 6 LSBs of length
+            int len = inputBuffer[0] & 0x3F;
+
+            // process additional bytes
+            for(int i=0; i<nb; i++) {
+               vfs_read(f, inputBuffer, 1);
+               len |= inputBuffer[0] << (6 + i*8);
+            }
+
+            //printf("metadata len: %d, nb: %d\n", len, nb);
+
+            // read tag code
+            vfs_read(f, inputBuffer, 1);
+
+            int tag = inputBuffer[0];
+            //printf("\ttag: 0x%X\n", tag);
+
+            if (tag == 0x06) {       // Game Attribute / Compatibility Flags
+
+               vfs_read(f, inputBuffer, 3);  // skip first 3 bytes to search JLP attributes
+            
+               if(len > 3) {
+
+                  vfs_read(f, inputBuffer, 2);
+
+                  //printf("tag 0x06:  byte[3]: 0x%X, byte[4]: 0x%X\n", inputBuffer[0], inputBuffer[1]);
+
+                  int jlp_value = inputBuffer[0] >> 6;
+                  int jlpflash_value = inputBuffer[1];
+
+                  config_jlp(jlp_value, jlpflash_value, filename);
+               }
+
+            } else {
+
+               // skip metadata info
+               for(int i=0; i<len; i++) 
+                  vfs_read(f, inputBuffer, 1);
+            }
+
+            // skip metadata crc
+            vfs_read(f, inputBuffer, 2);
+         }
+      }
 
    } else { 
 
