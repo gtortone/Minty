@@ -74,7 +74,7 @@ int read_directory(char *path, SCREEN_ENTRY *dst) {
    vfs_dir_t *dir = vfs_opendir(path);
    if (!dir) {
       printf("read_directory: vfs_opendir error (%s)\n", path);
-      return 0;
+      return -1;
    };
 
    // stop at 512 entries to avoid overflowing the buffer

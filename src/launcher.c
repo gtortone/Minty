@@ -130,6 +130,11 @@ void IntyMenu(int type) {       // 1=start, 2=next page, 3=prev page, 4=dir up
          // and fell into new page read
       case READ_PAGE:
          num_dir_entries = read_directory(curPath, screen_entries);
+         if (num_dir_entries < 0) {
+            // could not read directory, show empty list and send info to INTY launcher
+            num_dir_entries = 0;
+            cart.RAM[SDPRES_ADDR] = 0;
+         }
          filefrom = 0;
          fileto = (((10)<(num_dir_entries))?(10):(num_dir_entries)) + filefrom;
          break;
@@ -233,17 +238,14 @@ void RunLauncher() {
 
          vfs_close(cfgfile);
       }
-   } 
-#endif
-
-   cart.RAM[DEV_ADDR] = volumeId;
-
-   // initial conditions 
-#if CONFIG_SD_STORAGE
+   }
    cart.RAM[HAS_SD_ADDR] = 1;
 #else
    cart.RAM[HAS_SD_ADDR] = 0;
 #endif
+
+   cart.RAM[DEV_ADDR] = volumeId;
+   cart.RAM[SDPRES_ADDR] = 1;
 
    // Initialise display list
    IntyMenu(READ_PAGE);

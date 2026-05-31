@@ -33,16 +33,17 @@
 
     ' RAM addresses for exchanges with PI
     CONST ADDRESS_status    = $8119
-    CONST ADDRESS_cmd       = $8889
-    CONST ADDRESS_has_sd    = $8121
     CONST ADDRESS_dev       = $8120
-    CONST ADDRESS_Select    = $8899
+    CONST ADDRESS_has_sd    = $8121
+    CONST ADDRESS_hw        = $8122
+    CONST ADDRESS_sdpres    = $8123
     CONST ADDRESS_flist     = $817F ' 10 files * 64 characters per file (640 bytes), end address is $83FF
+    CONST ADDRESS_cmd       = $8889
+    CONST ADDRESS_Select    = $8899
     CONST ADDRESS_ftype     = $9000
     CONST ADDRESS_ffrom     = $9028 ' First displayed entry (16 bits)
     CONST ADDRESS_fto       = $9030 ' Last displayed entry (16 bits)
     CONST ADDRESS_ftotal    = $9032 ' Total number of entries (16 bits)
-    CONST ADDRESS_hw        = $8122
     CONST ADDRESS_path      = $9100
     
     ' PI current status
@@ -75,6 +76,7 @@
     DEF FN PI_STATUS = PEEK(ADDRESS_status)
     DEF FN PI_CMD(command) = POKE(ADDRESS_cmd),command
     DEF FN PI_HAS_SD = PEEK(ADDRESS_has_sd)
+    DEF FN PI_SD_PRESENT = PEEK(ADDRESS_sdpres)
     DEF FN PI_SELECTDEVICE(device) = POKE(ADDRESS_dev),device
     DEF FN PI_CURRENTDEVICE = PEEK(ADDRESS_dev)
     DEF FN PI_SELECTENTRY(entry) = POKE(ADDRESS_Select),(entry+1)
@@ -180,7 +182,7 @@ START:
         #BACKTAB(20+I) = ASCII_table(#tmp) + CS_GREEN
     NEXT I
 
-    ' Get current directory informations and disply slider
+    ' Get current directory informations and display slider
     #f_from  = PI_GET_FFROM
     #f_to    = PI_GET_FTO
     #f_total = PI_GET_FTOTAL  
@@ -207,6 +209,11 @@ START:
         END IF
 
         SPRITE 1, 160 + VISIBLE, 24 - 4 + (I+J) / 2 + ZOOMY2,  $20E8 'Using "=" character from GROM
+    ELSE
+        ' Empty list => Display empty slider
+        ResetSprite(1)
+        ResetSprite(2)
+        ResetSprite(3)
     END IF
 
     FOR I=59 TO 219 STEP 20:#BACKTAB(I)=$0827:NEXT I
@@ -401,6 +408,8 @@ WAIT_CARD_ANSWER: PROCEDURE
 
 DISPLAY_FILELIST: PROCEDURE
     Max_Entry = #f_to - #f_from
+    SelEnt_Start = 0
+    SelEnt_Length = 0
 
     IF Max_Entry > 0 THEN 
         Max_Entry = Max_Entry - 1
@@ -421,12 +430,32 @@ DISPLAY_FILELIST: PROCEDURE
                 #BACKTAB(41 + J*20 + I) = ASCII_table(#tmp) + #Disp_Color
             NEXT I
         NEXT J
+		WHILE ((PEEK((ADDRESS_flist+SelEnt_Length)+FNAME_LENGTH*Selected_Entry)<>255) AND (SelEnt_Length<FNAME_LENGTH))
+			SelEnt_Length = SelEnt_Length + 1 
+		WEND
+	ELSE
+        ' Change background color
+        #BACKTAB(40) = $2000
+        IF ((PI_CURRENTDEVICE = DEV_SD) AND (PI_SD_PRESENT = 0)) THEN
+            ' No SD Card present => Display <NO SD> in middle of screen
+            #BACKTAB(126) = ASCII_table(28)+CS_WHITE
+            #BACKTAB(127) = ASCII_table(46)+CS_WHITE
+            #BACKTAB(128) = ASCII_table(47)+CS_WHITE
+            #BACKTAB(129) = ASCII_table(00)+CS_WHITE
+            #BACKTAB(130) = ASCII_table(51)+CS_WHITE
+            #BACKTAB(131) = ASCII_table(36)+CS_WHITE
+            #BACKTAB(132) = ASCII_table(30)+CS_WHITE
+        ELSE
+            ' Empty Directory => Display <EMPTY> in middle of screen
+            #BACKTAB(126) = ASCII_table(28)+CS_WHITE
+            #BACKTAB(127) = ASCII_table(37)+CS_WHITE
+            #BACKTAB(128) = ASCII_table(45)+CS_WHITE
+            #BACKTAB(129) = ASCII_table(48)+CS_WHITE
+            #BACKTAB(130) = ASCII_table(52)+CS_WHITE
+            #BACKTAB(131) = ASCII_table(57)+CS_WHITE
+            #BACKTAB(132) = ASCII_table(30)+CS_WHITE
+        END IF
     END IF
-    SelEnt_Length = 0
-    WHILE ((PEEK((ADDRESS_flist+SelEnt_Length)+FNAME_LENGTH*Selected_Entry)<>255) AND (SelEnt_Length<FNAME_LENGTH))
-        SelEnt_Length = SelEnt_Length + 1 
-    WEND
-    SelEnt_Start = 0
     END
 
 DISPLAY_SELECTED_ENTRY: PROCEDURE
