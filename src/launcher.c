@@ -91,7 +91,11 @@ int LoadGame(int entry_num) {
    }
 #endif
 
-   load_file_by_id(screen_entries[entry_num].id, curPath);
+   int result = load_file_by_id(screen_entries[entry_num].id, curPath);
+   if (result != 0) {
+      printf("E: failed to load file\n");
+      return result;
+   }
 
    // ROM file has internal cfg info
    if(!is_rom_file(curPath))
@@ -137,8 +141,8 @@ int LoadGame(int entry_num) {
    sleep_ms(200);
    memset((uint16_t *) cart.RAM, 0, sizeof(cart.RAM));
 
-   // returns 1 to indicate success so that launcher execution stops and actual game is launched
-   return 1;
+   // returns 0 to indicate success so that launcher execution stops and actual game is launched
+   return 0;
 }
 
 void IntyMenu(int type) {       // 1=start, 2=next page, 3=prev page, 4=dir up
@@ -290,6 +294,8 @@ void RunLauncher() {
 
          cart.RAM[STATUS_ADDR] = 1;
          cart.RAM[CMD_ADDR] = 0;
+         cart.RAM[ERROR_ADDR] = 0;
+
          printf("cmd: %d\n", cmd);
 
          switch (cmd) {
@@ -303,10 +309,14 @@ void RunLauncher() {
                   if (screen_entries[entry_num].isDir) {  // directory
                      ChangeDirectory(entry_num);
                      IntyMenu(READ_PAGE);
-                  } else { 
-                     if (LoadGame(entry_num) == 1) {
+                  } else {
+                     int result = LoadGame(entry_num);
+                     if (result == 0) {
                         // game loaded return from launcher to actually run it
                         return;
+                     } else {
+                        // loading game failed => tell inty launcher to show error message
+                        cart.RAM[ERROR_ADDR] = -result;   // error codes are negative, convert to positive for launcher
                      }
                   }
                }

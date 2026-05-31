@@ -39,6 +39,7 @@
     CONST ADDRESS_sdpres    = $8123
     CONST ADDRESS_flist     = $817F ' 10 files * 64 characters per file (640 bytes), end address is $83FF
     CONST ADDRESS_cmd       = $8889
+    CONST ADDRESS_err       = $888A
     CONST ADDRESS_Select    = $8899
     CONST ADDRESS_ftype     = $9000
     CONST ADDRESS_ffrom     = $9028 ' First displayed entry (16 bits)
@@ -70,6 +71,10 @@
     CONST PI_HW_PIRTO2SD    = 3
     CONST PI_HW_PIRTO2DUO   = 4
     CONST PI_HW_PINTY       = 5
+    ' ERROR codes
+    CONST ERR_NO_ERROR            = 0
+    CONST ERR_COULD_NOT_OPEN_FILE = 1
+    CONST ERR_FILE_TO_BIG         = 2
 
     CONST FNAME_LENGTH      = 64
 
@@ -85,6 +90,7 @@
     DEF FN PI_GET_FTO    = ((PEEK(ADDRESS_fto)    * 256) + PEEK(ADDRESS_fto+1))
     DEF FN PI_GET_FTOTAL = ((PEEK(ADDRESS_ftotal) * 256) + PEEK(ADDRESS_ftotal+1))
     DEF FN PI_GET_HW     = PEEK(ADDRESS_hw)
+    DEF FN PI_GET_ERROR  = PEEK(ADDRESS_err)
 
     ' Display splash screen
 	MODE 0,0,2,0,2
@@ -379,9 +385,31 @@ SELECT_ENTRY: PROCEDURE
         ELSE
             ' RUN GAME
             GOSUB WAIT_CARD_ANSWER
-            ' Infinite loop till getting reseted by card
-            ASM InfiniteLoop:
-            ASM    B InfiniteLoop
+            
+            ' If error is file to big, display error message and wait for user to press clear
+            IF PI_GET_ERROR = ERR_FILE_TO_BIG THEN
+                PRINT AT SCREENPOS(0,4)  COLOR CS_RED, "                   "
+                PRINT AT SCREENPOS(0,5)  COLOR CS_RED, "   File too big!   "
+                PRINT AT SCREENPOS(0,6)  COLOR CS_RED, "                   "
+                PRINT AT SCREENPOS(0,10)  COLOR CS_RED, "                   "
+                PRINT AT SCREENPOS(0,11) COLOR CS_RED, "  CLEAR to return  "
+                WHILE (CONT <> $88)  'CLEAR
+                    WAIT
+                WEND
+            ELSEIF PI_GET_ERROR = ERR_COULD_NOT_OPEN_FILE THEN
+                PRINT AT SCREENPOS(0,4)  COLOR CS_RED, "                   "
+                PRINT AT SCREENPOS(0,5)  COLOR CS_RED, "Couldn't open file!"
+                PRINT AT SCREENPOS(0,6)  COLOR CS_RED, "                   "
+                PRINT AT SCREENPOS(0,10)  COLOR CS_RED, "                   "
+                PRINT AT SCREENPOS(0,11) COLOR CS_RED, "  CLEAR to return  "
+                WHILE (CONT <> $88)  'CLEAR
+                    WAIT
+                WEND
+            ELSE
+                ' Infinite loop till getting reseted by card
+                ASM InfiniteLoop:
+                ASM    B InfiniteLoop
+            END IF
         END IF
     END IF
     END

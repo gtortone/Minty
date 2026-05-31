@@ -9,6 +9,7 @@
 #define SDPRES_ADDR     0x0123      // SD card presence (0: no SD Card present, 1: SD Card present)
 #define ENTRY_LIST_ADDR 0x017f      // start of entry list array (10 entries of 64 characters each)
 #define CMD_ADDR        0x0889      // address used by INTY launcher to send command to pi
+#define ERROR_ADDR      0x088A      // Used to send error code to Pi
 #define SELECTION_ADDR  0x0899      // Used to send actual selected entry to Pi
 #define ENTRY_TYPE_ADDR 0x1000      // start of entry type array (directory = 1 or file = 0)
 #define FFROM_HI_ADDR   0x1028      // high byte of first displayed entries from current directory
