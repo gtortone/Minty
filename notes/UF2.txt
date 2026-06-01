@@ -1,0 +1,21 @@
+
+How to build a single .uf2 file including Minty firmware and LittleFs partition
+-------------------------------------------------------------------------------
+
+- copy BIN+CFG or ROM files in "data" directory
+
+- create LittleFs filesystem image:
+
+mklittlefs -c data -b 4096 -p 256 -s 2097152 littlefs.bin
+
+- copy Minty firmware in current directory
+
+cp build/pirto_ii_duo/debug/Minty.bin Minty.bin
+
+- merge firmware (Minty.bin) with filesystem image (littlefs.bin)
+
+dd if=littlefs.bin of=Minty-fs.bin bs=1 seek=$((0x200000)) conv=notrunc
+
+- convert BIN file to UF2
+
+picotool uf2 convert Minty-fs.bin Minty-fs.uf2
