@@ -324,16 +324,10 @@ void RunGame() {
    get_rand_32();
 
    int16_t s16_op1, s16_op2;
-   int16_t prev_s16_op1, prev_s16_op2;
-
    uint16_t u16_op1, u16_op2;
-   uint16_t prev_u16_op1, prev_u16_op2;
 
    s16_op1 = s16_op2 = 0;
-   prev_s16_op1 = prev_s16_op2 = 0;
-
    u16_op1 = u16_op2 = 0;
-   prev_u16_op1 = prev_u16_op2 = 0;
 #endif
 
    while (1) {
@@ -370,13 +364,9 @@ void RunGame() {
                case 0x9F81: {
                   s16_op1 = cart.RAM[0x1F80];
                   s16_op2 = cart.RAM[0x1F81];
-                  if ( (s16_op1 != prev_s16_op1) && (s16_op2 != prev_s16_op2) ) {
-                     int32_t res = s16_op1 * s16_op2;
-                     cart.RAM[0x1F8F] = (res) >> 16;
-                     cart.RAM[0x1F8E] = (res & 0xffff);
-                     s16_op1 = s16_op2 = 0;
-                     prev_s16_op1 = prev_s16_op2 = 0;
-                  }
+                  int32_t res = s16_op1 * s16_op2;
+                  cart.RAM[0x1F8F] = (res) >> 16;
+                  cart.RAM[0x1F8E] = (res & 0xffff);
                }
                break;
                
@@ -385,13 +375,9 @@ void RunGame() {
                case 0x9F83: {
                   s16_op1 = cart.RAM[0x1F82];
                   u16_op2 = cart.RAM[0x1F83];
-                  if ( (s16_op1 != prev_s16_op1) && (u16_op2 != prev_u16_op2) ) {
-                     int32_t res = s16_op1 * u16_op2;
-                     cart.RAM[0x1F8F] = (res) >> 16;
-                     cart.RAM[0x1F8E] = (res & 0xffff);
-                     s16_op1 = u16_op2 = 0;
-                     prev_s16_op1 = prev_u16_op2 = 0;
-                  }
+                  int32_t res = s16_op1 * u16_op2;
+                  cart.RAM[0x1F8F] = (res) >> 16;
+                  cart.RAM[0x1F8E] = (res & 0xffff);
                }
                break;
 
@@ -400,13 +386,9 @@ void RunGame() {
                case 0x9F85: {
                   u16_op1 = cart.RAM[0x1F84];
                   s16_op2 = cart.RAM[0x1F85];
-                  if ( (u16_op1 != prev_u16_op1) && (s16_op2 != prev_s16_op2) ) {
-                     int32_t res = u16_op1 * s16_op2;
-                     cart.RAM[0x1F8F] = (res) >> 16;
-                     cart.RAM[0x1F8E] = (res & 0xffff);
-                     u16_op1 = s16_op2 = 0;
-                     prev_u16_op1 = prev_s16_op2 = 0;
-                  }
+                  int32_t res = u16_op1 * s16_op2;
+                  cart.RAM[0x1F8F] = (res) >> 16;
+                  cart.RAM[0x1F8E] = (res & 0xffff);
                }
                break;
                
@@ -415,13 +397,9 @@ void RunGame() {
                case 0x9F87: {
                   u16_op1 = cart.RAM[0x1F86];
                   u16_op2 = cart.RAM[0x1F87];
-                  if ( (u16_op1 != prev_u16_op1) && (u16_op2 != prev_u16_op2) ) {
-                     int32_t res = u16_op1 * u16_op2;
-                     cart.RAM[0x1F8F] = (res) >> 16;
-                     cart.RAM[0x1F8E] = (res & 0xffff);
-                     u16_op1 = u16_op2 = 0;
-                     prev_u16_op1 = prev_u16_op2 = 0;
-                  }
+                  uint32_t res = u16_op1 * u16_op2;
+                  cart.RAM[0x1F8F] = (res) >> 16;
+                  cart.RAM[0x1F8E] = (res & 0xffff);
                }
                break;
                
@@ -430,14 +408,10 @@ void RunGame() {
                case 0x9F89: {
                   s16_op1 = cart.RAM[0x1F88];
                   s16_op2 = cart.RAM[0x1F89];
-                  if ( (s16_op1 != prev_s16_op1) && (s16_op2 != prev_s16_op2) ) {
-                     int16_t res = s16_op1 % s16_op2;
-                     cart.RAM[0x1F8F] = res;
-                     res = s16_op1 / s16_op2;
-                     cart.RAM[0x1F8E] = res;
-                     s16_op1 = s16_op2 = 0;
-                     prev_s16_op1 = prev_s16_op2 = 0;
-                  }
+                  int16_t res = s16_op1 % s16_op2;
+                  cart.RAM[0x1F8F] = res;
+                  res = s16_op1 / s16_op2;
+                  cart.RAM[0x1F8E] = res;
                }
                break;
                
@@ -446,14 +420,10 @@ void RunGame() {
                case 0x9F8B: {
                   u16_op1 = cart.RAM[0x1F8A];
                   u16_op2 = cart.RAM[0x1F8B];
-                  if ( (u16_op1 != prev_u16_op1) && (u16_op2 != prev_u16_op2) ) {
-                     int16_t res = u16_op1 % u16_op2;
-                     cart.RAM[0x1F8F] = res;
-                     res = u16_op1 / u16_op2;
-                     cart.RAM[0x1F8E] = res;
-                     u16_op1 = u16_op2 = 0;
-                     prev_u16_op1 = prev_u16_op2 = 0;
-                  }
+                  int16_t res = u16_op1 % u16_op2;
+                  cart.RAM[0x1F8F] = res;
+                  res = u16_op1 / u16_op2;
+                  cart.RAM[0x1F8E] = res;
                }
                break;
 
