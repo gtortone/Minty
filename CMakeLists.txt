@@ -61,6 +61,12 @@ FetchContent_Declare(
 )
 
 FetchContent_MakeAvailable(littlefs)
+
+# disable warning on lfs.c
+set_source_files_properties(
+   ${LITTLEFS_DIR}/lfs.c
+   PROPERTIES COMPILE_OPTIONS "-Wno-unused-function"
+)
 ###
 
 add_subdirectory(
