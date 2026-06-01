@@ -112,23 +112,20 @@ int LoadGame(int entry_num) {
    //addSlot(0x800E, 0x801E, 0x4810, 0, ROM_SLOT);
    //addSlot(0x800E, 0x811E, 0x4810, 0, ROM_SLOT);
 
-   // GoSubDigital.cfg
-   addSlot(0x0000, 0x045F, 0x2100, 0, ROM_SLOT);
-   addSlot(0x0460, 0x046D, 0x4800, 0, ROM_SLOT);
-   addSlot(0x046E, 0x0549, 0x4810, 0, ROM_SLOT);
-   addSlot(0x054A, 0x1549, 0x5000, 0, ROM_SLOT);
-   addSlot(0x154A, 0x19B9, 0x6000, 0, ROM_SLOT);
-   addSlot(0x19BA, 0x2187, 0xA000, 0, ROM_SLOT);
-   addSlot(0x2188, 0x2B73, 0xB000, 0, ROM_SLOT);
-   addSlot(0x2B74, 0x3787, 0xC040, 0, ROM_SLOT);
+   // Cat Attack
+   //addSlot(0x10000, 0x1000C, 0x4800, 0, ROM_SLOT);
+   //addSlot(0x1000D, 0x103AB, 0x4810, 0, ROM_SLOT);
+   //addSlot(0x103AC, 0x113AB, 0x5000, 0, ROM_SLOT);
+   //addSlot(0x113AC, 0x123A7, 0x6000, 0, ROM_SLOT);
+   //addSlot(0x123A8, 0x12A57, 0xA000, 0, ROM_SLOT);
 
    printFilledSlots();
 
-   uint16_t addr = 0x2100;
+   uint16_t addr = 0x47D0;
    uint32_t romaddr;
    mapType type = ROM_SLOT;
 
-   while (addr <= 0xCC53) {
+   while (addr <= 0xA6B0) {
       if (mapAddress(addr, 0, &romaddr, &type))
          printf("R:0x%lX  A:0x%X\n", romaddr, addr);
       else

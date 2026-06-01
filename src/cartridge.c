@@ -229,8 +229,7 @@ void __time_critical_func(core1_main()) {
 
                } else { // RAM8_SLOT or RAM16_SLOT
                
-                  //if ( (addrIn - slots[idx].from[0]) <= (slots[idx].size[0] - 1) ) {
-                  if ( (addrIn - slots[idx].from[0]) <= (slots[idx].size[0]) ) {
+                  if ( (addrIn - slots[idx].from[0]) < (slots[idx].size[0]) ) {
 
                      romaddr = (addrIn - slots[idx].from[0]);
                      dataOut = cart.RAM[romaddr];
