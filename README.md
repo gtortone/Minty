@@ -26,12 +26,12 @@ Multi-cart based on Raspberry Pi Pico hardware and PiRTOII firmware (https://git
 
 ## Table of features
 
-| board  | MCU | max ROM size  | JLP | ROM storage |
-|--------|-----|---------------| --- | ----------- |
-| Pirto | RP2040 | ~180kB      | ❌  | microSD     |
-| Pirto-II | RP2040 | ~100kB   | ❌  | flash       |
-| Pirto-II-SD | RP2040 | ~180kB | ❌ | microSD     |
-| Pirto-II-Duo | RP2350 | ~450 kB | ✅ | microSD   |
+| board  | MCU | max ROM size  | JLP | ROM storage | build target |
+|--------|-----|---------------| --- | ----------- | ------------ |
+| Pirto | RP2040 | ~180kB      | ❌  | microSD     | `pirto` |
+| Pirto-II | RP2040 | ~100kB   | ❌  | flash       | `pirto_ii_default` |
+| Pirto-II-SD | RP2040 | ~180kB | ❌ | microSD     | `pirto_ii_sd` |
+| Pirto-II-Duo | RP2350 | ~450 kB | ✅ | microSD   | `pirto_ii_duo` |
 
 ## Firmware
 
@@ -64,6 +64,8 @@ Setup ROMs:
 - CMake (>3.13)
 
 ### Commands
+
+Replace `BOARD` with build target available on table of features.
 
 ```
 cmake -B build/BOARD/debug -DPICO_BOARD=BOARD -DCMAKE_BUILD_TYPE=Debug
