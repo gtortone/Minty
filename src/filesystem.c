@@ -115,8 +115,8 @@ int load_file(char *filename) {
 
    if (vfs_stat(filename, &st) == 0) {
       printf("file size: %d bytes\n", st.size);
-      if (st.size > BINLENGTH*2) {
-         printf("file size exceeds maximum supported size of %d bytes\n", BINLENGTH*2);
+      if (st.size > MAX_ROM_SIZE*2) {
+         printf("file size exceeds maximum supported size of %d bytes\n", MAX_ROM_SIZE*2);
          return -2;
       }
    }

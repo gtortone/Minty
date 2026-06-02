@@ -118,6 +118,7 @@ target_compile_definitions(${PROJECT} PRIVATE "CONFIG_SD_STORAGE=${CONFIG_SD_STO
 target_compile_definitions(${PROJECT} PRIVATE "CONFIG_FLASH_FAT_STORAGE=${CONFIG_FLASH_FAT_STORAGE}")
 target_compile_definitions(${PROJECT} PRIVATE "CONFIG_FLASH_LFS_STORAGE=${CONFIG_FLASH_LFS_STORAGE}")
 target_compile_definitions(${PROJECT} PRIVATE "CONFIG_JLP=${CONFIG_JLP}")
+target_compile_definitions(${PROJECT} PRIVATE "MAX_ROM_SIZE=${MAX_ROM_SIZE}")
 
 if(CONFIG_FLASH_LFS_STORAGE)
    #target_compile_definitions(${PROJECT} PRIVATE "LFS_THREADSAFE=1")

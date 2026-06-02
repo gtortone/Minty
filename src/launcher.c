@@ -289,7 +289,7 @@ void RunLauncher() {
    // Initialise display list
    IntyMenu(READ_PAGE);
 
-   printf("max size of ROM file: %d bytes\n", BINLENGTH*2);
+   printf("max size of ROM file: %d bytes\n", MAX_ROM_SIZE*2);
   
    cart.RAM[STATUS_ADDR] = 0;      // release welcome screen
    gpio_put(LED, true);

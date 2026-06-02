@@ -7,35 +7,10 @@
 
 #include "vfs.h"
 
-// CONFIG_FLASH_FAT_STORAGE allocates some big buffers for FAT wear leveling,
-// on microSD equipped boards this option is disabled and saves some RAM
-
-#ifdef NDEBUG
-   #if PICO_RP2040
-      #if CONFIG_FLASH_FAT_STORAGE
-         #define BINLENGTH 1024*50     // 100 kb         // Pirto II default
-      #else
-         #define BINLENGTH 1024*90     // 180 kb         // Pirto and Pirto II SD
-      #endif
-   #elif PICO_RP2350
-      #if CONFIG_FLASH_FAT_STORAGE
-         #define BINLENGTH 1024*205    // 420 kb         // PintyCard
-      #else
-         #define BINLENGTH 1024*218    // ~450 kb        // Pirto II Duo
-      #endif
-   #endif
-#else
-   #if PICO_RP2040
-      #define BINLENGTH 1024*50
-   #elif PICO_RP2350
-      #define BINLENGTH 1024*205
-   #endif
-#endif
-
 #define RAMSIZE   0x2000
 
 typedef struct {
-   volatile uint16_t ROM[BINLENGTH];
+   volatile uint16_t ROM[MAX_ROM_SIZE];
    volatile uint16_t RAM[RAMSIZE];
    uint32_t len;
 
