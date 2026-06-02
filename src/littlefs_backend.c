@@ -6,20 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#define LFS_PARTITION_SIZE    (2 * 1024 * 1024)
-//
-// test on RP2350
-//
-// PICO_FLASH_SIZE_BYTES:        4194304     (4 MB)
-// LFS_PARTITION_SIZE:           2097152     (2 MB)
-// LFS flash start address:      0x10200000
-//
-// create littlefs.bin:
-//    mklittlefs -c data -b 4096 -p 256 -s 2097152 littlefs.bin
-//
-// flash LFS partition with OpenOCD:
-//    program littlefs.bin 0x10200000
-//
+#define LFS_PARTITION_SIZE    (1 * 1024 * 1024)
 
 static struct lfs_config *lfs_cfg;
 static lfs_t lfs;
