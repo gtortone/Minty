@@ -22,7 +22,14 @@ Multi-cart based on Raspberry Pi Pico hardware and PiRTOII firmware (https://git
 - VFS (Virtual File System) library included to access storage devices based on FatFs or LittleFs
 - full JLP support: hardware acceleration, expanded memory and save/load on flash
 - new launcher firmware with icons and custom fonts with automatic saving of last opened directory 
-- tons of roms tested - Minty now is albe to run Bad Apple demo (on RP2350) !!!
+- tons of roms tested - Minty now is able to run Bad Apple demo (on RP2350) !!!
+
+## Screenshots
+
+| <img src="images/ui01.png"/> | <img src="images/ui02.png"/> |
+|------------------------------|------------------------------|
+| <img src="images/badapple.png"/> | <img src="images/onion.png"/> |
+
 
 ## Table of features
 
@@ -53,7 +60,7 @@ Setup ROMs:
 ### Controller keys
 
 <div align="center">
-   <img src="images/controller.png"/>
+   <img src="images/controller.png"/ width="25%">
 </div>
 
 ## Build (TL;DR)
