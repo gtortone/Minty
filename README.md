@@ -60,7 +60,7 @@ Setup ROMs:
 ### Controller keys
 
 <div align="center">
-   <img src="images/controller.png"/ width="25%">
+   <img src="images/controller.png"/>
 </div>
 
 ## Build (TL;DR)
