@@ -9,6 +9,8 @@ Multi-cart based on Raspberry Pi Pico hardware and PiRTOII firmware (https://git
 
 - Pico C/C++ code refactoring
 - Intybasic code refactoring
+- support for RP2040 multicarts: Pirto, Pirto-II, Pirto-II-SD
+- support for RP2350 multicart Pirto-II-Duo
 - no more config files for "official" ITV titles
 - new navigation keys for UI ROM
 - new color schema for UI ROM
@@ -16,23 +18,26 @@ Multi-cart based on Raspberry Pi Pico hardware and PiRTOII firmware (https://git
 - move from 64 to 512 max number of files for directory
 - SD support (with sukkopera board: https://github.com/SukkoPera/PiRTOII)
 - Intellicart ROM support (.rom)
+- new data structure for page decoding with O(1) lookup performance
+- VFS (Virtual File System) library included to access storage devices based on FatFs or LittleFs
+- full JLP support: hardware acceleration, expanded memory and save/load on flash
+- new launcher firmware with icons and custom fonts with automatic saving of last opened directory 
+- tons of roms tested - Minty now is albe to run Bad Apple demo (on RP2350) !!!
 
 ## Firmware
 
-Firmware files (.bin and .uf2) are available in [release](https://github.com/gtortone/Minty/releases) section.
+Firmware files for different boards (.bin and .uf2) are available in [release](https://github.com/gtortone/Minty/releases) section.
 
 ## Getting started
 
 To simply program Pi Pico:
 - connect it to your PC/laptop using an USB-C cable while pressing Pico on-board button (boot MODE)
-- drag and drop inside root directory `Minty.default_board.uf2` (for PirtoII default board) or `Minty.sd_board.uf2` (for PirtoII board with microSD slot)
+- drag and drop .uf2 file inside root directory
 
 Setup ROMs:
 - copy your ITV ROM to flash (or microSD) root directory
 - if ROM name is included in [cfg/0game-maps.csv](cfg/0game-maps.csv) you do not need to add config (.cfg) file
 - enjoy your PiRTOII cart with Minty firmware !
-
-User can switch flash/SD storage device using controller key.
 
 ## User interface
 
@@ -52,21 +57,16 @@ User can switch flash/SD storage device using controller key.
 ### Commands
 
 ```
-mkdir build
-cd build
-
-cmake -DPICO_BOARD=pirto_ii_default ..    # for default PirtoII board
+cmake -B build/BOARD/debug -DPICO_BOARD=BOARD -DCMAKE_BUILD_TYPE=Debug
+make -j -C build/pirto_ii_duo/debug
    or
-cmake -DPICO_BOARD=pirto_ii_sd ..         # for PirtoII board with microSD slot
-   or
-cmake -DPICO_BOARD=pintycard ..           # for PintyCard
-
-make
+cmake -B build/BOARD/release -DPICO_BOARD=BOARD -DCMAKE_BUILD_TYPE=Release
+make -j -C build/pirto_ii_duo/release
 ```
 
 After compilation `Minty.bin` and `Minty.uf2` are generated.
 
-To use `Minty.bin` to flash PiRTOII cart `picotool` is required. Run following
+To use `Minty.bin` to flash a board `picotool` is required. Run following
 command after setting Pi Pico in BOOT mode:
 
 ```
@@ -78,6 +78,8 @@ picotool load -f Minty.bin; picotool reboot
 Thanks a lot to Andrea Ottaviani for his PiRTOII firmware (https://github.com/aotta/PiRTOII) and PCB files.
 
 Thanks a lot to sukkopera for his PirtoII board with microSD card slot (https://github.com/SukkoPera/PiRTOII)
+
+A special thanks to Minty new developer Yannick Erb for his priceless contribution on launcher and various patches and improvements on the firmware.
 
 
 
