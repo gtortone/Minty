@@ -12,8 +12,8 @@ Multi-cart based on Raspberry Pi Pico hardware and PiRTOII firmware (https://git
 - support for RP2040 multicarts: Pirto, Pirto-II, Pirto-II-SD
 - support for RP2350 multicart Pirto-II-Duo
 - no more config files for "official" ITV titles
-- new navigation keys for UI ROM
-- new color schema for UI ROM
+- new navigation keys for launcher
+- new color schema for launcher
 - support for long filenames (up to 255 chars)
 - move from 64 to 512 max number of files for directory
 - SD support (with sukkopera board: https://github.com/SukkoPera/PiRTOII)
@@ -23,6 +23,15 @@ Multi-cart based on Raspberry Pi Pico hardware and PiRTOII firmware (https://git
 - full JLP support: hardware acceleration, expanded memory and save/load on flash
 - new launcher firmware with icons and custom fonts with automatic saving of last opened directory 
 - tons of roms tested - Minty now is albe to run Bad Apple demo (on RP2350) !!!
+
+## Table of features
+
+| board  | MCU | max ROM size  | JLP | ROM storage |
+|--------|-----|---------------| --- | ----------- |
+| Pirto | RP2040 | ~180kB      | ❌  | microSD     |
+| Pirto-II | RP2040 | ~100kB   | ❌  | flash       |
+| Pirto-II-SD | RP2040 | ~180kB | ❌ | microSD     |
+| Pirto-II-Duo | RP2350 | ~450 kB | ✅ | microSD   |
 
 ## Firmware
 
