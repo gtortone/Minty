@@ -33,13 +33,13 @@ Multi-cart based on Raspberry Pi Pico hardware and PiRTOII firmware (https://git
 
 ## Table of features
 
-| board  | MCU | max ROM size  | JLP | ROM storage | build target |
-|--------|-----|---------------| --- | ----------- | ------------ |
-| [Pirto](https://github.com/aotta/PiRTO) | RP2040 | ~180kB      | ❌  | microSD     | `pirto` |
-| [Pirto-II](https://github.com/aotta/PiRTOII) | RP2040 | ~100kB   | ❌  | flash       | `pirto_ii_default` |
-| [Pirto-II-SD](https://github.com/SukkoPera/PiRTOII) | RP2040 | ~180kB | ❌ | microSD     | `pirto_ii_sd` |
-| [Pirto-II-Duo](https://github.com/aotta/PiRTOIIDuo) | RP2350 | ~450 kB | ✅ | microSD   | `pirto_ii_duo` |
-| [PintyCard](https://oshwlab.com/yannick.erb/intv-pirto-hb) | RP2354A | ~420kB | ✅ | flash | `pintycard` |
+| board  | MCU | RAM | max ROM size  | JLP | ROM storage | build target |
+|--------|-----|-----|---------------| --- | ----------- | ------------ |
+| [Pirto](https://github.com/aotta/PiRTO) | RP2040 | 256 kB | ~180kB      | ❌  | microSD     | `pirto` |
+| [Pirto-II](https://github.com/aotta/PiRTOII) | RP2040 | 256 kB | ~100kB   | ❌  | flash       | `pirto_ii_default` |
+| [Pirto-II-SD](https://github.com/SukkoPera/PiRTOII) | RP2040 | 256 kB | ~180kB | ❌ | microSD     | `pirto_ii_sd` |
+| [Pirto-II-Duo](https://github.com/aotta/PiRTOIIDuo) | RP2350 | 512 kB | ~450 kB | ✅ | microSD   | `pirto_ii_duo` |
+| [PintyCard](https://oshwlab.com/yannick.erb/intv-pirto-hb) | RP2354A | 512 kB | ~450kB | ✅ | flash | `pintycard` |
 
 ## Firmware
 
