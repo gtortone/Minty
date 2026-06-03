@@ -23,9 +23,6 @@ Cartridge cart;     // main data structure for cart emulation
 
 extern struct mapEntry slots[NSLOTS];
 
-// RAM base address for launcher 
-const unsigned int base = 0x17F;
-
 void init_cart(void) {
 
    memset((uint16_t *) cart.ROM, 0, sizeof(cart.ROM));
@@ -327,7 +324,7 @@ void load_cfg(char *filename) {
             else {
                uint32_t romaddr;
                mapType type = ROM_SLOT;
-               
+
                mapAddress(poke_address, 0, &romaddr, &type);
                cart.ROM[romaddr] = poke_value;
             }
