@@ -6,7 +6,7 @@ How to build a single .uf2 file including Minty firmware and LittleFs partition
 
 - create LittleFs filesystem image:
 
-mklittlefs -c data -b 4096 -p 256 -s 1045876 littlefs.bin
+mklittlefs -c data -b 4096 -p 256 -s 1048576 littlefs.bin
 
 - copy Minty firmware in current directory
 
