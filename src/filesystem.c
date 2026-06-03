@@ -141,7 +141,6 @@ int load_file(char *filename) {
 
       cleanSlots();
       cleanHoles();
-      cleanHacks();
 
       vfs_read(f, inputBuffer, sizeof(inputBuffer));
       

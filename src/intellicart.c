@@ -124,6 +124,7 @@ void load_cfg(char *filename) {
    cfgSection cfgsec; 
    vfs_file_t *f;
    int ret;
+   int num_pokes = 0;
 
 #if CONFIG_JLP
    int jlp_value;
@@ -175,7 +176,6 @@ void load_cfg(char *filename) {
   
    cleanSlots();
    cleanHoles();
-   cleanHacks();
 
    cfgsec = NONE;
 
@@ -276,12 +276,62 @@ void load_cfg(char *filename) {
          uint32_t a, b;
 
          ret = sscanf(line, "p %lx %lx", &a, &b);
-         if (ret != 2) {
-            printf("E: parsing error in line: \n\t %s\n", line);
-            return;
+         if (ret != 2)
+            printf("E: not a MACRO/poke cmd in line: \n\t %s\n", line);
+         else
+            num_pokes++;
+      }
+   }
+
+   // rewind file to apply POKES (hacks)
+   if (num_pokes > 0) {
+      printf("applying %d pokes\n", num_pokes);
+      vfs_lseek(f, 0);
+   
+      cfgsec = NONE;
+      while (!(vfs_eof(f))) {
+         vfs_gets(f, line, sizeof(line));
+         strcpy(line, trim(line));
+
+         // skip comments
+         if ( (line[0] == ';') || !(stralpha(line)) ) {
+            continue;
          }
 
-         addHack(a, b);
+         if (strstr(line, "jlp") != NULL) {
+            // skip JLP config lines in case they are after the [vars] section
+            continue;
+         }
+
+         if (strstr(line, "[macro]") != NULL) {
+            cfgsec = MACRO;
+            printf("[macro] section\n");
+            continue;
+         }
+
+         if (strstr(line, "[") != NULL) {
+            cfgsec = NONE;
+            printf("Not in MACRO section\n");
+            continue;
+         }
+
+         if (cfgsec == MACRO) {
+            // example: 
+            // p 66fe 34
+
+            uint32_t poke_address, poke_value;
+
+            ret = sscanf(line, "p %lx %lx", &poke_address, &poke_value);
+            if (ret != 2)
+               printf("E: not a MACRO/poke cmd in line: \n\t %s\n", line);
+            else {
+               uint32_t romaddr;
+               mapType type = ROM_SLOT;
+               
+               mapAddress(poke_address, 0, &romaddr, &type);
+               cart.ROM[romaddr] = poke_value;
+            }
+         }
       }
    }
 
@@ -297,5 +347,3 @@ void load_cfg(char *filename) {
 
    printf("load_cfg done\n");
 }
-
-
