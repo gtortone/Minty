@@ -268,15 +268,16 @@ void load_cfg(char *filename) {
 
       } else if (cfgsec == MACRO) {
          // example: 
-         // p 66fe 34
+         // p 66fe 34 or poke 66fe 34
+         uint32_t poke_address, poke_value;
+         char cmd[16];
+            
+         ret = sscanf(line, "%15s %lx %lx", cmd, &poke_address, &poke_value);
 
-         uint32_t a, b;
-
-         ret = sscanf(line, "p %lx %lx", &a, &b);
-         if (ret != 2)
-            printf("E: not a MACRO/poke cmd in line: \n\t %s\n", line);
-         else
+         if (ret == 3 && (strcasecmp(cmd, "p") == 0 || strcasecmp(cmd, "poke") == 0))
             num_pokes++;
+         else
+            printf("E: not a MACRO/poke cmd in line: \n\t %s\n", line);            
       }
    }
 
@@ -314,19 +315,22 @@ void load_cfg(char *filename) {
 
          if (cfgsec == MACRO) {
             // example: 
-            // p 66fe 34
-
+            // p 66fe 34 or poke 66fe 34
             uint32_t poke_address, poke_value;
+            char cmd[16];
+            
+            ret = sscanf(line, "%15s %lx %lx", cmd, &poke_address, &poke_value);
 
-            ret = sscanf(line, "p %lx %lx", &poke_address, &poke_value);
-            if (ret != 2)
-               printf("E: not a MACRO/poke cmd in line: \n\t %s\n", line);
-            else {
+            if (ret == 3 && (strcasecmp(cmd, "p") == 0 || strcasecmp(cmd, "poke") == 0)) {
+               // Modify actual value @corresponding address in binary
                uint32_t romaddr;
                mapType type = ROM_SLOT;
-
+               
                mapAddress(poke_address, 0, &romaddr, &type);
-               cart.ROM[romaddr] = poke_value;
+               cart.ROM[romaddr] = poke_value;               /* valid command */
+            }
+            else {
+               printf("E: not a MACRO/poke cmd in line: \n\t %s\n", line);
             }
          }
       }
