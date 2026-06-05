@@ -292,8 +292,6 @@ int load_cfg(char *filename) {
       }
    }
 
-   // rewind cfg file to apply POKES (hacks)
-
    vfs_close(f);
 
 #if CONFIG_JLP
