@@ -38,7 +38,8 @@ typedef struct {
 #define JLP_ROW_NUMBER              cart.RAM[0x26]
 
 void init_cart(void);
-void load_cfg(char *filename);
+int load_cfg(char *filename);
+void apply_pokes(char *filename);
 void config_jlp(int jlp_value, int jlpflash_value, char *filename);
 
 #endif

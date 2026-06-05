@@ -37,7 +37,6 @@ volatile uint16_t addrInCopy;
 
 extern struct mapEntry slots[NSLOTS];
 extern struct mapHole holes[NSLOTS];
-extern struct memHack hacks[MAX_HACKS_NUM];
 
 __attribute__((optimize("O3")))
 void __time_critical_func(core1_main()) {

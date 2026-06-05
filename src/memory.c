@@ -15,9 +15,7 @@
 
 struct mapEntry slots[NSLOTS];
 struct mapHole holes[NSLOTS];
-struct memHack hacks[MAX_HACKS_NUM];
 
-static uint8_t numHacks = 0;
 
 void printSlot(uint8_t idx, uint8_t page) {
 
@@ -341,22 +339,4 @@ void config_memory(int cfg) {
       default:
          break;
    }
-}
-
-void cleanHacks(void) {
-   for (int i=0; i<MAX_HACKS_NUM; i++) {
-      hacks[i].address = 0;
-      hacks[i].value = 0;
-   }
-   numHacks = 0;
-}
-
-void addHack(uint16_t addr, uint8_t value) {
-   hacks[numHacks].address = addr;
-   hacks[numHacks].value = value;
-   numHacks++;
-}
-
-uint8_t getHacksNum(void) {
-   return numHacks;
 }

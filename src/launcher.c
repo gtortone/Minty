@@ -46,7 +46,6 @@ extern Cartridge cart;     // main data structure for cart emulation
 
 extern struct mapEntry slots[NSLOTS];
 extern struct mapHole holes[NSLOTS];
-extern struct memHack hacks[MAX_HACKS_NUM];
 
 char curPath[512] = "";
 
@@ -98,15 +97,19 @@ int LoadGame(int entry_num) {
    }
 
    // ROM file has internal cfg info
-   if(!is_rom_file(curPath))
-      load_cfg(curPath);
+   if(!is_rom_file(curPath)) {
+      if (load_cfg(curPath) > 0) {
+         // pokes found in cfg file, apply them now
+         apply_pokes(curPath);
+      }
+   }
 
    /*
    // test
 
    cleanSlots();
    cleanHoles();
-   cleanHacks();
+
 
    //addSlot(0x8000, 0x800D, 0x4800, 0, ROM_SLOT);
    //addSlot(0x800E, 0x801E, 0x4810, 0, ROM_SLOT);
@@ -135,13 +138,6 @@ int LoadGame(int entry_num) {
       
    // test
    */
-
-   for (int i=0; i<getHacksNum(); i++) {
-      uint32_t romaddr;
-      mapType type;
-      mapAddress(hacks[i].address, 0, &romaddr, &type);
-      cart.ROM[romaddr] = hacks[i].value;
-   }
 
    gpio_put(LED, false);
 
@@ -223,7 +219,6 @@ void RunLauncher() {
    // Configure card
    cleanSlots();
    cleanHoles();
-   cleanHacks();
 
 	if ((sizeof(mintyfw) / 2) < 0x1000) {
 		addSlot(0x0000, (sizeof(mintyfw) / 2)-1, 0x5000, 0, ROM_SLOT);

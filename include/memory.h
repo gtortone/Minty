@@ -7,7 +7,6 @@
 
 #define NSLOTS    256
 #define NPAGES     16
-#define MAX_HACKS_NUM   32
 
 /*
  * mapEntry is a struct to contain Intellicart config "row"
@@ -41,10 +40,6 @@ struct mapHole {
    bool filled;
 };
 
-struct memHack {
-   uint16_t address;
-   uint8_t value;
-};
 
 void printSlot(uint8_t idx, uint8_t page);
 void printFilledSlots(void);
@@ -54,10 +49,6 @@ void addSlot(uint32_t from, uint32_t to, uint16_t target, uint8_t page, mapType 
 bool mapSlot(uint16_t addr, uint8_t page, uint8_t *slot);
 bool mapAddress(uint16_t addr, uint8_t page, uint32_t *romaddr, mapType *type);
 void getRAMRange(uint16_t *ramfrom, uint16_t *ramto, uint8_t *ramwidth);
-void cleanHacks(void);
-void addHack(uint16_t addr, uint8_t value);
-uint8_t getHacksNum(void);
-
 void config_memory(int cfg);
 
 #endif
