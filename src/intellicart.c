@@ -247,7 +247,7 @@ int load_cfg(char *filename) {
          ret = sscanf(line, "$%lx - $%lx = %3s %d", &a, &b, type, &w);
          if (ret != 4) {
             printf("E: parsing error in line: \n\t %s\n", line);
-            return;
+            return num_pokes;
          }
          if ( (strcmp(type, "ROM") != 0) && (strcmp(type, "RAM") != 0) ) {
             printf("E: parsing error in line: \n\t %s\n", line);
