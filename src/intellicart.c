@@ -126,8 +126,8 @@ void load_cfg(char *filename) {
    int ret;
 
 #if CONFIG_JLP
-   int jlp_value;
-   int jlpflash_value;
+   int jlp_value = 0;
+   int jlpflash_value = 0;
 #endif
 
    char *dot = strrchr(filename, '.');
@@ -181,16 +181,16 @@ void load_cfg(char *filename) {
 
    while (!(vfs_eof(f))) {
 
-      vfs_gets(f, line, sizeof(line));
+      if (vfs_gets(f, line, sizeof(line)) == NULL)
+         continue;
+
       strcpy(line, trim(line));
 
       //printf("line: %s, len: %d\n", line, strlen(line));
 
       // skip comments
-      if ( (line[0] == ';') || !(stralpha(line)) ) {
-         //cfgsec = NONE;
+      if ( (line[0] == ';') || !(stralpha(line)) )
          continue;
-      }
 
       if (strstr(line, "[mapping]") != NULL) {
          cfgsec = MAPPING;
