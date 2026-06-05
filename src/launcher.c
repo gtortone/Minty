@@ -97,8 +97,12 @@ int LoadGame(int entry_num) {
    }
 
    // ROM file has internal cfg info
-   if(!is_rom_file(curPath))
-      load_cfg(curPath);
+   if(!is_rom_file(curPath)) {
+      if (load_cfg(curPath) > 0) {
+         // pokes found in cfg file, apply them now
+         apply_pokes(curPath);
+      }
+   }
 
    /*
    // test

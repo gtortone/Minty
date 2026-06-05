@@ -23,6 +23,9 @@ Cartridge cart;     // main data structure for cart emulation
 
 extern struct mapEntry slots[NSLOTS];
 
+// RAM base address for launcher 
+const unsigned int base = 0x17F;
+
 void init_cart(void) {
 
    memset((uint16_t *) cart.ROM, 0, sizeof(cart.ROM));
@@ -114,9 +117,9 @@ void config_jlp(int jlp_value, int jlpflash_value, char *filename) {
    }  // end if(JLPFlash)
 }
 
-void load_cfg(char *filename) {
+int load_cfg(char *filename) {
 
-   char line[80];
+   char line[256];
    char cfgfile[512] = {0};
    cfgSection cfgsec; 
    vfs_file_t *f;
@@ -152,7 +155,7 @@ void load_cfg(char *filename) {
 
                getRAMRange(&cart.ramfrom, &cart.ramto, &cart.ramwidth);
 
-               return;
+               return num_pokes;
             }
 
             config_memory(fingerprints[i+1]);
@@ -160,13 +163,13 @@ void load_cfg(char *filename) {
             //printf("cart.ramfrom: 0x%X, cart.ramto: 0x%X, cart.ramwidth: %d\n",
             //      cart.ramfrom, cart.ramto, cart.ramwidth);
 
-            return;
+            return num_pokes;
          }
       }
 
       // if this line is reached no config file and no fingerprint so use default config
       config_memory(0);
-      return;
+      return num_pokes;
    }
 
    printf("load_cfg: use %s config file\n", cfgfile);
@@ -185,7 +188,7 @@ void load_cfg(char *filename) {
 
       // skip comments
       if ( (line[0] == ';') || !(stralpha(line)) ) {
-         cfgsec = NONE;
+         // cfgsec = NONE;
          continue;
       }
 
@@ -218,7 +221,7 @@ void load_cfg(char *filename) {
             ret = sscanf(line, "$%lx - $%lx = $%lx%*[^P]PAGE %lx", &a, &b, &c, &p);
             if (ret != 4) {
                printf("E: parsing error in line: \n\t %s\n", line);
-               return;
+               return num_pokes;
             }
             cart.pagingSupport = true;
             addSlot(a, b, c, p, ROM_PAGE_SLOT);
@@ -228,7 +231,7 @@ void load_cfg(char *filename) {
             ret = sscanf(line, "$%lx - $%lx = $%lx", &a, &b, &c); 
             if (ret != 3) {
                printf("E: parsing error in line: \n\t %s\n", line);
-               return;
+               return num_pokes;
             }
             addSlot(a, b, c, 0, ROM_SLOT);
          }
@@ -243,7 +246,7 @@ void load_cfg(char *filename) {
          ret = sscanf(line, "$%lx - $%lx =%*[^R]RAM %d", &a, &b, &w);
          if (ret != 3) {
             printf("E: parsing error in line: \n\t %s\n", line);
-            return;
+            return num_pokes;
          }
          if (w == 8)
             addSlot(a, b, 0, 0, RAM8_SLOT);
@@ -274,67 +277,17 @@ void load_cfg(char *filename) {
             
          ret = sscanf(line, "%15s %lx %lx", cmd, &poke_address, &poke_value);
 
-         if (ret == 3 && (strcasecmp(cmd, "p") == 0 || strcasecmp(cmd, "poke") == 0))
+         if (ret == 3 && (strcasecmp(cmd, "p") == 0 || strcasecmp(cmd, "poke") == 0)) {
             num_pokes++;
-         else
-            printf("E: not a MACRO/poke cmd in line: \n\t %s\n", line);            
-      }
-   }
-
-   // rewind file to apply POKES (hacks)
-   if (num_pokes > 0) {
-      printf("applying %d pokes\n", num_pokes);
-      vfs_lseek(f, 0);
-   
-      cfgsec = NONE;
-      while (!(vfs_eof(f))) {
-         vfs_gets(f, line, sizeof(line));
-         strcpy(line, trim(line));
-
-         // skip comments
-         if ( (line[0] == ';') || !(stralpha(line)) ) {
-            continue;
+            printf("Poke %d detected : %lx @ %lx\n",num_pokes,poke_value,poke_address);
          }
-
-         if (strstr(line, "jlp") != NULL) {
-            // skip JLP config lines in case they are after the [vars] section
-            continue;
-         }
-
-         if (strstr(line, "[macro]") != NULL) {
-            cfgsec = MACRO;
-            printf("[macro] section\n");
-            continue;
-         }
-
-         if (strstr(line, "[") != NULL) {
-            cfgsec = NONE;
-            printf("Not in MACRO section\n");
-            continue;
-         }
-
-         if (cfgsec == MACRO) {
-            // example: 
-            // p 66fe 34 or poke 66fe 34
-            uint32_t poke_address, poke_value;
-            char cmd[16];
-            
-            ret = sscanf(line, "%15s %lx %lx", cmd, &poke_address, &poke_value);
-
-            if (ret == 3 && (strcasecmp(cmd, "p") == 0 || strcasecmp(cmd, "poke") == 0)) {
-               // Modify actual value @corresponding address in binary
-               uint32_t romaddr;
-               mapType type = ROM_SLOT;
-               
-               mapAddress(poke_address, 0, &romaddr, &type);
-               cart.ROM[romaddr] = poke_value;               /* valid command */
-            }
-            else {
-               printf("E: not a MACRO/poke cmd in line: \n\t %s\n", line);
-            }
+         else {
+            printf("E: not a MACRO/poke cmd in line: \n\t %s\n", line);
          }
       }
    }
+
+   // rewind cfg file to apply POKES (hacks)
 
    vfs_close(f);
 
@@ -347,4 +300,73 @@ void load_cfg(char *filename) {
    //printFilledSlots();
 
    printf("load_cfg done\n");
+
+   return num_pokes;
+}
+
+void apply_pokes(char *filename) {
+   char line[256];
+   char cfgfile[512] = {0};
+   cfgSection cfgsec; 
+   vfs_file_t *f;
+   int ret;
+
+   char *dot = strrchr(filename, '.');
+   strncpy(cfgfile, filename, (dot - filename));
+   strcat(cfgfile, ".cfg");
+
+   printf("applying pokes\n");
+
+   f = vfs_open(cfgfile, "r");
+
+   cfgsec = NONE;
+   while (!(vfs_eof(f))) {
+      vfs_gets(f, line, sizeof(line));
+      strcpy(line, trim(line));
+
+      // skip comments
+      if ( (line[0] == ';') || !(stralpha(line)) ) {
+         continue;
+      }
+
+      // detect start of MACRO section
+      if (strstr(line, "[macro]") != NULL) {
+         cfgsec = MACRO;
+         printf("[macro] section\n");
+         continue;
+      }
+
+      if (cfgsec == MACRO) {
+         // detect end of MACRO section
+         if (strstr(line, "[") != NULL) {
+            cfgsec = NONE;
+            printf("End of MACRO section\n");
+         }
+         else {
+            // example: 
+            // p 66fe 34 or poke 66fe 34
+            uint32_t poke_address, poke_value;
+            char cmd[16];
+            
+            ret = sscanf(line, "%15s %lx %lx", cmd, &poke_address, &poke_value);
+
+            if (ret == 3 && (strcasecmp(cmd, "p") == 0 || strcasecmp(cmd, "poke") == 0)) {
+               // Modify actual value @corresponding address in binary
+               uint32_t romaddr;
+               mapType type = ROM_SLOT;
+               
+               if (mapAddress(poke_address, 0, &romaddr, &type)) {
+                  cart.ROM[romaddr] = poke_value;               /* valid command */
+                  printf("Apply poke : value %lx @ address %lx (%lx)\n",poke_value, poke_address, romaddr);
+               }
+               else {
+                  printf("E: failure to map address %lx\n", poke_address);
+               }
+            }
+            else {
+               printf("E: not a MACRO/poke cmd in line: \n\t %s\n", line);
+            }
+         }
+      }
+   }
 }
