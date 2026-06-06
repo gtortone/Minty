@@ -7,7 +7,10 @@
 #define HAS_SD_ADDR     0x0121      // 0: no SD support, 1: SD support
 #define BOARD_ID_ADDR   0x0122      // (see firmware)
 #define SDPRES_ADDR     0x0123      // SD card presence (0: no SD Card present, 1: SD Card present)
-#define ENTRY_LIST_ADDR 0x017f      // start of entry list array (10 entries of 64 characters each)
+#define ENTRY_LIST_ADDR 0x017F      // start of entry list array (10 entries of 64 characters each) going to 0x03FF
+#define INFO_NUM_ADDR   0x0500      // address to store the number of info entries available to launcher
+#define INFO_DISP_ADDR  0x0501      // address to store the first displayed info entry
+#define INFO_ADDR       0x0502      // start of info entries array (10 entries of 64 characters each) going to 0x0782
 #define CMD_ADDR        0x0889      // address used by INTY launcher to send command to pi
 #define ERROR_ADDR      0x088A      // Used to send error code to Pi
 #define SELECTION_ADDR  0x0899      // Used to send actual selected entry to Pi

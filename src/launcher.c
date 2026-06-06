@@ -58,11 +58,14 @@ int volumeId = 1;    // default SD storage
 // recycle cartridge ROM to allocate temporary buffers
 // start from 0x4000 to allow launcher ROM size <= 16Kb
 SCREEN_ENTRY *screen_entries = (SCREEN_ENTRY *) (cart.ROM + 0x2000);
+// buffer for [vars] section of cfg file to pass to INTY launcher
+INFO_ENTRY *info_entries = (INFO_ENTRY *) (cart.ROM + 0x7000);
 
 int filefrom = 0, fileto = 0;
 volatile char cmd = 0;
 
 int num_dir_entries = 0;         // how many entries in the current directory
+int num_info_entries = 0;        // how many entries in the [vars] section of cfg file
 
 void ChangeDirectory(int entry_num) {
    strcat(curPath, "/");
@@ -146,6 +149,33 @@ int LoadGame(int entry_num) {
 
    // returns 0 to indicate success so that launcher execution stops and actual game is launched
    return 0;
+}
+
+void info_list(INFO_ENTRY *en, int first, int num) {
+   int max_entry;
+   
+   if (first + 10 > num)
+      first = (num > 10) ? num - 10 : 0;
+   max_entry = first + 10;
+   max_entry = (max_entry > num) ? num : max_entry;
+   for (int n = first; n < max_entry; n++) {   
+      for (int i = 0; i < 16; i++) {
+         int pos = INFO_ADDR + i + (n-first) * 64;
+         if (i < 16)
+            cart.RAM[pos] = en[n].key[i];
+         else
+            cart.RAM[pos] = en[n].value[i-16];
+
+         if (cart.RAM[pos] < 32)
+            // 255 to indicate end of string if shorter than 64
+            cart.RAM[pos] = 255;
+		   else
+            // convert to INTY numbering here (much faster than on INTY side)
+            // only ascii chars from 32 to 127 are displayed and are mapped to 0 - 95 in lookup table
+			   cart.RAM[pos] = (cart.RAM[pos] & 0x7F) - 32;
+      }
+   }
+   cart.RAM[INFO_DISP_ADDR] = max_entry - first;   // now launcher can display the correct number of info entries
 }
 
 void IntyMenu(int type) {       // 1=start, 2=next page, 3=prev page, 4=dir up
@@ -306,7 +336,7 @@ void RunLauncher() {
                break;
             case 2:            // select entry
                {
-                  int entry_num = cart.RAM[SELECTION_ADDR] + filefrom - 1;;
+                  int entry_num = cart.RAM[SELECTION_ADDR] + filefrom - 1;
 
                   if (screen_entries[entry_num].isDir) {  // directory
                      ChangeDirectory(entry_num);
@@ -342,6 +372,46 @@ void RunLauncher() {
                IntyMenu(1);
                break;
 #endif
+            case 7:       // show info for selected entry
+               {
+                  int entry_num = cart.RAM[SELECTION_ADDR] + filefrom - 1;
+
+                  num_info_entries = 0; // reset number of info entries
+
+                  if (!(screen_entries[entry_num].isDir)) {
+                     num_info_entries = collect_info_by_id(entry_num, curPath, info_entries);
+                     if (num_info_entries > 0) {
+                        // successfully parsed info entries for the selected game, now make them available to launcher
+                        info_list(info_entries, 0, num_info_entries);
+                     }
+                  }
+                  cart.RAM[INFO_DISP_ADDR] = 0;   // default to show first info entry in the list
+                  cart.RAM[INFO_NUM_ADDR] = num_info_entries;   // now launcher can display the vars entries
+               }
+               break;
+            case 8:       // show next info page
+               if (num_info_entries > 0) {
+                  int first_displayed = cart.RAM[INFO_DISP_ADDR];
+                  if (first_displayed + 10 < num_info_entries) {
+                     first_displayed += 10;
+                     cart.RAM[INFO_DISP_ADDR] = first_displayed;
+                     info_list(info_entries, first_displayed, num_info_entries);
+                  }
+               }
+               break;
+            case 9:       // show prev info page
+               if (num_info_entries > 0) {
+                  int first_displayed = cart.RAM[INFO_DISP_ADDR];
+                  if (first_displayed >= 10) {
+                     first_displayed -= 10;
+                     cart.RAM[INFO_DISP_ADDR] = first_displayed;
+                     info_list(info_entries, first_displayed, num_info_entries);
+                  }
+               }
+               break;
+            default:
+               printf("E: unknown cmd\n");
+               break;
          }
          cart.RAM[STATUS_ADDR] = 0;
       }

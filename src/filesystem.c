@@ -8,6 +8,7 @@
 #include "memory.h"
 #include "vfs.h"
 #include "launcher.h"
+#include "utils.h"
 
 #if PICO_RP2350
    #include "pico/sha256.h"
@@ -298,8 +299,8 @@ int load_file(char *filename) {
    return 0;
 }
 
-int load_file_by_id(unsigned int id, char *path) {
-
+int get_file_from_id(unsigned int id, char *path) {
+   // appends the filename corresponding to the given id in the path variable, returns 0 if successful, -1 if error (e.g. id not found)
    unsigned int i = 0;
    vfs_dir_t *dir;
    vfs_dirent_t ent;
@@ -327,23 +328,107 @@ int load_file_by_id(unsigned int id, char *path) {
          if (i++ == id) {
             strcat(path, "/");
             strcat(path, ent.name);
-
             vfs_closedir(dir);
-            printf("load_file_by_id: id %d, opening %s\n", id, path);
-            int result = load_file(path);
-            if (result != 0) {
-               printf("load_file_by_id: failed to load %s\n", path);
-               // need to remove the file from the path since it was not loaded successfully
-               char *last_slash = strrchr(path, '/');
-               if (last_slash)                  
-                  *last_slash = 0; 
-            }
-            return result;
+            return 0;
          }
       }
       vfs_closedir(dir);
    }
    return -1;
+}
+
+int load_file_by_id(unsigned int id, char *path) {
+
+   int result = get_file_from_id(id, path);
+   if (result == 0) {
+      printf("load_file_by_id: id %d, opening %s\n", id, path);
+
+      result = load_file(path);
+      if (result != 0) {
+         printf("load_file_by_id: failed to load %s\n", path);
+
+         // need to remove the file from the path since it was not loaded successfully
+         char *last_slash = strrchr(path, '/');
+         if (last_slash)                  
+            *last_slash = 0; 
+      }
+   }
+   return result;
+}
+
+int collect_info(char *filename, INFO_ENTRY *info_entries) {
+
+   char line[256];
+   vfs_file_t *f;
+
+   f = vfs_open(filename, "r");
+   if (f == NULL) {
+      printf("collect_info: could not open file %s\n", filename);
+      return -1;
+   }
+   // now parse the file to collect info entries
+   while (!(vfs_eof(f))) {
+      vfs_gets(f, line, sizeof(line));
+      strcpy(line, trim(line));
+
+      // skip comments
+      if ( (line[0] == ';') || !(stralpha(line)) ) {
+         continue;
+      }
+
+      // detect start of [vars] section
+      if (strstr(line, "[vars]") != NULL) {
+         printf("[vars] section\n");
+         continue;
+      }
+
+      // detect start of [info] section
+      if (strstr(line, "[info]") != NULL) {
+         printf("[info] section\n");
+         continue;
+      }
+
+      // collect info entries in [info] section
+      if (strstr(line, "[info]") == NULL && strncmp(line, "[", 1) == 0) {
+         // reached end of [info] section
+         break;
+      } else if (strstr(line, "[info]") != NULL) {
+         char *equal_sign = strchr(line, '=');
+         if (equal_sign) {
+            *equal_sign = 0; // split the line into key and value
+            char *key = trim(line);
+            char *value = trim(equal_sign + 1);
+
+            // store the key and value as an info entry
+            snprintf(info_entries->key, 16, "%s", key);
+            snprintf(info_entries->value, 64, "%s", value);
+            info_entries->section = 0;
+            info_entries++;
+         } else {
+            printf("E: invalid line in [info] section: \n\t %s\n", line);
+         }
+      }
+   }
+   vfs_close(f);
+    
+   return 0;
+}
+
+int collect_info_by_id(unsigned int id, char *path, INFO_ENTRY *info_entries) {
+
+   int result = get_file_from_id(id, path);
+   if (result == 0) {
+      printf("collect_info_by_id: id %d, opening %s\n", id, path);
+
+      result = collect_info(path, info_entries);
+
+      // remove the file from the path since we only wanted to collect info and not load the file
+      char *last_slash = strrchr(path, '/');
+      if (last_slash)                  
+         *last_slash = 0; 
+
+   }
+   return result;
 }
 
 void filelist(SCREEN_ENTRY *en, int from, int to, int num) {
