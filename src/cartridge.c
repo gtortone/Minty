@@ -311,6 +311,7 @@ void __time_critical_func(core1_main()) {
    } // end while
 }
 
+#if CONFIG_JLP 
 static void generate_random(uint16_t *arr, int n) {
 
    uint64_t rand = get_rand_64();
@@ -324,16 +325,17 @@ static void generate_random(uint16_t *arr, int n) {
       }
    }
 }
+#endif
 
 void RunGame() {
-   
+#if CONFIG_JLP  
    // initialize random seed and preallocate an array of random numbers
    uint16_t randarr[4];
    uint8_t randidx = 0;
    bool randrefill = false;
 
    generate_random(randarr, sizeof(randarr));
-
+#endif
    resetCart();              // start game !
 
 #if CONFIG_JLP
