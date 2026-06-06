@@ -311,15 +311,33 @@ void __time_critical_func(core1_main()) {
    } // end while
 }
 
+static void generate_random(uint16_t *arr, int n) {
+
+   uint64_t rand = get_rand_64();
+   int k = 0;
+
+   for(int i=0; i<n; i++) {
+      arr[i] = (rand >> 16*k++) & 0xFFFF;
+      if ( (k % 4) == 0 ) {
+         rand = get_rand_64();
+         k = 0;
+      }
+   }
+}
+
 void RunGame() {
-      
+   
+   // initialize random seed and preallocate an array of random numbers
+   uint16_t randarr[4];
+   uint8_t randidx = 0;
+   bool randrefill = false;
+
+   generate_random(randarr, sizeof(randarr));
+
    resetCart();              // start game !
 
 #if CONFIG_JLP
    volatile uint16_t pbc; 
-
-   // initialize random seed with first random number request 
-   get_rand_32();
 
    int16_t s16_op1, s16_op2;
    uint16_t u16_op1, u16_op2;
@@ -427,7 +445,11 @@ void RunGame() {
 
                // nondeterministic hardware random number generator
                case 0x9FFE: {
-                  cart.RAM[0x1FFE] = get_rand_32() & 0xFFFF;
+                  cart.RAM[0x1FFE] = randarr[randidx++];
+                  if (randidx == 4) {
+                     randidx = 0;
+                     randrefill = true;
+                  }
                }
                break;
 
@@ -474,6 +496,12 @@ void RunGame() {
                default:
                   break;
             }
+         }
+
+         // refill random numbers
+         if (randrefill) {
+            generate_random(randarr, sizeof(randarr));
+            randrefill = false;
          }
 
       } else { 

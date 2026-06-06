@@ -44,7 +44,7 @@ void init_cart(void) {
    cart.flashfile[0] = '\0';
 }
 
-void config_jlp(int jlp_value, int jlpflash_value, char *filename) {
+inline void config_jlp(int jlp_value, int jlpflash_value, char *filename) {
 
    if (jlp_value != 0) {
       // JLP required
@@ -70,8 +70,11 @@ void config_jlp(int jlp_value, int jlpflash_value, char *filename) {
       // check if JLP flash file exists
       vfs_file_t *f;
       vfs_stat_t st;
-      char *dot = strrchr(filename, '.');
+      uint32_t chunk = 0;
+      uint32_t remaining = 0;
+      uint32_t written = 0;
 
+      char *dot = strrchr(filename, '.');
       strncpy(cart.flashfile, filename, (dot - filename));
       strcat(cart.flashfile, ".save");
 
@@ -91,12 +94,11 @@ void config_jlp(int jlp_value, int jlpflash_value, char *filename) {
 
          memset(buffer, 0xFF, sizeof(buffer));
 
-         uint32_t remaining = size;
-         uint32_t written = 0;
+         remaining = size;
 
          while (remaining) {
 
-            uint32_t chunk = (remaining > sizeof(buffer)) ? sizeof(buffer) : remaining;
+            chunk = (remaining > sizeof(buffer)) ? sizeof(buffer) : remaining;
 
             written = vfs_write(f, buffer, chunk);
 
