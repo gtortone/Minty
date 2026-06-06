@@ -236,7 +236,7 @@ void IntyMenu(int type) {       // 1=start, 2=next page, 3=prev page, 4=dir up
       }
       path_char++;
    }
-   for (int pos = PATH_ADDR + path_char; pos < PATH_ADDR + 20; pos++) {
+   for (int pos = PATH_ADDR + path_char; pos < PATH_ADDR + 21; pos++) {
       cart.RAM[pos] = 0;
    }
 }
