@@ -20,7 +20,7 @@ Multi-cart based on Raspberry Pi Pico hardware and PiRTOII firmware (https://git
 - Intellicart ROM support (.rom)
 - new data structure for page decoding with O(1) lookup performance
 - VFS (Virtual File System) library included to access storage devices based on FatFs or LittleFs
-- full JLP support: hardware acceleration, expanded memory and save/load on flash
+- full JLP support: hardware acceleration, expanded memory and save/load on flash (for boards with microSD storage)
 - support of arbitrary number of patches from ROM config file
 - new launcher firmware with icons and custom fonts with automatic saving of last opened directory 
 - tons of roms tested - Minty is now able to run [Bad Apple demo](https://forums.atariage.com/topic/266031-intellivision-bad-apple/) (445 kB ROM with 52 memory pages) on RP235x boards
@@ -36,7 +36,7 @@ Multi-cart based on Raspberry Pi Pico hardware and PiRTOII firmware (https://git
 
 | board  | MCU | RAM | max ROM size  | JLP | ROM storage | build target |
 |--------|-----|-----|---------------| --- | ----------- | ------------ |
-| [Pirto](https://github.com/aotta/PiRTO) | RP2040 | 256 kB | ~180kB      | ❌  | microSD     | `pirto` |
+| [Pirto](https://github.com/aotta/PiRTO) | RP2040 | 256 kB | ~180kB      | ✅  | microSD     | `pirto` |
 | [Pirto-II](https://github.com/aotta/PiRTOII) | RP2040 | 256 kB | ~100kB   | ❌  | flash       | `pirto_ii_default` |
 | [Pirto-II-SD](https://github.com/SukkoPera/PiRTOII) | RP2040 | 256 kB | ~180kB | ✅  | microSD     | `pirto_ii_sd` |
 | [Pirto-II-Duo](https://github.com/aotta/PiRTOIIDuo) | RP2350 | 512 kB | ~450 kB | ✅ | microSD   | `pirto_ii_duo` |
