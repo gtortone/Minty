@@ -98,6 +98,10 @@ add_subdirectory(
 
 add_executable(${PROJECT})
 
+set_target_properties(Minty PROPERTIES
+    OUTPUT_NAME "Minty_${PICO_BOARD}"
+)
+
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
    target_link_libraries(${PROJECT} pico_stdio_uart)
    pico_enable_stdio_uart(${PROJECT} 1)
