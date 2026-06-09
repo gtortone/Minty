@@ -356,64 +356,6 @@ int load_file_by_id(unsigned int id, char *path) {
    return result;
 }
 
-int collect_info(char *filename, INFO_ENTRY *info_entries) {
-
-   char line[256];
-   vfs_file_t *f;
-
-   f = vfs_open(filename, "r");
-   if (f == NULL) {
-      printf("collect_info: could not open file %s\n", filename);
-      return -1;
-   }
-   // now parse the file to collect info entries
-   while (!(vfs_eof(f))) {
-      vfs_gets(f, line, sizeof(line));
-      strcpy(line, trim(line));
-
-      // skip comments
-      if ( (line[0] == ';') || !(stralpha(line)) ) {
-         continue;
-      }
-
-      // detect start of [vars] section
-      if (strstr(line, "[vars]") != NULL) {
-         printf("[vars] section\n");
-         continue;
-      }
-
-      // detect start of [info] section
-      if (strstr(line, "[info]") != NULL) {
-         printf("[info] section\n");
-         continue;
-      }
-
-      // collect info entries in [info] section
-      if (strstr(line, "[info]") == NULL && strncmp(line, "[", 1) == 0) {
-         // reached end of [info] section
-         break;
-      } else if (strstr(line, "[info]") != NULL) {
-         char *equal_sign = strchr(line, '=');
-         if (equal_sign) {
-            *equal_sign = 0; // split the line into key and value
-            char *key = trim(line);
-            char *value = trim(equal_sign + 1);
-
-            // store the key and value as an info entry
-            snprintf(info_entries->key, 16, "%s", key);
-            snprintf(info_entries->value, 64, "%s", value);
-            info_entries->section = 0;
-            info_entries++;
-         } else {
-            printf("E: invalid line in [info] section: \n\t %s\n", line);
-         }
-      }
-   }
-   vfs_close(f);
-    
-   return 0;
-}
-
 int collect_info_by_id(unsigned int id, char *path, INFO_ENTRY *info_entries) {
 
    int result = get_file_from_id(id, path);
@@ -431,27 +373,4 @@ int collect_info_by_id(unsigned int id, char *path, INFO_ENTRY *info_entries) {
    return result;
 }
 
-void filelist(SCREEN_ENTRY *en, int from, int to, int num) {
-   for (int n = 0; n < (to - from); n++) {
-      cart.RAM[ENTRY_TYPE_ADDR + n] = en[n + from].isDir;
-      
-      for (int i = 0; i < 64; i++) {
-         int pos = ENTRY_LIST_ADDR + i + (n * 64);
-         cart.RAM[pos] = en[n + from].filename[i];
-         if (cart.RAM[pos] < 32)
-            // 255 to indicate end of string if shorter than 64
-            cart.RAM[pos] = 255;
-		   else
-            // convert to INTY numbering here (much faster than on INTY side)
-            // only ascii chars from 32 to 127 are displayed and are mapped to 0 - 95 in lookup table
-			   cart.RAM[pos] = (cart.RAM[pos] & 0x7F) - 32;
-      }
-   }
-   cart.RAM[FFROM_HI_ADDR] = (from & 0xFF00) >> 8;  // MSB
-   cart.RAM[FFROM_LO_ADDR] = (from & 0x00FF);       // LSB
-   cart.RAM[FTO_HI_ADDR  ] = (to   & 0xFF00) >> 8;  // MSB
-   cart.RAM[FTO_LO_ADDR  ] = (to   & 0x00FF);       // LSB
-   cart.RAM[FTOT_HI_ADDR ] = (num  & 0xFF00) >> 8;  // MSB
-   cart.RAM[FTOT_LO_ADDR ] = (num  & 0x00FF);       // LSB
-}
 

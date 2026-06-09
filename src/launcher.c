@@ -65,7 +65,32 @@ int filefrom = 0, fileto = 0;
 volatile char cmd = 0;
 
 int num_dir_entries = 0;         // how many entries in the current directory
-int num_info_entries = 0;        // how many entries in the [vars] section of cfg file
+int num_info_pages  = 0;         // Total number of infopage
+int cur_info_page   = 0;         // Currently displayed infopage
+
+void file_list(SCREEN_ENTRY *en, int from, int to, int num) {
+   for (int n = 0; n < (to - from); n++) {
+      cart.RAM[ENTRY_TYPE_ADDR + n] = en[n + from].isDir;
+      
+      for (int i = 0; i < 64; i++) {
+         int pos = ENTRY_LIST_ADDR + i + (n * 64);
+         cart.RAM[pos] = en[n + from].filename[i];
+         if (cart.RAM[pos] < 32)
+            // 255 to indicate end of string if shorter than 64
+            cart.RAM[pos] = 255;
+		   else
+            // convert to INTY numbering here (much faster than on INTY side)
+            // only ascii chars from 32 to 127 are displayed and are mapped to 0 - 95 in lookup table
+			   cart.RAM[pos] = (cart.RAM[pos] & 0x7F) - 32;
+      }
+   }
+   cart.RAM[FFROM_HI_ADDR] = (from & 0xFF00) >> 8;  // MSB
+   cart.RAM[FFROM_LO_ADDR] = (from & 0x00FF);       // LSB
+   cart.RAM[FTO_HI_ADDR  ] = (to   & 0xFF00) >> 8;  // MSB
+   cart.RAM[FTO_LO_ADDR  ] = (to   & 0x00FF);       // LSB
+   cart.RAM[FTOT_HI_ADDR ] = (num  & 0xFF00) >> 8;  // MSB
+   cart.RAM[FTOT_LO_ADDR ] = (num  & 0x00FF);       // LSB
+}
 
 void ChangeDirectory(int entry_num) {
    strcat(curPath, "/");
@@ -151,31 +176,67 @@ int LoadGame(int entry_num) {
    return 0;
 }
 
-void info_list(INFO_ENTRY *en, int first, int num) {
-   int max_entry;
+void info_list(INFO_ENTRY *en, int page) {
+   int pos;
+   int sec_pos = 0;
+   char section_str[20];
    
-   if (first + 10 > num)
-      first = (num > 10) ? num - 10 : 0;
-   max_entry = first + 10;
-   max_entry = (max_entry > num) ? num : max_entry;
-   for (int n = first; n < max_entry; n++) {   
-      for (int i = 0; i < 16; i++) {
-         int pos = INFO_ADDR + i + (n-first) * 64;
-         if (i < 16)
-            cart.RAM[pos] = en[n].key[i];
-         else
-            cart.RAM[pos] = en[n].value[i-16];
+   // write section
+   switch(en[page].section) {
+      case 0: // NONE
+         sprintf(section_str, "[NONE]");
+         break;
+      case 1: // MAPPING
+         sprintf(section_str, "[MAPPING]");
+         break;
+      case 2: // MEMATTR
+         sprintf(section_str, "[MEMATTR]");
+         break;
+      case 3: // VARS
+         sprintf(section_str, "[VARS]");
+         break;
+      case 4: // MACRO
+         sprintf(section_str, "[MACRO]");
+         break;
+      default:
+         sprintf(section_str, "[UNDEFINED]");
+         break;
+   }
+
+   while(section_str[sec_pos]) {
+      pos = PATH_ADDR + sec_pos;
+      cart.RAM[pos] = section_str[sec_pos];
+      if (cart.RAM[pos] < 32) {
+         cart.RAM[pos] = 0;
+      }
+      else {
+         // convert to INTY numbering here (much faster than on INTY side)
+         // only ascii chars from 32 to 127 are displayed and are mapped to 0 - 95 in lookup table
+         cart.RAM[pos] = (cart.RAM[pos] & 0x7F) - 32;
+      }
+      sec_pos++;
+   }
+   for (pos = PATH_ADDR + sec_pos; pos < PATH_ADDR + 21; pos++) {
+      cart.RAM[pos] = 0;
+   }
+
+   for (int n = 0; n < 10; n++) { 
+      pos = INFO_ADDR + n * 19;
+      printf("info_list: page %d, line %d: %s\n", page, n, en[page].line[n]);
+      for (int i = 0; i < 19; i++) {
+         cart.RAM[pos] = en[page].line[n][i];
 
          if (cart.RAM[pos] < 32)
-            // 255 to indicate end of string if shorter than 64
+            // 255 to indicate end of string if shorter than 19
             cart.RAM[pos] = 255;
 		   else
             // convert to INTY numbering here (much faster than on INTY side)
             // only ascii chars from 32 to 127 are displayed and are mapped to 0 - 95 in lookup table
 			   cart.RAM[pos] = (cart.RAM[pos] & 0x7F) - 32;
+         pos++;
       }
+      
    }
-   cart.RAM[INFO_DISP_ADDR] = max_entry - first;   // now launcher can display the correct number of info entries
 }
 
 void IntyMenu(int type) {       // 1=start, 2=next page, 3=prev page, 4=dir up
@@ -220,7 +281,7 @@ void IntyMenu(int type) {       // 1=start, 2=next page, 3=prev page, 4=dir up
    }
 
    // update screen entries with new parameters
-   filelist(screen_entries, filefrom, fileto, num_dir_entries);
+   file_list(screen_entries, filefrom, fileto, num_dir_entries);
 
    // make path available to launcher
    while(curPath[path_char]) {
@@ -376,37 +437,33 @@ void RunLauncher() {
                {
                   int entry_num = cart.RAM[SELECTION_ADDR] + filefrom - 1;
 
-                  num_info_entries = 0; // reset number of info entries
+                  num_info_pages = 0; // reset number of info entries
+                  cur_info_page  = 0;
 
                   if (!(screen_entries[entry_num].isDir)) {
-                     num_info_entries = collect_info_by_id(entry_num, curPath, info_entries);
-                     if (num_info_entries > 0) {
+                     num_info_pages = collect_info_by_id(screen_entries[entry_num].id, curPath, info_entries);
+                     if (num_info_pages > 0) {
                         // successfully parsed info entries for the selected game, now make them available to launcher
-                        info_list(info_entries, 0, num_info_entries);
+                        info_list(info_entries, 0);
                      }
                   }
-                  cart.RAM[INFO_DISP_ADDR] = 0;   // default to show first info entry in the list
-                  cart.RAM[INFO_NUM_ADDR] = num_info_entries;   // now launcher can display the vars entries
+                  if (num_info_pages < 0) {
+                     num_info_pages = 0;   // in case of error set number of info pages to 0 to avoid showing wrong info
+                  }
+                  cart.RAM[INFO_DISP_ADDR] = cur_info_page;   // default to show first info entry in the list
+                  cart.RAM[INFO_NUM_ADDR] = num_info_pages;   // now launcher can display the vars entries
                }
                break;
             case 8:       // show next info page
-               if (num_info_entries > 0) {
-                  int first_displayed = cart.RAM[INFO_DISP_ADDR];
-                  if (first_displayed + 10 < num_info_entries) {
-                     first_displayed += 10;
-                     cart.RAM[INFO_DISP_ADDR] = first_displayed;
-                     info_list(info_entries, first_displayed, num_info_entries);
-                  }
+               if (cur_info_page < num_info_pages-1) {
+                  cart.RAM[INFO_DISP_ADDR] = ++cur_info_page;
+                  info_list(info_entries, cur_info_page);
                }
                break;
             case 9:       // show prev info page
-               if (num_info_entries > 0) {
-                  int first_displayed = cart.RAM[INFO_DISP_ADDR];
-                  if (first_displayed >= 10) {
-                     first_displayed -= 10;
-                     cart.RAM[INFO_DISP_ADDR] = first_displayed;
-                     info_list(info_entries, first_displayed, num_info_entries);
-                  }
+               if (cur_info_page > 0) {
+                  cart.RAM[INFO_DISP_ADDR] = --cur_info_page;
+                  info_list(info_entries, cur_info_page);
                }
                break;
             default:

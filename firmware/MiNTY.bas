@@ -38,6 +38,9 @@
     CONST ADDRESS_hw        = $8122
     CONST ADDRESS_sdpres    = $8123
     CONST ADDRESS_flist     = $817F ' 10 files * 64 characters per file (640 bytes), end address is $83FF
+    CONST ADDRESS_INFO_NUM  = $8400 ' address to store the total number of info pages
+    CONST ADDRESS_INFO_DISP = $8401 ' address to store the current displayed info page
+    CONST ADDRESS_INFO_PAGE = $8402 ' 10 lines of 19 characters = 190 bytes, end address is $84C0
     CONST ADDRESS_cmd       = $8889
     CONST ADDRESS_err       = $888A
     CONST ADDRESS_Select    = $8899
@@ -46,7 +49,6 @@
     CONST ADDRESS_fto       = $9030 ' Last displayed entry (16 bits)
     CONST ADDRESS_ftotal    = $9032 ' Total number of entries (16 bits)
     CONST ADDRESS_path      = $9100
-    
     ' PI current status
     CONST PI_STAT_BUZZY     = 1
     CONST PI_STAT_READY     = 0
@@ -58,6 +60,9 @@
     CONST CMD_PREVIOUSPAGE  = 4
     CONST CMD_UPDIRECTORY   = 5
     CONST CMD_SWITCHDEVICE  = 6
+    CONST CMD_READINFO      = 7
+    CONST CMD_NEXTINFO      = 8
+    CONST CMD_PREVINFO      = 9
     ' Type of mass storage devices
     CONST DEV_FLASH         = 0
     CONST DEV_SD            = 1
@@ -76,7 +81,8 @@
     CONST ERR_COULD_NOT_OPEN_FILE = 1
     CONST ERR_FILE_TO_BIG         = 2
 
-    CONST FNAME_LENGTH      = 64
+    CONST FNAME_LENGTH   = 64
+    CONST INFO_LENGTH    = 19
 
     DEF FN PI_STATUS = PEEK(ADDRESS_status)
     DEF FN PI_CMD(command) = POKE(ADDRESS_cmd),command
@@ -91,6 +97,8 @@
     DEF FN PI_GET_FTOTAL = ((PEEK(ADDRESS_ftotal) * 256) + PEEK(ADDRESS_ftotal+1))
     DEF FN PI_GET_HW     = PEEK(ADDRESS_hw)
     DEF FN PI_GET_ERROR  = PEEK(ADDRESS_err)
+    DEF FN PI_GET_INFO_NUM = PEEK(ADDRESS_INFO_NUM)
+    DEF FN PI_GET_INFO_DISP = PEEK(ADDRESS_INFO_DISP)
 
     ' Display splash screen
 	MODE 0,0,2,0,2
@@ -193,37 +201,8 @@ START:
     #f_to    = PI_GET_FTO
     #f_total = PI_GET_FTOTAL  
 
-    IF #f_from < #f_to THEN ' Not an Empty list
-        I = ((79 * #f_from) / #f_total)
-        J = ((79 * #f_to)   / #f_total)
-        IF I > 71   THEN I = 71
-        IF J < I+7  THEN J = I+7
-        K = J-I
-
-        IF K > 64 THEN
-            SPRITE 3, 160 + VISIBLE, 24      + I + ZOOMY8 + DOUBLEY, SPR02 + SPR_GREY
-            SPRITE 2, 160 + VISIBLE, 24 - 64 + J + ZOOMY8 + DOUBLEY, SPR02 + SPR_GREY
-        ELSEIF K > 32 THEN
-            SPRITE 3, 160 + VISIBLE, 24       + I + ZOOMY8, SPR02 + SPR_GREY
-            SPRITE 2, 160 + VISIBLE, 24  - 32 + J + ZOOMY8, SPR02 + SPR_GREY
-        ELSEIF K > 16 THEN
-            SPRITE 3, 160 + VISIBLE, 24      + I + ZOOMY4, SPR02 + SPR_GREY
-            SPRITE 2, 160 + VISIBLE, 24 - 16 + J + ZOOMY4, SPR02 + SPR_GREY
-        ELSE
-            SPRITE 3, 160 + VISIBLE, 24     + I + ZOOMY2, SPR02 + SPR_GREY
-            SPRITE 2, 160 + VISIBLE, 24 - 8 + J + ZOOMY2, SPR02 + SPR_GREY
-        END IF
-
-        SPRITE 1, 160 + VISIBLE, 24 - 4 + (I+J) / 2 + ZOOMY2,  $20E8 'Using "=" character from GROM
-    ELSE
-        ' Empty list => Display empty slider
-        ResetSprite(1)
-        ResetSprite(2)
-        ResetSprite(3)
-    END IF
-
-    FOR I=59 TO 219 STEP 20:#BACKTAB(I)=$0827:NEXT I
-    #BACKTAB(239) = $082F
+    ' Diplay Slider
+    GOSUB DISPLAY_SLIDER
 
     ' Display file list
     GOSUB DISPLAY_FILELIST
@@ -319,6 +298,13 @@ MENU_LOOP:
         GOTO START
     END IF
 
+    ' DISPLAY FILE INFORMATION
+    IF (Input=$41) THEN     ' KEYPAD_2
+        Debounce = DEBOUNCE_DELAY
+        GOSUB INFO_SCREEN
+        GOTO START
+    END IF
+   
     GOTO MENU_LOOP
 
 '
@@ -375,6 +361,79 @@ HELP_SCREEN: PROCEDURE
     WEND
     END
 
+DISP_INFO: PROCEDURE
+    ' Display current information screen
+    #f_from  = PI_GET_INFO_DISP 
+    #f_total = PI_GET_INFO_NUM
+    #f_to    = PI_GET_INFO_DISP+1
+    GOSUB DISPLAY_SLIDER
+	#Disp_Color = CS_WHITE
+	
+    FOR J=0 TO 9
+        FOR I=0 TO INFO_LENGTH - 1
+            #tmp = PEEK((ADDRESS_INFO_PAGE+I)+INFO_LENGTH*J)
+            IF #tmp = 255 THEN #tmp = 0
+			IF (I + J = 0) THEN #Disp_Color = CS_WHITE + $2000 ELSE #Disp_Color = CS_WHITE
+            #BACKTAB(40 + J*20 + I) = ASCII_table(#tmp) + #Disp_Color
+        NEXT I  
+    NEXT J
+	
+	' Display section in title bar
+    #tmp = PEEK(ADDRESS_path) AND $7F
+    ' First letter need to change Color Stack
+    #BACKTAB(20) = ASCII_table(#tmp) + CS_GREEN + $2000
+    FOR I = 1 TO 19
+        #tmp = PEEK(ADDRESS_path + I) AND $7F
+        #BACKTAB(20+I) = ASCII_table(#tmp) + CS_GREEN
+    NEXT I
+	
+    END
+
+INFO_SCREEN: PROCEDURE
+    PlaySnd(InputSound)
+    IF PI_GET_FTYPE(Selected_Entry) <> TYPE_DIR THEN
+        PI_SELECTENTRY(Selected_Entry)
+        PI_CMD(CMD_READINFO)
+        GOSUB WAIT_CARD_ANSWER
+        IF PI_GET_INFO_NUM > 0 THEN
+            ' Info available for this entry, display it
+            GOSUB DISP_INFO
+            Input = 0
+            Debounce = 0
+            WHILE (Input <> $88)  ' run until CLR key is pressed
+                IF Debounce>0 THEN 
+                    Debounce = Debounce-1
+                ELSE
+                    ' Get new input and process it
+                    Input = CONT
+                    IF (Input=$48 OR Input=$01 OR Input=$11 OR Input=$19 OR Input=$09 OR Input=$03 OR Input=$13 OR Input=$12) THEN
+                        ' Display next info page
+                        PlaySnd(InputSound)
+                        Debounce = DEBOUNCE_DELAY
+                        PI_CMD(CMD_NEXTINFO)
+                        GOSUB WAIT_CARD_ANSWER
+                        GOSUB DISP_INFO
+                    END IF
+                    IF (Input=$44 or Input=$04 or Input=$0C or Input=$1C or Input=$18 or Input=$14 or Input=$16 or Input=$06) THEN
+                        ' Display prev info page
+                        PlaySnd(InputSound)
+                        Debounce = DEBOUNCE_DELAY
+                        PI_CMD(CMD_PREVINFO)
+                        GOSUB WAIT_CARD_ANSWER
+                        GOSUB DISP_INFO
+                    END IF
+                END IF
+                ' Update animation frame
+                IF FRAME%8 = 0 THEN
+                    WaveFrame = (WaveFrame+1)%4
+                    DEFINE 6,1,VARPTR Title_wave(WaveFrame * 4)
+                END IF
+                WAIT
+            WEND
+        END IF
+    END IF
+    END
+
 SELECT_ENTRY: PROCEDURE
     IF #f_from < #f_to THEN
         PI_SELECTENTRY(Selected_Entry)
@@ -391,8 +450,8 @@ SELECT_ENTRY: PROCEDURE
                 PRINT AT SCREENPOS(0,4)  COLOR CS_RED, "                   "
                 PRINT AT SCREENPOS(0,5)  COLOR CS_RED, "   File too big!   "
                 PRINT AT SCREENPOS(0,6)  COLOR CS_RED, "                   "
-                PRINT AT SCREENPOS(0,10)  COLOR CS_RED, "                   "
-                PRINT AT SCREENPOS(0,11) COLOR CS_RED, "  CLEAR to return  "
+                PRINT AT SCREENPOS(0,10) COLOR CS_RED, "                   "
+                PRINT AT SCREENPOS(0,11) COLOR CS_RED, "   CLR to return   "
                 WHILE (CONT <> $88)  'CLEAR
                     WAIT
                 WEND
@@ -400,8 +459,8 @@ SELECT_ENTRY: PROCEDURE
                 PRINT AT SCREENPOS(0,4)  COLOR CS_RED, "                   "
                 PRINT AT SCREENPOS(0,5)  COLOR CS_RED, "Couldn't open file!"
                 PRINT AT SCREENPOS(0,6)  COLOR CS_RED, "                   "
-                PRINT AT SCREENPOS(0,10)  COLOR CS_RED, "                   "
-                PRINT AT SCREENPOS(0,11) COLOR CS_RED, "  CLEAR to return  "
+                PRINT AT SCREENPOS(0,10) COLOR CS_RED, "                   "
+                PRINT AT SCREENPOS(0,11) COLOR CS_RED, "   CLR to return   "
                 WHILE (CONT <> $88)  'CLEAR
                     WAIT
                 WEND
@@ -504,6 +563,40 @@ DISPLAY_SELECTED_ENTRY: PROCEDURE
     END IF
     END
 
+DISPLAY_SLIDER: PROCEDURE
+    IF #f_from < #f_to THEN ' Not an Empty list
+        I = ((79 * #f_from) / #f_total)
+        J = ((79 * #f_to)   / #f_total)
+        IF I > 71   THEN I = 71
+        IF J < I+7  THEN J = I+7
+        K = J-I
+
+        IF K > 64 THEN
+            SPRITE 3, 160 + VISIBLE, 24      + I + ZOOMY8 + DOUBLEY, SPR02 + SPR_GREY
+            SPRITE 2, 160 + VISIBLE, 24 - 64 + J + ZOOMY8 + DOUBLEY, SPR02 + SPR_GREY
+        ELSEIF K > 32 THEN
+            SPRITE 3, 160 + VISIBLE, 24       + I + ZOOMY8, SPR02 + SPR_GREY
+            SPRITE 2, 160 + VISIBLE, 24  - 32 + J + ZOOMY8, SPR02 + SPR_GREY
+        ELSEIF K > 16 THEN
+            SPRITE 3, 160 + VISIBLE, 24      + I + ZOOMY4, SPR02 + SPR_GREY
+            SPRITE 2, 160 + VISIBLE, 24 - 16 + J + ZOOMY4, SPR02 + SPR_GREY
+        ELSE
+            SPRITE 3, 160 + VISIBLE, 24     + I + ZOOMY2, SPR02 + SPR_GREY
+            SPRITE 2, 160 + VISIBLE, 24 - 8 + J + ZOOMY2, SPR02 + SPR_GREY
+        END IF
+
+        SPRITE 1, 160 + VISIBLE, 24 - 4 + (I+J) / 2 + ZOOMY2,  $20E8 'Using "=" character from GROM
+    ELSE
+        ' Empty list => Display empty slider
+        ResetSprite(1)
+        ResetSprite(2)
+        ResetSprite(3)
+    END IF
+
+    FOR I=59 TO 219 STEP 20:#BACKTAB(I)=$0827:NEXT I
+    #BACKTAB(239) = $082F
+    END
+
 'test_init: PROCEDURE
 '    K = 0
 '    
@@ -541,6 +634,15 @@ DISPLAY_SELECTED_ENTRY: PROCEDURE
 '    POKE(ADDRESS_fto+1),10
 '    POKE(ADDRESS_ftotal),0
 '    POKE(ADDRESS_ftotal+1),32
+'
+'    FOR J=0 TO 9
+'        FOR I = 0 TO INFO_LENGTH - 1
+'            POKE(ADDRESS_INFO_PAGE + I + J * INFO_LENGTH),41
+'        NEXT I
+'    NEXT J
+'	POKE (ADDRESS_INFO_DISP),0
+'	POKE (ADDRESS_INFO_NUM) ,9
+'
 '    END
 
 '

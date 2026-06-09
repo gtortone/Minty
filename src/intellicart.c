@@ -375,3 +375,107 @@ void apply_pokes(char *filename) {
       }
    }
 }
+
+int collect_info(char *filename, INFO_ENTRY *info_entries) {
+
+   char line[256];
+   char cfgfile[512] = {0};
+   vfs_file_t *f;
+   cfgSection cfgsec = NONE;
+   cfgSection new_cfgsec = NONE;
+   int cur_line = 0;
+   int cur_page = 0;
+
+   if (is_rom_file(filename)) {
+      printf("collect_info: ROM file not supported%s\n", filename);
+      return -1;
+   }
+
+   char *dot = strrchr(filename, '.');
+   strncpy(cfgfile, filename, (dot - filename));
+   strcat(cfgfile, ".cfg");  
+   
+   f = vfs_open(cfgfile, "r");
+   if (f == NULL) {
+      printf("collect_info: could not open file %s\n", cfgfile);
+      return -1;
+   }
+   // now parse the file to collect info entries
+   while (!(vfs_eof(f))) {
+      vfs_gets(f, line, sizeof(line));
+      strcpy(line, trim(line));
+
+      // skip comments
+      if ( (line[0] == ';') || !(stralpha(line)) ) {
+         continue;
+      }
+
+      strcpy(line, trim(line));
+
+      //printf("line: %s, len: %d\n", line, strlen(line));
+
+      // skip comments
+      if ( (line[0] == ';') || !(stralpha(line)) )
+         continue;
+
+      if (strstr(line, "[mapping]") != NULL) {
+         new_cfgsec = MAPPING;
+         printf("[mapping] section\n");
+      } else if (strstr(line, "[memattr]") != NULL) {
+         new_cfgsec = MEMATTR;
+         printf("[memattr] section\n");
+      } else if (strstr(line, "[vars]") != NULL) {
+         new_cfgsec = VARS;
+         printf("[vars] section\n");
+      } else if (strstr(line, "[macro]") != NULL) {
+         new_cfgsec = MACRO;
+         printf("[macro] section\n");
+      }
+
+      if (new_cfgsec != cfgsec) {
+         // new config section detected => start a new page
+         cfgsec = new_cfgsec;
+         // if page is not first one, clear non used lines
+         if (cur_page != 0) {
+            for (int i=cur_line; i<10 ; i++)
+               info_entries->line[i][0] = 0;
+            info_entries++;
+         }
+         cur_page++;
+         cur_line = 0;
+         info_entries->section = cfgsec;
+         continue;
+      }
+
+      if (cfgsec != NONE) {
+         printf("collecting info from line: %s\n", line);
+         char *equal_sign = strchr(line, '=');
+         if (equal_sign) {
+            *equal_sign = 0; // split the line into key and value
+            char *key = trim(line);
+            char *value = trim(equal_sign + 1);
+
+            // remove trailing comment
+            char *comment_sign = strchr(value, ';');
+            if (comment_sign) *comment_sign = 0;
+            value = trim(value);
+
+            // if page is full start a new one
+            if (cur_line == 10) {
+               cur_line = 0;
+               cur_page++;
+               info_entries++;
+               info_entries->section = cfgsec;
+            }
+            snprintf(info_entries->line[cur_line++], 20, "%s", key);
+            snprintf(info_entries->line[cur_line++], 20, "%19s", value);
+            printf("key: %s, value: %s\n", key, value);
+         } else {
+            printf("E: invalid line:\t %s\n", line);
+         }
+      }
+   }
+   vfs_close(f);
+    
+   return cur_page;
+}

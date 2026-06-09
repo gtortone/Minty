@@ -6,6 +6,7 @@
 #include <stdbool.h>
 
 #include "vfs.h"
+#include "filesystem.h"
 
 #define RAMSIZE   0x2000
 
@@ -41,5 +42,6 @@ void init_cart(void);
 int load_cfg(char *filename);
 void apply_pokes(char *filename);
 void config_jlp(int jlp_value, int jlpflash_value, char *filename);
+int collect_info(char *filename, INFO_ENTRY *info_entries);
 
 #endif
