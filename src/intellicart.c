@@ -16,7 +16,8 @@ typedef enum {
    MAPPING,
    MEMATTR,
    VARS,
-   MACRO
+   MACRO,
+   MAIN
 } cfgSection;
 
 Cartridge cart;     // main data structure for cart emulation
@@ -384,108 +385,257 @@ int collect_info(char *filename, INFO_ENTRY *info_entries) {
    cfgSection cfgsec = NONE;
    cfgSection new_cfgsec = NONE;
    int cur_line = 0;
-   int cur_page = 0; 
+   int cur_page = 1;
+   vfs_stat_t st;
+
+   // Get file name and size for MAIN section
+   info_entries->section = MAIN;
+   // clear new page
+   for (int i=0; i<10 ; i++)
+      for (int j=0; j<20; j++)
+         info_entries->line[i][j] = 0;
+
+   char *basename = strrchr(filename, '/') + 1;
+   snprintf(info_entries->line[cur_line++], 20, "%-19s", "Filename");
+   snprintf(info_entries->line[cur_line++], 20, "%19s", basename);
+
+   if (vfs_stat(filename, &st) == 0) {
+      printf("file size: %d bytes\n", st.size);
+      snprintf(info_entries->line[cur_line++], 20, "%-19s", "File size");
+      snprintf(info_entries->line[cur_line++], 20, "%12d KWords", st.size/1024/2);
+   }   
 
    if (is_rom_file(filename)) {
-      printf("collect_info: ROM file not supported%s\n", filename);
-      return -1;
-   }
+      // ROM file, info collection parsing complete file to get mapping and memattr info as well as JLP attributes if available
+      snprintf(info_entries->line[cur_line++], 20, "%-19s", "File Type");
+      snprintf(info_entries->line[cur_line++], 20, "%19s", "ROM");
+      
+      f = vfs_open(filename, "r");
+      if (f != NULL) {
+         uint32_t from, prev_from;
+         uint16_t prev_size, target;
+         char inputBuffer[3];
 
-   char *dot = strrchr(filename, '.');
-   strncpy(cfgfile, filename, (dot - filename));
-   strcat(cfgfile, ".cfg");  
-   
-   f = vfs_open(cfgfile, "r");
-   if (f == NULL) {
-      printf("collect_info: could not open file %s\n", cfgfile);
-      return -1;
-   }
-   // now parse the file to collect info entries
-   while (!(vfs_eof(f))) {
-      vfs_gets(f, line, sizeof(line));
-      strcpy(line, trim(line));
+         vfs_read(f, inputBuffer, sizeof(inputBuffer));
+         
+         // read number of segments
+         int slots = inputBuffer[1];
 
-      // skip comments
-      if ( (line[0] == ';') || !(stralpha(line)) ) {
-         continue;
-      }
+         // fill current page so that new page is started for MAPPING section
+         cur_line = 10;
 
-      strcpy(line, trim(line));
+         for(int i=0; i<slots; i++) {
+            vfs_read(f, inputBuffer, 2);
 
-      //printf("line: %s, len: %d\n", line, strlen(line));
+            int lo = inputBuffer[0] << 8;
+            int hi = (inputBuffer[1] << 8) + 0x100;
 
-      // skip comments
-      if ( (line[0] == ';') || !(stralpha(line)) )
-         continue;
+            target = lo;
+            if (i == 0)
+               from = 0x0000;
+            else
+               from = prev_from + prev_size + 1;
 
-      if (strstr(line, "[mapping]") != NULL) {
-         new_cfgsec = MAPPING;
-         printf("[mapping] section\n");
-      } else if (strstr(line, "[memattr]") != NULL) {
-         new_cfgsec = MEMATTR;
-         printf("[memattr] section\n");
-      } else if (strstr(line, "[vars]") != NULL) {
-         new_cfgsec = VARS;
-         printf("[vars] section\n");
-      } else if (strstr(line, "[macro]") != NULL) {
-         new_cfgsec = MACRO;
-         printf("[macro] section\n");
-      }
+            prev_size = (hi - lo) - 1;
+            prev_from = from;
 
-      if (new_cfgsec != cfgsec) {
-         // new config section detected => start a new page
-         cfgsec = new_cfgsec;
-         // if currentpage is existing clear non used lines
-         if (cur_page != 0) {
-            for (int i=cur_line; i<10 ; i++)
-               for (int j=0; j<20; j++)
-                  info_entries->line[i][j] = 0;
-            info_entries++;
-         }
-         cur_page++;
-         cur_line = 0;
-  
-         info_entries->section = cfgsec;
-         // clear new page
-         for (int i=0; i<10 ; i++)
-            for (int j=0; j<20; j++)
-               info_entries->line[i][j] = 0;
-         continue;
-      }
-
-      if (cfgsec != NONE) {
-         printf("collecting info from line: %s\n", line);
-         char *equal_sign = strchr(line, '=');
-         if (equal_sign) {
-            *equal_sign = 0; // split the line into key and value
-            char *key = trim(line);
-            char *value = trim(equal_sign + 1);
-
-            // remove trailing comment
-            char *comment_sign = strchr(value, ';');
-            if (comment_sign) *comment_sign = 0;
-            value = trim(value);
-
+            // store mapping info in info_entries
             // if page is full start a new one
             if (cur_line == 10) {
                cur_line = 0;
                cur_page++;
                info_entries++;
-               info_entries->section = cfgsec;
+               info_entries->section = MAPPING;
                // clear new page
                for (int i=0; i<10 ; i++)
                   for (int j=0; j<20; j++)
                      info_entries->line[i][j] = 0;
             }
-            snprintf(info_entries->line[cur_line++], 20, "%-19s", key);
-            snprintf(info_entries->line[cur_line++], 20, "%19s", value);
-            printf("key: %s, value: %s\n", key, value);
-         } else {
-            printf("E: invalid line:\t %s\n", line);
+            sprintf(line, "$%04X - $%04X", lo, hi-1);
+            snprintf(info_entries->line[cur_line++], 20, "%-19s", line);
+            sprintf(line, "$%04X", target);
+            snprintf(info_entries->line[cur_line++], 20, "%19s", line);
+
+            // skip actual ROM data
+            for (int j = lo; j < hi; j++) {
+               vfs_read(f, inputBuffer, 2);
+            }
+            // skip CRC (2 bytes)
+            vfs_read(f, inputBuffer, 2);
          }
+
+         // fill current page so that new page is started for MEMATTR section
+         cur_line = 10;
+         
+         // read memory block (2Kb) attributes
+         char memattr[50];
+         vfs_read(f, memattr, sizeof(memattr));
+         for (int i = 0; i < 32; i++) {
+            int attr = 0xF & (memattr[(i >> 1)] >> ((i & 1) * 4));
+            int lohi = memattr[16 + ((i >> 1) | ((i & 1) << 4))];
+            int lo   = (lohi >> 4) & 0x7;
+            int hi   = (lohi & 0x7) + 1;
+
+            // check if memory block has write attribute
+            if(attr & 0x02) {              
+               // store memattr info in info_entries, if page is full start a new one
+               if (cur_line == 10) {
+                  cur_line = 0;
+                  cur_page++;
+                  info_entries++;
+                  info_entries->section = MEMATTR;
+                  // clear new page
+                  for (int i=0; i<10 ; i++)
+                     for (int j=0; j<20; j++)
+                        info_entries->line[i][j] = 0;
+               }
+               sprintf(line, "$%04X - $%04X", i * 0x800, (i * 0x800) + ((hi - lo) * 0x100) - 1);
+               snprintf(info_entries->line[cur_line++], 20, "%-19s", line);
+               if(attr & 0x04)
+                  snprintf(info_entries->line[cur_line++], 20, "%19s", "RAM 8");
+               else
+                  snprintf(info_entries->line[cur_line++], 20, "%19s", "RAM 16");
+            }
+         }
+         // fill current page so that new page is started for VARS section
+         cur_line = 10;
+
+         // check for metadata section 
+         if (!vfs_eof(f)) {
+            while (!vfs_eof(f)) {
+               vfs_read(f, inputBuffer, 1);
+               // find number of bytes in length
+               int nb = inputBuffer[0] >> 6;
+               // get 6 LSBs of length
+               int len = inputBuffer[0] & 0x3F;
+               // process additional bytes
+               for(int i=0; i<nb; i++) {
+                  vfs_read(f, inputBuffer, 1);
+                  len |= inputBuffer[0] << (6 + i*8);
+               }
+
+               // read tag code
+               vfs_read(f, inputBuffer, 1);
+               int tag = inputBuffer[0];
+
+               if (tag == 0x06) {       // Game Attribute / Compatibility Flags
+                  vfs_read(f, inputBuffer, 3);  // skip first 3 bytes to search JLP attributes            
+                  if(len > 3) {
+                     vfs_read(f, inputBuffer, 2);
+                     int jlp_value = inputBuffer[0] >> 6;
+                     int jlpflash_value = inputBuffer[1];
+
+                     // need to store JLP attributes in info_entries for display in UI
+                     // store memattr info in info_entries, if page is full start a new one
+                     if (cur_line == 10) {
+                        cur_line = 0;
+                        cur_page++;
+                        info_entries++;
+                        info_entries->section = VARS;
+                        // clear new page
+                        for (int i=0; i<10 ; i++)
+                           for (int j=0; j<20; j++)
+                              info_entries->line[i][j] = 0;
+                     }
+                     snprintf(info_entries->line[cur_line++], 20, "%-19s", "JLP");
+                     sprintf(line, "%d", jlp_value);
+                     snprintf(info_entries->line[cur_line++], 20, "%19s", line);
+                     snprintf(info_entries->line[cur_line++], 20, "%-19s", "JLP flash");
+                     sprintf(line, "%d", jlpflash_value);
+                     snprintf(info_entries->line[cur_line++], 20, "%19s", line);
+                  }
+               } else {
+                  // skip metadata info
+                  for(int i=0; i<len; i++) 
+                     vfs_read(f, inputBuffer, 1);
+               }
+
+               // skip metadata crc
+               vfs_read(f, inputBuffer, 2);
+            }
+         }
+         vfs_close(f);
       }
    }
-   vfs_close(f);
-    
+   else {
+      // not a ROM file, try to collect info from corresponding config file
+      char *dot = strrchr(filename, '.');
+      strncpy(cfgfile, filename, (dot - filename));
+      strcat(cfgfile, ".cfg");  
+     
+      f = vfs_open(cfgfile, "r");
+      if (f == NULL) {
+         printf("collect_info: could not open file %s\n", cfgfile);
+         snprintf(info_entries->line[cur_line++], 20, "%-19s", "file Type");
+         snprintf(info_entries->line[cur_line++], 20, "%19s", "BIN (no cfg)");
+      }
+      else {
+         snprintf(info_entries->line[cur_line++], 20, "%-19s", "file Type");
+         snprintf(info_entries->line[cur_line++], 20, "%19s", "BIN+CFG");
+         // now parse the file to collect info entries
+         while (!(vfs_eof(f))) {
+            vfs_gets(f, line, sizeof(line));
+            strcpy(line, trim(line));
+
+            // skip comments
+            if ( (line[0] == ';') || !(stralpha(line)) ) {
+               continue;
+            }
+
+            if (strstr(line, "[mapping]") != NULL) {
+               new_cfgsec = MAPPING;
+               printf("[mapping] section\n");
+            } else if (strstr(line, "[memattr]") != NULL) {
+               new_cfgsec = MEMATTR;
+               printf("[memattr] section\n");
+            } else if (strstr(line, "[vars]") != NULL) {
+               new_cfgsec = VARS;
+               printf("[vars] section\n");
+            } else if (strstr(line, "[macro]") != NULL) {
+               new_cfgsec = MACRO;
+               printf("[macro] section\n");
+            }
+
+            if (new_cfgsec != cfgsec) {
+               // new config section detected => fill current page so that new page gets started for new section
+               cfgsec = new_cfgsec;
+               cur_line = 10;
+               continue;
+            }
+
+            if (cfgsec != NONE) {
+               printf("collecting info from line: %s\n", line);
+               char *equal_sign = strchr(line, '=');
+               if (equal_sign) {
+                  // split the line into key and value
+                  *equal_sign = 0;
+                  char *key = trim(line);
+                  char *value = trim(equal_sign + 1);
+                  // remove trailing comment
+                  char *comment_sign = strchr(value, ';');
+                  if (comment_sign) *comment_sign = 0;
+                  value = trim(value);
+                  // if page is full start a new one
+                  if (cur_line == 10) {
+                     cur_line = 0;
+                     cur_page++;
+                     info_entries++;
+                     info_entries->section = cfgsec;
+                     // clear new page
+                     for (int i=0; i<10 ; i++)
+                        for (int j=0; j<20; j++)
+                           info_entries->line[i][j] = 0;
+                  }
+                  printf("key: %s, value: %s\n", key, value);
+                  snprintf(info_entries->line[cur_line++], 20, "%-19s", key);
+                  snprintf(info_entries->line[cur_line++], 20, "%19s", value);
+               } else {
+                  printf("E: invalid line:\t %s\n", line);
+               }
+            }
+         }
+         vfs_close(f);
+      }
+   }
    return cur_page;
 }
