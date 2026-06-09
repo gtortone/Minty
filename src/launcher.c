@@ -204,7 +204,7 @@ void info_list(INFO_ENTRY *en, int page) {
    }
 
    while(section_str[sec_pos]) {
-      pos = PATH_ADDR + sec_pos;
+      pos = SECTION_ADDR + sec_pos;
       cart.RAM[pos] = section_str[sec_pos];
       if (cart.RAM[pos] < 32) {
          cart.RAM[pos] = 0;
@@ -216,7 +216,7 @@ void info_list(INFO_ENTRY *en, int page) {
       }
       sec_pos++;
    }
-   for (pos = PATH_ADDR + sec_pos; pos < PATH_ADDR + 21; pos++) {
+   for (pos = SECTION_ADDR + sec_pos; pos < SECTION_ADDR + 21; pos++) {
       cart.RAM[pos] = 0;
    }
 

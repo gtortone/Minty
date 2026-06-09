@@ -384,7 +384,7 @@ int collect_info(char *filename, INFO_ENTRY *info_entries) {
    cfgSection cfgsec = NONE;
    cfgSection new_cfgsec = NONE;
    int cur_line = 0;
-   int cur_page = 0;
+   int cur_page = 0; 
 
    if (is_rom_file(filename)) {
       printf("collect_info: ROM file not supported%s\n", filename);
@@ -435,15 +435,21 @@ int collect_info(char *filename, INFO_ENTRY *info_entries) {
       if (new_cfgsec != cfgsec) {
          // new config section detected => start a new page
          cfgsec = new_cfgsec;
-         // if page is not first one, clear non used lines
+         // if currentpage is existing clear non used lines
          if (cur_page != 0) {
             for (int i=cur_line; i<10 ; i++)
-               info_entries->line[i][0] = 0;
+               for (int j=0; j<20; j++)
+                  info_entries->line[i][j] = 0;
             info_entries++;
          }
          cur_page++;
          cur_line = 0;
+  
          info_entries->section = cfgsec;
+         // clear new page
+         for (int i=0; i<10 ; i++)
+            for (int j=0; j<20; j++)
+               info_entries->line[i][j] = 0;
          continue;
       }
 
@@ -466,8 +472,12 @@ int collect_info(char *filename, INFO_ENTRY *info_entries) {
                cur_page++;
                info_entries++;
                info_entries->section = cfgsec;
+               // clear new page
+               for (int i=0; i<10 ; i++)
+                  for (int j=0; j<20; j++)
+                     info_entries->line[i][j] = 0;
             }
-            snprintf(info_entries->line[cur_line++], 20, "%s", key);
+            snprintf(info_entries->line[cur_line++], 20, "%-19s", key);
             snprintf(info_entries->line[cur_line++], 20, "%19s", value);
             printf("key: %s, value: %s\n", key, value);
          } else {

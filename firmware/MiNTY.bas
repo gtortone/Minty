@@ -49,6 +49,7 @@
     CONST ADDRESS_fto       = $9030 ' Last displayed entry (16 bits)
     CONST ADDRESS_ftotal    = $9032 ' Total number of entries (16 bits)
     CONST ADDRESS_path      = $9100
+    CONST ADDRESS_section   = $9300
     ' PI current status
     CONST PI_STAT_BUZZY     = 1
     CONST PI_STAT_READY     = 0
@@ -224,21 +225,21 @@ MENU_LOOP:
     Input = CONT
 
     ' SELECT
-    IF (Input=$28) THEN
+    IF (Input=$28) THEN ' ENTER
         Debounce = DEBOUNCE_DELAY
         GOSUB SELECT_ENTRY
         GOTO START
     END IF
 
     ' UPDIR
-    IF (Input=$88) THEN
+    IF (Input=$88) THEN ' CLEAR
         Debounce = DEBOUNCE_DELAY
         GOSUB UP_DIRECTORY
         GOTO START
     END IF    
     
     ' HELP
-    IF (Input=$81) THEN
+    IF (Input=$81) THEN ' KEYPAD_1
         Debounce = DEBOUNCE_DELAY
         GOSUB HELP_SCREEN
         GOTO START
@@ -359,6 +360,35 @@ HELP_SCREEN: PROCEDURE
         END IF
         WAIT
     WEND
+    Debounce = DEBOUNCE_DELAY
+    END
+
+INFO_HELP_SCREEN: PROCEDURE
+    PlaySnd(InputSound)
+    CLS
+    ResetSprite(1)
+    ResetSprite(2)
+    ResetSprite(3)
+    SCREEN Title_cards,0,0,8,1,8
+    SPRITE 4,  8 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
+    SPRITE 5, 24 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
+    SPRITE 6, 40 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
+    SPRITE 7, 56 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
+    PRINT AT SCREENPOS(2,1) COLOR CS_YELLOW, "Info help screen"
+    PRINT AT SCREENPOS(0,3) COLOR CS_TAN, "UP:       go up"
+    PRINT AT SCREENPOS(0,4) COLOR CS_TAN, "DOWN:     go dn"
+    PRINT AT SCREENPOS(0,8) COLOR CS_TAN, "CLEAR:     EXIT"
+    PRINT AT SCREENPOS(0,11) COLOR CS_YELLOW, "  <CLEAR> to exit"
+    WHILE (CONT <> $88)  'CLEAR
+        IF FRAME%8 = 0 THEN
+            WaveFrame = (WaveFrame+1)%4
+            DEFINE 6,1,VARPTR Title_wave(WaveFrame * 4)
+        END IF
+        WAIT
+    WEND
+    Debounce = DEBOUNCE_DELAY
+    ' restore HELP display
+    SCREEN Help_Cards,0,17,3,1,3
     END
 
 DISP_INFO: PROCEDURE
@@ -379,11 +409,11 @@ DISP_INFO: PROCEDURE
     NEXT J
 	
 	' Display section in title bar
-    #tmp = PEEK(ADDRESS_path) AND $7F
+    #tmp = PEEK(ADDRESS_section) AND $7F
     ' First letter need to change Color Stack
     #BACKTAB(20) = ASCII_table(#tmp) + CS_GREEN + $2000
     FOR I = 1 TO 19
-        #tmp = PEEK(ADDRESS_path + I) AND $7F
+        #tmp = PEEK(ADDRESS_section + I) AND $7F
         #BACKTAB(20+I) = ASCII_table(#tmp) + CS_GREEN
     NEXT I
 	
@@ -422,6 +452,11 @@ INFO_SCREEN: PROCEDURE
                         GOSUB WAIT_CARD_ANSWER
                         GOSUB DISP_INFO
                     END IF
+                    IF (Input=$81) THEN
+                        Debounce = DEBOUNCE_DELAY
+                        GOSUB INFO_HELP_SCREEN
+                        GOSUB DISP_INFO
+                    END IF                    
                 END IF
                 ' Update animation frame
                 IF FRAME%8 = 0 THEN
@@ -430,6 +465,7 @@ INFO_SCREEN: PROCEDURE
                 END IF
                 WAIT
             WEND
+            Debounce = DEBOUNCE_DELAY
         END IF
     END IF
     END
