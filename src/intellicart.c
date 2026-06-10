@@ -10,6 +10,7 @@
 #include "intellicart.h"
 #include "utils.h"
 #include "vfs.h"
+#include "rommeta_parser.h"
 
 typedef enum {
    NONE,
@@ -502,56 +503,40 @@ int collect_info(char *filename, INFO_ENTRY *info_entries) {
 
          // check for metadata section 
          if (!vfs_eof(f)) {
-            while (!vfs_eof(f)) {
-               vfs_read(f, inputBuffer, 1);
-               // find number of bytes in length
-               int nb = inputBuffer[0] >> 6;
-               // get 6 LSBs of length
-               int len = inputBuffer[0] & 0x3F;
-               // process additional bytes
-               for(int i=0; i<nb; i++) {
-                  vfs_read(f, inputBuffer, 1);
-                  len |= inputBuffer[0] << (6 + i*8);
+            rommeta_status_t st;
+            rommeta_parser_t parser;
+            char key[ROMMETA_STR_SIZE];
+            char value[ROMMETA_STR_SIZE];
+
+            rommeta_parser_init(&parser);
+
+            for (;;)
+            {
+               st = rommeta_read_next(&parser, f, key, value);
+
+               if (st == ROMMETA_END)
+                  break;
+
+               if (st == ROMMETA_ERR)
+               {
+                  printf("Error parsing ROM metadata\n");
+                  break;
                }
 
-               // read tag code
-               vfs_read(f, inputBuffer, 1);
-               int tag = inputBuffer[0];
-
-               if (tag == 0x06) {       // Game Attribute / Compatibility Flags
-                  vfs_read(f, inputBuffer, 3);  // skip first 3 bytes to search JLP attributes            
-                  if(len > 3) {
-                     vfs_read(f, inputBuffer, 2);
-                     int jlp_value = inputBuffer[0] >> 6;
-                     int jlpflash_value = inputBuffer[1];
-
-                     // need to store JLP attributes in info_entries for display in UI
-                     // store memattr info in info_entries, if page is full start a new one
-                     if (cur_line == 10) {
-                        cur_line = 0;
-                        cur_page++;
-                        info_entries++;
-                        info_entries->section = VARS;
-                        // clear new page
-                        for (int i=0; i<10 ; i++)
-                           for (int j=0; j<20; j++)
-                              info_entries->line[i][j] = 0;
-                     }
-                     snprintf(info_entries->line[cur_line++], 20, "%-19s", "JLP");
-                     sprintf(line, "%d", jlp_value);
-                     snprintf(info_entries->line[cur_line++], 20, "%19s", line);
-                     snprintf(info_entries->line[cur_line++], 20, "%-19s", "JLP flash");
-                     sprintf(line, "%d", jlpflash_value);
-                     snprintf(info_entries->line[cur_line++], 20, "%19s", line);
-                  }
-               } else {
-                  // skip metadata info
-                  for(int i=0; i<len; i++) 
-                     vfs_read(f, inputBuffer, 1);
+               // need to store VARS attributes in info_entries for display in UI
+               // store memattr info in info_entries, if page is full start a new one
+               if (cur_line == 10) {
+                  cur_line = 0;
+                  cur_page++;
+                  info_entries++;
+                  info_entries->section = VARS;
+                  // clear new page
+                  for (int i=0; i<10 ; i++)
+                     for (int j=0; j<20; j++)
+                        info_entries->line[i][j] = 0;
                }
-
-               // skip metadata crc
-               vfs_read(f, inputBuffer, 2);
+               snprintf(info_entries->line[cur_line++], 20, "%-19s", key);
+               snprintf(info_entries->line[cur_line++], 20, "%19s", value);      
             }
          }
          vfs_close(f);
