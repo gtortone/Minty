@@ -132,6 +132,10 @@ elseif(CONFIG_FLASH_LFS_STORAGE)
    )
 endif()
 
+if(CONFIG_ECS_AUDIO)
+   target_link_libraries(${PROJECT} hardware_pwm)
+endif()
+
 if(PICO_RP2350)
    target_link_libraries(${PROJECT} pico_sha256)
 
@@ -144,6 +148,7 @@ target_compile_definitions(${PROJECT} PRIVATE "CONFIG_SD_STORAGE=${CONFIG_SD_STO
 target_compile_definitions(${PROJECT} PRIVATE "CONFIG_FLASH_FAT_STORAGE=${CONFIG_FLASH_FAT_STORAGE}")
 target_compile_definitions(${PROJECT} PRIVATE "CONFIG_FLASH_LFS_STORAGE=${CONFIG_FLASH_LFS_STORAGE}")
 target_compile_definitions(${PROJECT} PRIVATE "CONFIG_JLP=${CONFIG_JLP}")
+target_compile_definitions(${PROJECT} PRIVATE "CONFIG_ECS_AUDIO=${CONFIG_ECS_AUDIO}")
 target_compile_definitions(${PROJECT} PRIVATE "MAX_ROM_SIZE=${MAX_ROM_SIZE}")
 
 if(CONFIG_FLASH_LFS_STORAGE)
@@ -177,6 +182,8 @@ target_sources(${PROJECT} PUBLIC
    ${CMAKE_CURRENT_LIST_DIR}/src/fatfs_backend.c
    ${CMAKE_CURRENT_LIST_DIR}/src/littlefs_backend.c
    ${CMAKE_CURRENT_LIST_DIR}/src/launcher.c
+   ${CMAKE_CURRENT_LIST_DIR}/src/ecs.c
+   ${CMAKE_CURRENT_LIST_DIR}/src/emu2149.c
 )
 
 target_include_directories(${PROJECT} PUBLIC

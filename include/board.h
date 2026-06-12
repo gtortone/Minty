@@ -30,4 +30,8 @@
    #endif
 #endif
 
+#if CONFIG_ECS_AUDIO
+   #define ECS_AUDIO    MI_ECS_AUDIO_PIN
+#endif
+
 #endif

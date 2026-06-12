@@ -3,5 +3,6 @@
 
 char* trim(char *s);
 bool stralpha(char *s);
+void to_lower(char *str);
 
 #endif

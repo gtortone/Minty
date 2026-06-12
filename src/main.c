@@ -14,6 +14,7 @@
 #include "board.h"
 #include "cartridge.h"
 #include "debug.h"
+#include "ecs.h"
 
 #if CONFIG_USB_DEVICE
    #include "tusb.h"
@@ -39,6 +40,10 @@ int main(void) {
 
 #if CONFIG_USB_DEVICE
    tud_init(BOARD_TUD_RHPORT);
+#endif
+
+#if CONFIG_ECS_AUDIO
+   init_ecs();          // move to load_cfg
 #endif
 
 #ifndef NDEBUG

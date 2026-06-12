@@ -27,6 +27,8 @@ typedef struct {
    bool JLPAccel;
    char flashfile[512];
    vfs_file_t *filesave;
+
+   bool ECSSupport;
 } Cartridge;
 
 #define JLP_FEATURE_ACCEL(status)   (status & (1U << 0))

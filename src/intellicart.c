@@ -10,6 +10,7 @@
 #include "intellicart.h"
 #include "utils.h"
 #include "vfs.h"
+#include "ecs.h"
 
 typedef enum {
    NONE,
@@ -42,6 +43,8 @@ void init_cart(void) {
    cart.JLPFlashSize = 0;
    cart.JLPAccel = 0;
    cart.flashfile[0] = '\0';
+
+   cart.ECSSupport = 0;
 }
 
 inline void config_jlp(int jlp_value, int jlpflash_value, char *filename) {
@@ -187,6 +190,7 @@ int load_cfg(char *filename) {
          continue;
 
       strcpy(line, trim(line));
+      to_lower(line);
 
       //printf("line: %s, len: %d\n", line, strlen(line));
 
@@ -218,9 +222,9 @@ int load_cfg(char *filename) {
 
          uint32_t a, b, c, p;
 
-         if(strstr(line, "PAGE") != NULL) {
+         if(strstr(line, "page") != NULL) {
 
-            ret = sscanf(line, "$%lx - $%lx = $%lx%*[^P]PAGE %lx", &a, &b, &c, &p);
+            ret = sscanf(line, "$%lx - $%lx = $%lx%*[^p]page%lx", &a, &b, &c, &p);
             if (ret != 4) {
                printf("E: parsing error in line: \n\t %s\n", line);
                return num_pokes;
@@ -251,7 +255,7 @@ int load_cfg(char *filename) {
             printf("E: parsing error in line: \n\t %s\n", line);
             return num_pokes;
          }
-         if ( (strcmp(type, "ROM") != 0) && (strcmp(type, "RAM") != 0) ) {
+         if ( (strcmp(type, "rom") != 0) && (strcmp(type, "ram") != 0) ) {
             printf("E: parsing error in line: \n\t %s\n", line);
             return num_pokes;
          }
@@ -273,6 +277,17 @@ int load_cfg(char *filename) {
                sscanf(line, "jlpflash = %d", &jlpflash_value) == 1 ) {
 
             printf("JLP flash config found\n");
+         }
+#endif
+
+#if CONFIG_ECS_AUDIO
+         int ecs_value = 0;
+         if ( sscanf(line, "ecs = %d", &ecs_value) == 1 ) {
+            if (ecs_value == 1) {
+               cart.ECSSupport = true;
+               //init_ecs();
+               printf("ECS support found\n");
+            }
          }
 #endif
 

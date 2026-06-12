@@ -24,9 +24,17 @@
 #include "launcher.h"
 #include "fatfs_backend.h"
 #include "littlefs_backend.h"
+#include "emu2149.h"
 
 #if CONFIG_JLP
    #include "jlpflash.h"
+#endif
+
+#if CONFIG_ECS_AUDIO
+   extern PSG* psg0;
+   bool ayWrite = false;
+   uint8_t ayRegister = 0;
+   uint8_t ayValue = 0;
 #endif
 
 extern Cartridge cart;     // main data structure for cart emulation
@@ -249,6 +257,18 @@ void __time_critical_func(core1_main()) {
                
                dataIn = sio_hw->gpio_in & 0xFFFF;
 
+#if CONFIG_ECS_AUDIO
+               if (cart.ECSSupport) {
+                  if ( (addrIn & 0xFFF0) == 0x00F0)  {
+                     ayWrite = true;
+                     ayRegister = addrIn - 0x00F0;
+                     ayValue = dataIn;
+                     //PSG_writeReg(psg0, addrIn - 0x00F0, dataIn);
+                     continue;
+                  }
+               }
+#endif
+
                if (cart.pagingSupport) {
                   if ((addrIn & 0xFFF) == 0xFFF) {
                      if ( ((dataIn >> 4) & 0x00FF) == 0xA5 ) {
@@ -350,7 +370,19 @@ void RunGame() {
 
    while (1) {
 
+#if CONFIG_ECS_AUDIO
+
+      if (ayWrite) {
+         if (ayRegister != 0xFF)
+            PSG_writeReg(psg0, ayRegister, ayValue);
+         ayWrite = false;
+         continue;
+      }
+
+#endif
+
 #if CONFIG_JLP
+
       if (cart.JLPSupport) {
 
          pbc = addrInCopy;

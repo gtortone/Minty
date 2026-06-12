@@ -1,0 +1,48 @@
+#include <stdlib.h>
+
+#include "pico/stdlib.h"
+#include "hardware/timer.h"
+#include "hardware/pwm.h"
+
+#include "board.h"
+#include "ecs.h"
+
+#if CONFIG_ECS_AUDIO
+
+static repeating_timer_t timer;
+PSG* psg0;
+
+bool ay_callback(repeating_timer_t *rt) {
+   PSG_calc(psg0);
+
+   uint16_t leftAudio = abs(
+         (int32_t)psg0->ch_out[0] + 
+         (int32_t)psg0->ch_out[1] + 
+         (int32_t)psg0->ch_out[2]) * PWM_WRAP >> 14;
+
+   pwm_set_gpio_level(ECS_AUDIO, leftAudio);
+
+   return true;
+}
+
+#endif
+
+void init_ecs(void) {
+
+#if CONFIG_ECS_AUDIO
+   gpio_set_function(ECS_AUDIO, GPIO_FUNC_PWM);
+
+   uint audioSlice = pwm_gpio_to_slice_num(ECS_AUDIO);
+
+   pwm_config cfg = pwm_get_default_config();
+   pwm_config_set_clkdiv(&cfg, 1.0f);
+   pwm_config_set_wrap(&cfg, PWM_WRAP);
+   pwm_init(audioSlice, &cfg, true);
+
+   psg0 = PSG_new(2000000, SAMPLING_FREQ);
+   PSG_setVolumeMode(psg0, EMU2149_VOL_AY_3_8910);
+
+   add_repeating_timer_us(-(1.0/SAMPLING_FREQ) * 1000000, ay_callback, NULL, &timer);
+#endif
+
+}
