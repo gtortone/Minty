@@ -198,6 +198,9 @@ void info_list(INFO_ENTRY *en, int page) {
       case 4: // MACRO
          sprintf(section_str, "[MACRO]");
          break;
+      case 5: // MAIN
+         sprintf(section_str, "[MAIN]");
+         break;
       default:
          sprintf(section_str, "[UNDEFINED]");
          break;

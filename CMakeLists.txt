@@ -182,6 +182,7 @@ target_sources(${PROJECT} PUBLIC
    ${CMAKE_CURRENT_LIST_DIR}/src/fatfs_backend.c
    ${CMAKE_CURRENT_LIST_DIR}/src/littlefs_backend.c
    ${CMAKE_CURRENT_LIST_DIR}/src/launcher.c
+   ${CMAKE_CURRENT_LIST_DIR}/src/rommeta_parser.c
    ${CMAKE_CURRENT_LIST_DIR}/src/ecs.c
    ${CMAKE_CURRENT_LIST_DIR}/src/emu2149.c
 )
