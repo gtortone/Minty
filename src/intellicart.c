@@ -285,7 +285,7 @@ int load_cfg(char *filename) {
          if ( sscanf(line, "ecs = %d", &ecs_value) == 1 ) {
             if (ecs_value == 1) {
                cart.ECSSupport = true;
-               //init_ecs();
+               init_ecs();
                printf("ECS support found\n");
             }
          }

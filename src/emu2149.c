@@ -301,7 +301,7 @@ int16_t PSG_calc (PSG * psg) {
    return psg->out;
 }
 
-void PSG_writeReg (PSG * psg, uint32_t reg, uint32_t val) {
+void PSG_writeReg (PSG * psg, uint8_t reg, uint8_t val) {
    int c;
    
    if (reg > 15)

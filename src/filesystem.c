@@ -9,6 +9,7 @@
 #include "vfs.h"
 #include "launcher.h"
 #include "utils.h"
+#include "ecs.h"
 
 #if PICO_RP2350
    #include "pico/sha256.h"
@@ -238,7 +239,14 @@ int load_file(char *filename) {
 
             if (tag == 0x06) {       // Game Attribute / Compatibility Flags
 
-               vfs_read(f, inputBuffer, 3);  // skip first 3 bytes to search JLP attributes
+               vfs_read(f, inputBuffer, 1);  // check for ECS compatibility
+               
+               if ( (inputBuffer[0] >> 6) != 0 ) {
+                  cart.ECSSupport = true;
+                  init_ecs();
+               }
+
+               vfs_read(f, inputBuffer, 2);  // skip 2 bytes to search JLP attributes
             
                if(len > 3) {
 

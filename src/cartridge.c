@@ -31,10 +31,13 @@
 #endif
 
 #if CONFIG_ECS_AUDIO
+   #define ECS_BUF_SIZE    32
    extern PSG* psg0;
-   bool ayWrite = false;
-   uint8_t ayRegister = 0;
-   uint8_t ayValue = 0;
+   extern const uint8_t ECS_LUT[16];
+   volatile uint8_t ayWrite = 0;
+   volatile uint8_t ayRead = 0;
+   volatile uint8_t ayRegister[ECS_BUF_SIZE] = {0};
+   volatile uint8_t ayValue[ECS_BUF_SIZE] = {0};
 #endif
 
 extern Cartridge cart;     // main data structure for cart emulation
@@ -159,7 +162,6 @@ void __time_critical_func(core1_main()) {
 
                   if ( (cart.JLPAccel || cart.JLPFlash) && ((addrIn >= 0x8000) && (addrIn <= 0x9FFF)) ) {
 
-
                      if ((cart.JLPFlash) && (addrIn == 0x8023)) {
                         dataOut = 0;
                         deviceAddress = true;
@@ -259,11 +261,10 @@ void __time_critical_func(core1_main()) {
 
 #if CONFIG_ECS_AUDIO
                if (cart.ECSSupport) {
-                  if ( (addrIn & 0xFFF0) == 0x00F0)  {
-                     ayWrite = true;
-                     ayRegister = addrIn - 0x00F0;
-                     ayValue = dataIn;
-                     //PSG_writeReg(psg0, addrIn - 0x00F0, dataIn);
+                  if ( (addrIn & 0xFFF0) == 0x00F0 ) {
+                     ayRegister[ayWrite] = ECS_LUT[addrIn & 0x000F];
+                     ayValue[ayWrite] = dataIn;
+                     ayWrite = (ayWrite + 1) % ECS_BUF_SIZE;
                      continue;
                   }
                }
@@ -372,11 +373,9 @@ void RunGame() {
 
 #if CONFIG_ECS_AUDIO
 
-      if (ayWrite) {
-         if (ayRegister != 0xFF)
-            PSG_writeReg(psg0, ayRegister, ayValue);
-         ayWrite = false;
-         continue;
+      if(ayRead != ayWrite) {
+         PSG_writeReg(psg0, ayRegister[ayRead], ayValue[ayRead]);
+         ayRead = (ayRead + 1) % ECS_BUF_SIZE;
       }
 
 #endif
@@ -537,17 +536,6 @@ void RunGame() {
             generate_random(randarr, sizeof(randarr));
             randrefill = false;
          }
-
-      } else { 
-#endif
-         
-         // JLP off
-         gpio_put(LED, true);
-         sleep_ms(2000);
-         gpio_put(LED, false);
-         sleep_ms(2000);
-
-#if CONFIG_JLP
       }
 #endif
    }  // end while

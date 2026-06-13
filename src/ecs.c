@@ -12,6 +12,25 @@
 static repeating_timer_t timer;
 PSG* psg0;
 
+const uint8_t ECS_LUT[16] = {
+   0x00,
+   0x02,
+   0x04,
+   0x0B,
+   0x01,
+   0x03,
+   0x05,
+   0x0C,
+   0x07,
+   0x06,
+   0x0D,
+   0x08,
+   0x09,
+   0x0A,
+   0x0E,
+   0x0F
+};
+
 bool ay_callback(repeating_timer_t *rt) {
    PSG_calc(psg0);
 
@@ -40,6 +59,7 @@ void init_ecs(void) {
    pwm_init(audioSlice, &cfg, true);
 
    psg0 = PSG_new(2000000, SAMPLING_FREQ);
+   PSG_reset(psg0);
    PSG_setVolumeMode(psg0, EMU2149_VOL_AY_3_8910);
 
    add_repeating_timer_us(-(1.0/SAMPLING_FREQ) * 1000000, ay_callback, NULL, &timer);
