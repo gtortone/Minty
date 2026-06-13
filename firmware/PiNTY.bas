@@ -32,6 +32,8 @@
 	CONST DEBOUNCE_DELAY  = 5					' Number of cycles to detect button press
 
     ' RAM addresses for exchanges with PI
+    CONST ADDRESS_TVMODE    = $8100
+    CONST ADDRESS_ECS_PRES  = $8101
     CONST ADDRESS_status    = $8119
     CONST ADDRESS_cmd       = $8889
     CONST ADDRESS_has_sd    = $8121
@@ -68,6 +70,12 @@
     CONST PI_HW_PIRTO2SD    = 3
     CONST PI_HW_PIRTO2DUO   = 4
     CONST PI_HW_PINTY       = 5
+    ' TV MODE
+    CONST isPAL          = 0
+    CONST isNTSC         = 1
+    ' ECS Presence
+    CONST ECS_Absent     = 0 
+    CONST ECS_Present    = 1
 
     DEF FN PI_STATUS = PEEK(ADDRESS_status)
     DEF FN PI_CMD(command) = POKE(ADDRESS_cmd),command
@@ -113,6 +121,10 @@
         WAIT
     WEND
 
+    ' Send INTY condfiguration to PI
+    IF (NTSC <>0) THEN PI_SET_TVMODE(isNTSC) ELSE PI_SET_TVMODE(isPAL)
+    IF (ECS.AVAILABLE <> 0) THEN PI_SET_ECS_PRES(ECS_Present) ELSE PI_SET_ECS_PRES(ECS_Absent)
+    
     ' Load waiting animation frames into GRAM
     CLS
     DEFINE 0,10,In_Progress

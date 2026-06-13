@@ -32,6 +32,8 @@
 	CONST DEBOUNCE_DELAY  = 5					' Number of cycles to detect button press
 
     ' RAM addresses for exchanges with PI
+    CONST ADDRESS_TVMODE    = $8100
+    CONST ADDRESS_ECS_PRES  = $8101
     CONST ADDRESS_status    = $8119
     CONST ADDRESS_dev       = $8120
     CONST ADDRESS_has_sd    = $8121
@@ -81,6 +83,12 @@
     CONST ERR_NO_ERROR            = 0
     CONST ERR_COULD_NOT_OPEN_FILE = 1
     CONST ERR_FILE_TO_BIG         = 2
+    ' TV MODE
+    CONST isPAL          = 0
+    CONST isNTSC         = 1
+    ' ECS Presence
+    CONST ECS_Absent     = 0 
+    CONST ECS_Present    = 1
 
     CONST FNAME_LENGTH   = 64
     CONST INFO_LENGTH    = 19
@@ -100,8 +108,10 @@
     DEF FN PI_GET_ERROR  = PEEK(ADDRESS_err)
     DEF FN PI_GET_INFO_NUM = PEEK(ADDRESS_INFO_NUM)
     DEF FN PI_GET_INFO_DISP = PEEK(ADDRESS_INFO_DISP)
+    DEF FN PI_SET_TVMODE(mode) = POKE(ADDRESS_TVMODE),mode
+    DEF FN PI_SET_ECS_PRES(presence) = POKE(ADDRESS_ECS_PRES),presence
 
-    ' Display splash screen
+     ' Display splash screen
 	MODE 0,0,2,0,2
 	WAIT
 	DEFINE 0,16,screen_bitmaps_0
@@ -148,6 +158,10 @@
         IF I>0 THEN I = I - 1
         WAIT
     WEND
+
+    ' Send INTY condfiguration to PI
+    IF (NTSC <>0) THEN PI_SET_TVMODE(isNTSC) ELSE PI_SET_TVMODE(isPAL)
+    IF (ECS.AVAILABLE <> 0) THEN PI_SET_ECS_PRES(ECS_Present) ELSE PI_SET_ECS_PRES(ECS_Absent)
 
     CLS
     MODE 0,6,0,7,0
@@ -342,18 +356,17 @@ HELP_SCREEN: PROCEDURE
     SPRITE 5, 24 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
     SPRITE 6, 40 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
     SPRITE 7, 56 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
-    PRINT AT SCREENPOS(9,0) COLOR CS_YELLOW, "Help Screen"
-    PRINT AT SCREENPOS(1,2) COLOR CS_TAN, "8 or UP      Go Up"
-    PRINT AT SCREENPOS(1,3) COLOR CS_TAN, "0 or DOWN    Go Dn"
-    PRINT AT SCREENPOS(1,4) COLOR CS_TAN, "7 or B-UP  Page Up"
-    PRINT AT SCREENPOS(1,5) COLOR CS_TAN, "9 or B-DN  Page Dn"
+    PRINT AT SCREENPOS(9,0) COLOR CS_YELLOW, "Help screen"
+    PRINT AT SCREENPOS(0,2) COLOR CS_TAN, "8 or up:   go up"
+    PRINT AT SCREENPOS(0,3) COLOR CS_TAN, "0 or down: go dn"
+    PRINT AT SCREENPOS(0,4) COLOR CS_TAN, "7 or b-up: page up"
+    PRINT AT SCREENPOS(0,5) COLOR CS_TAN, "9 or b-dn: page dn"
     IF PI_HAS_SD=1 THEN
-        PRINT AT SCREENPOS(1,6) COLOR CS_TAN, "3     Switch FL/SD"
+        PRINT AT SCREENPOS(0,7) COLOR CS_TAN, "3:         sw FL/SD"
     END IF
-    PRINT AT SCREENPOS(1,7) COLOR CS_TAN, "2        File Info"
-    PRINT AT SCREENPOS(1,8) COLOR CS_TAN, "CLEAR       Dir Up"
-    PRINT AT SCREENPOS(1,9) COLOR CS_TAN, "ENTER       Select"
-    PRINT AT SCREENPOS(2,11) COLOR CS_YELLOW, "<CLEAR>  to exit"
+    PRINT AT SCREENPOS(0,8) COLOR CS_TAN, "CLEAR:     dir up"
+    PRINT AT SCREENPOS(0,9) COLOR CS_TAN, "ENTER:     select"
+    PRINT AT SCREENPOS(0,11) COLOR CS_YELLOW, "  <CLEAR> to exit"
     WHILE (CONT <> $88)  'CLEAR
         IF FRAME%8 = 0 THEN
             WaveFrame = (WaveFrame+1)%4
@@ -375,11 +388,11 @@ INFO_HELP_SCREEN: PROCEDURE
     SPRITE 5, 24 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
     SPRITE 6, 40 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
     SPRITE 7, 56 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
-    PRINT AT SCREENPOS(11,0) COLOR CS_YELLOW, "Info Help"
-    PRINT AT SCREENPOS(1,3) COLOR CS_TAN, "8 or UP      Go Up"
-    PRINT AT SCREENPOS(1,4) COLOR CS_TAN, "0 or DOWN    Go Dn"
-    PRINT AT SCREENPOS(1,6) COLOR CS_TAN, "CLEAR    Exit Info"
-    PRINT AT SCREENPOS(2,11) COLOR CS_YELLOW, "<CLEAR>  to exit"
+    PRINT AT SCREENPOS(2,1) COLOR CS_YELLOW, "Info help screen"
+    PRINT AT SCREENPOS(0,3) COLOR CS_TAN, "UP:       go up"
+    PRINT AT SCREENPOS(0,4) COLOR CS_TAN, "DOWN:     go dn"
+    PRINT AT SCREENPOS(0,8) COLOR CS_TAN, "CLEAR:     EXIT"
+    PRINT AT SCREENPOS(0,11) COLOR CS_YELLOW, "  <CLEAR> to exit"
     WHILE (CONT <> $88)  'CLEAR
         IF FRAME%8 = 0 THEN
             WaveFrame = (WaveFrame+1)%4

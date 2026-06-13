@@ -48,7 +48,7 @@ bool ay_callback(repeating_timer_t *rt) {
 
 #endif
 
-void init_ecs(void) {
+void init_ecs(uint8_t tv_mode) {
 
 #if CONFIG_ECS_AUDIO
    gpio_set_function(ECS_AUDIO, GPIO_FUNC_PWM);
@@ -60,7 +60,11 @@ void init_ecs(void) {
    pwm_config_set_wrap(&cfg, PWM_WRAP);
    pwm_init(audioSlice, &cfg, true);
 
-   psg0 = PSG_new(2000000, SAMPLING_FREQ);
+   if (tv_mode == 0) 
+      psg0 = PSG_new(2000000, SAMPLING_FREQ);
+   else
+      psg0 = PSG_new(1789772, SAMPLING_FREQ);
+
    PSG_reset(psg0);
    PSG_setVolumeMode(psg0, EMU2149_VOL_AY_3_8910);
 

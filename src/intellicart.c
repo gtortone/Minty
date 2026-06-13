@@ -26,6 +26,9 @@ Cartridge cart;     // main data structure for cart emulation
 
 extern struct mapEntry slots[NSLOTS];
 
+extern uint8_t tv_mode;      // 0: PAL, 1: NTSC
+extern uint8_t ecs_present;  // 0: ECS absent, 1: ECS present
+
 // RAM base address for launcher 
 const unsigned int base = 0x17F;
 
@@ -283,12 +286,14 @@ int load_cfg(char *filename) {
 #endif
 
 #if CONFIG_ECS_AUDIO
-         int ecs_value = 0;
-         if ( sscanf(line, "ecs = %d", &ecs_value) == 1 ) {
-            if (ecs_value == 1) {
-               cart.ECSSupport = true;
-               init_ecs();
-               printf("ECS support found\n");
+         if (ecs_present == 0) {
+            int ecs_value = 0;
+            if ( sscanf(line, "ecs = %d", &ecs_value) == 1 ) {
+               if (ecs_value == 1) {
+                  cart.ECSSupport = true;
+                  init_ecs(tv_mode);
+                  printf("ECS support found\n");
+               }
             }
          }
 #endif

@@ -47,6 +47,10 @@ extern Cartridge cart;     // main data structure for cart emulation
 extern struct mapEntry slots[NSLOTS];
 extern struct mapHole holes[NSLOTS];
 
+// concole configurqtion
+uint8_t tv_mode;      // 0: PAL, 1: NTSC
+uint8_t ecs_present;  // 0: ECS absent, 1: ECS present
+
 char curPath[512] = "";
 
 #if CONFIG_FLASH_FAT_STORAGE
@@ -117,6 +121,10 @@ int LoadGame(int entry_num) {
       }
    }
 #endif
+
+   // get intellivision details for ECS emulation
+   tv_mode = cart.RAM[TV_MODE_ADDR];
+   ecs_present = cart.RAM[ECS_PRES_ADDR];
 
    int result = load_file_by_id(screen_entries[entry_num].id, curPath);
    if (result != 0) {

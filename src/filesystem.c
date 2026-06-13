@@ -19,6 +19,9 @@ extern Cartridge cart;
 
 extern struct mapEntry slots[NSLOTS];
 
+extern uint8_t tv_mode;      // 0: PAL, 1: NTSC
+extern uint8_t ecs_present;  // 0: ECS absent, 1: ECS present
+
 int entry_compare(const void *p1, const void *p2) {
    SCREEN_ENTRY *e1 = (SCREEN_ENTRY *) p1;
    SCREEN_ENTRY *e2 = (SCREEN_ENTRY *) p2;
@@ -242,9 +245,11 @@ int load_file(char *filename) {
                vfs_read(f, inputBuffer, 1);  // check for ECS compatibility
                
 #if CONFIG_ECS_AUDIO
-               if ( (inputBuffer[0] >> 6) != 0 ) {
-                  cart.ECSSupport = true;
-                  init_ecs();
+               if (ecs_present == 0) {
+                  if ( (inputBuffer[0] >> 6) != 0 ) {
+                     cart.ECSSupport = true;
+                     init_ecs(tv_mode);
+                  }
                }
 #endif
                vfs_read(f, inputBuffer, 2);  // skip 2 bytes to search JLP attributes

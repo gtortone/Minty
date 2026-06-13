@@ -9,6 +9,6 @@
 #define FRAME_FREQ         60
 #define FRAME_LOOPS_CNT    SAMPLING_FREQ / FRAME_FREQ
 
-void init_ecs(void);
+void init_ecs(uint8_t tv_mode);
 
 #endif
