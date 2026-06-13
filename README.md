@@ -17,10 +17,11 @@ Multi-cart based on Raspberry Pi Pico hardware and PiRTOII firmware (https://git
 - support for long filenames (up to 255 chars)
 - move from 64 to 512 max number of files for directory
 - SD support (with sukkopera board: https://github.com/SukkoPera/PiRTOII)
-- Intellicart ROM support (.rom)
+- Intellicart **ROM** support (.rom)
 - new data structure for page decoding with O(1) lookup performance
-- VFS (Virtual File System) library included to access storage devices based on FatFs or LittleFs
-- full JLP support: hardware acceleration, expanded memory and save/load on flash (for boards with microSD storage)
+- **VFS** (Virtual File System) library included to access storage devices based on FatFs or LittleFs
+- full **JLP** support: hardware acceleration, expanded memory and save/load on flash (for boards with microSD storage)
+- **ECS** audio emulation with **AY-3-8910** soft-core
 - support of arbitrary number of patches from ROM config file
 - new launcher firmware with icons and custom fonts with automatic saving of last opened directory 
 - tons of roms tested - Minty is now able to run [Bad Apple demo](https://forums.atariage.com/topic/266031-intellivision-bad-apple/) (445 kB ROM with 52 memory pages) on RP235x boards
