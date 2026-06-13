@@ -7,24 +7,23 @@ Multi-cart based on Raspberry Pi Pico hardware and PiRTOII firmware (https://git
 
 ## Features
 
-- Pico C/C++ code refactoring
-- Intybasic code refactoring
-- support for RP2040 multicarts: Pirto, Pirto-II, Pirto-II-SD
-- support for RP2350 multicart Pirto-II-Duo
-- no more config files for "official" ITV titles
-- new navigation keys for launcher
-- new color schema for launcher
-- support for long filenames (up to 255 chars)
-- move from 64 to 512 max number of files for directory
-- SD support (with sukkopera board: https://github.com/SukkoPera/PiRTOII)
-- Intellicart **ROM** support (.rom)
-- new data structure for page decoding with O(1) lookup performance
-- **VFS** (Virtual File System) library included to access storage devices based on FatFs or LittleFs
-- full **JLP** support: hardware acceleration, expanded memory and save/load on flash (for boards with microSD storage)
-- **ECS** audio emulation with **AY-3-8910** soft-core
-- support of arbitrary number of patches from ROM config file
-- new launcher firmware with icons and custom fonts with automatic saving of last opened directory 
-- tons of roms tested - Minty is now able to run [Bad Apple demo](https://forums.atariage.com/topic/266031-intellivision-bad-apple/) (445 kB ROM with 52 memory pages) on RP235x boards
+* 🔧 Pico C/C++ code refactoring
+* 🎮 Support for RP2040 multicarts: Pirto, Pirto-II, Pirto-II-SD
+* 🚀 Support for RP2350 multicart Pirto-II-Duo
+* 🧾 No more config files for official ITV titles
+* ⌨️ New launcher navigation keys
+* 🎨 New launcher color scheme
+* 📁 Support for long filenames (up to 255 characters)
+* 📂 Increased maximum number of files per directory from 64 to 512
+* 💾 SD card support (with SukkoPera's PiRTOII board)
+* 🧩 Intellicart ROM support (.rom files)
+* ⚡ New page decoding data structure with O(1) lookup performance
+* 🗂️ VFS (Virtual File System) library included for storage access via FatFs and LittleFS
+* 💡 Full JLP support: hardware acceleration, expanded memory, and flash save/load support (for boards with microSD storage)
+* 🔊 ECS audio emulation with AY-3-8910 soft-core
+* 🧱 Support for an arbitrary number of patches defined in ROM configuration files
+* 🧭 New launcher firmware featuring icons and custom fonts, automatic saving of the last opened directory, and file information persistence during cfg-based browsing
+* 🕹️ Tons of ROMs tested — Minty can now run the Bad Apple demo (445 KB ROM with 52 memory pages) on RP235x boards
 
 ## Screenshots
 
