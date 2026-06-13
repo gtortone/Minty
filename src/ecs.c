@@ -1,3 +1,5 @@
+#if CONFIG_ECS_AUDIO
+
 #include <stdlib.h>
 
 #include "pico/stdlib.h"
@@ -66,3 +68,5 @@ void init_ecs(void) {
 #endif
 
 }
+
+#endif

@@ -241,11 +241,12 @@ int load_file(char *filename) {
 
                vfs_read(f, inputBuffer, 1);  // check for ECS compatibility
                
+#if CONFIG_ECS_AUDIO
                if ( (inputBuffer[0] >> 6) != 0 ) {
                   cart.ECSSupport = true;
                   init_ecs();
                }
-
+#endif
                vfs_read(f, inputBuffer, 2);  // skip 2 bytes to search JLP attributes
             
                if(len > 3) {
