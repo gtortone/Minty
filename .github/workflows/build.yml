@@ -9,6 +9,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    strategy:
+      matrix:
+        board: [pintycard, pirto_ii_default, pirto_ii_duo, pirto_ii_sd, pirto]
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -33,4 +37,4 @@ jobs:
         run: chmod +x scripts/build-all.sh
 
       - name: Run build script
-        run: ./scripts/build-all.sh
+        run: ./scripts/build-board.sh ${{ matrix.board }} 
