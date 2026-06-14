@@ -99,8 +99,15 @@ vfs_file_t* vfs_open(const char *path, const char *mode) {
    }
    
    f->mount = mnt;
+
+   vfs_file_t *ret;
    
-   return mnt->driver->open(real_path, mode, f);
+   ret = mnt->driver->open(real_path, mode, f);
+
+   if(ret == NULL)
+      f->used = 0;
+
+   return(ret);
 }
 
 int vfs_stat(const char *path, vfs_stat_t *st) {
