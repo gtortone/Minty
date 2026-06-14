@@ -423,7 +423,7 @@ int collect_info(char *filename, INFO_ENTRY *info_entries) {
    if (vfs_stat(filename, &st) == 0) {
       printf("file size: %d bytes\n", st.size);
       snprintf(info_entries->line[cur_line++], 20, "%-19s", "File size");
-      snprintf(info_entries->line[cur_line++], 20, "%12d KWords", st.size/1024/2);
+      snprintf(info_entries->line[cur_line++], 20, "%16d KB", st.size/1024);
    }   
 
    if (is_rom_file(filename)) {
