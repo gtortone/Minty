@@ -423,8 +423,8 @@ int collect_info(char *filename, INFO_ENTRY *info_entries) {
    if (vfs_stat(filename, &st) == 0) {
       printf("file size: %d bytes\n", st.size);
       snprintf(info_entries->line[cur_line++], 20, "%-19s", "File size");
-      snprintf(info_entries->line[cur_line++], 20, "%16d KB", st.size/1024);
-   }   
+      snprintf(info_entries->line[cur_line++], 20, "%7dKB (Max %3d)", st.size/1024, MAX_ROM_SIZE*2/1024);
+   }
 
    if (is_rom_file(filename)) {
       // ROM file, info collection parsing complete file to get mapping and memattr info as well as JLP attributes if available
