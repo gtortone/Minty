@@ -224,7 +224,6 @@ START:
 
 MENU_LOOP:
     WAIT
-    IF Debounce>0 THEN Debounce = Debounce-1:GOTO MENU_LOOP
     ' Update animation frame
     IF FRAME%8 = 0 THEN
         WaveFrame = (WaveFrame+1)%4
@@ -235,6 +234,8 @@ MENU_LOOP:
     IF FRAME%16 = 0 THEN
         GOSUB DISPLAY_SELECTED_ENTRY
     END IF
+
+    IF Debounce>0 THEN Debounce = Debounce-1:GOTO MENU_LOOP
 
     Input = CONT
 
@@ -448,7 +449,6 @@ INFO_SCREEN: PROCEDURE
             ' Info available for this entry, display it
             GOSUB DISP_INFO
             Input = 0
-            Debounce = 0
             WHILE (Input <> $88)  ' run until CLR key is pressed
                 IF Debounce>0 THEN 
                     Debounce = Debounce-1
@@ -484,9 +484,9 @@ INFO_SCREEN: PROCEDURE
                 END IF
                 WAIT
             WEND
-            Debounce = DEBOUNCE_DELAY
         END IF
     END IF
+    Debounce = DEBOUNCE_DELAY
     END
 
 SELECT_ENTRY: PROCEDURE
