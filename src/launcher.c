@@ -66,7 +66,6 @@ SCREEN_ENTRY *screen_entries = (SCREEN_ENTRY *) (cart.ROM + 0x2000);
 INFO_ENTRY *info_entries = (INFO_ENTRY *) (cart.ROM + 0x7000);
 
 int filefrom = 0, fileto = 0;
-volatile char cmd = 0;
 
 int num_dir_entries = 0;         // how many entries in the current directory
 int num_info_pages  = 0;         // Total number of infopage
@@ -392,7 +391,7 @@ void RunLauncher() {
    gpio_put(LED, true);
 
    while (1) {
-      cmd = cart.RAM[CMD_ADDR];
+      char cmd = cart.RAM[CMD_ADDR];
 
       if (cmd > 0) {
 
@@ -400,10 +399,10 @@ void RunLauncher() {
          cart.RAM[CMD_ADDR] = 0;
          cart.RAM[ERROR_ADDR] = 0;
 
-         printf("cmd: %d\n", cmd);
+         printf("Received command %d\n", cmd);
 
          switch (cmd) {
-            case 1:            // intialise file list with current path
+            case 1:            // initialise file list with current path
                IntyMenu(READ_PAGE);
                break;
             case 2:            // select entry
@@ -457,10 +456,14 @@ void RunLauncher() {
                         // successfully parsed info entries for the selected game, now make them available to launcher
                         info_list(info_entries, 0);
                      }
+                     if (num_info_pages < 0) {
+                        num_info_pages = 0;   // in case of error set number of info pages to 0 to avoid showing wrong info
+                     }
                   }
-                  if (num_info_pages < 0) {
-                     num_info_pages = 0;   // in case of error set number of info pages to 0 to avoid showing wrong info
+                  else {
+                     printf("E: Information requested for directory entry (%d)\n",entry_num);
                   }
+
                   cart.RAM[INFO_DISP_ADDR] = cur_info_page;   // default to show first info entry in the list
                   cart.RAM[INFO_NUM_ADDR] = num_info_pages;   // now launcher can display the vars entries
                }
