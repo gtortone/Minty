@@ -88,7 +88,9 @@
     DEF FN PI_GET_FTO    = ((PEEK(ADDRESS_fto)    * 256) + PEEK(ADDRESS_fto+1))
     DEF FN PI_GET_FTOTAL = ((PEEK(ADDRESS_ftotal) * 256) + PEEK(ADDRESS_ftotal+1))
     DEF FN PI_GET_HW     = PEEK(ADDRESS_hw)
-
+    DEF FN PI_SET_TVMODE(mode) = POKE(ADDRESS_TVMODE),mode
+    DEF FN PI_SET_ECS_PRES(presence) = POKE(ADDRESS_ECS_PRES),presence
+    
     ' Display splash screen
 	MODE 0,0,2,0,2
 	WAIT

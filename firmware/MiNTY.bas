@@ -239,27 +239,27 @@ MENU_LOOP:
 
     Input = CONT
 
-    ' SELECT
-    IF (Input=$28) THEN ' ENTER
-        Debounce = DEBOUNCE_DELAY
-        GOSUB SELECT_ENTRY
-        GOTO START
-    END IF
-
-    ' UPDIR
-    IF (Input=$88) THEN ' CLEAR
-        Debounce = DEBOUNCE_DELAY
-        GOSUB UP_DIRECTORY
-        GOTO START
-    END IF    
-    
-    ' HELP
-    IF (Input=$81) THEN ' KEYPAD_1
-        Debounce = DEBOUNCE_DELAY
-        GOSUB HELP_SCREEN
-        GOTO START
-    END IF
-
+    SELECT CASE INPUT
+        CASE $28
+            Debounce = DEBOUNCE_DELAY:GOSUB SELECT_ENTRY:GOTO START
+        CASE $41
+            Debounce = DEBOUNCE_DELAY:GOSUB INFO_SCREEN:GOTO START
+        CASE $81
+            Debounce = DEBOUNCE_DELAY:GOSUB HELP_SCREEN:GOTO START
+        CASE $88
+            Debounce = DEBOUNCE_DELAY:GOSUB UP_DIRECTORY:GOTO START
+        CASE $60
+            IF (#f_to < #f_total) THEN Debounce = DEBOUNCE_DELAY:GOSUB NEXT_PAGE:GOTO START
+        CASE $C0
+            IF (#f_to < #f_total) THEN Debounce = DEBOUNCE_DELAY:GOSUB NEXT_PAGE:GOTO START
+        CASE $24
+            IF (#f_to < #f_total) THEN Debounce = DEBOUNCE_DELAY:GOSUB NEXT_PAGE:GOTO START
+        CASE $A0
+            IF (#f_from > 0) THEN Debounce = DEBOUNCE_DELAY:GOSUB PREVIOUS_PAGE:GOTO START
+        CASE $84
+            IF (#f_from > 0) THEN Debounce = DEBOUNCE_DELAY:GOSUB PREVIOUS_PAGE:GOTO START
+    END SELECT
+  
     ' DOWN
     IF (Input=$48 OR Input=$01 OR Input=$11 OR Input=$19 OR Input=$09 OR Input=$03 OR Input=$13 OR Input=$12) THEN      'KEYPAD_0 or S/SE/SW
         Debounce = DEBOUNCE_DELAY
@@ -291,21 +291,6 @@ MENU_LOOP:
         END IF
     END IF
 
-    ' PAGE_DOWN
-    IF ((Input=$60 or Input=$C0 or Input=$24) AND (#f_to < #f_total)) THEN     'b-left or b-right or KEYPAD_9
-        Debounce = DEBOUNCE_DELAY
-        GOSUB NEXT_PAGE
-        GOTO START
-    END IF
- 
-    ' PAGE_UP
-    IF ((Input=$A0 OR Input=$84) AND (#f_from > 0)) THEN    'b-top or KEYPAD_7
-        Debounce = DEBOUNCE_DELAY
-        Selected_Entry = 0
-        GOSUB PREVIOUS_PAGE
-        GOTO START
-    END IF
-
     ' Not supported anymore
     ' CHANGE STORAGE DEVICE
     'IF (Input=$21 and PI_HAS_SD=1) THEN     ' KEYPAD_3
@@ -314,13 +299,6 @@ MENU_LOOP:
     '    GOSUB CHANGE_DEVICE
     '    GOTO START
     'END IF
-
-    ' DISPLAY FILE INFORMATION
-    IF (Input=$41) THEN     ' KEYPAD_2
-        Debounce = DEBOUNCE_DELAY
-        GOSUB INFO_SCREEN
-        GOTO START
-    END IF
    
     GOTO MENU_LOOP
 
@@ -623,7 +601,7 @@ DISPLAY_SLIDER: PROCEDURE
         I = ((79 * #f_from) / #f_total)
         J = ((79 * #f_to)   / #f_total)
         IF I > 71   THEN I = 71
-        IF J < I+7  THEN J = I+7
+        IF J < I+8  THEN J = I+8
         K = J-I
 
         IF K > 64 THEN
@@ -710,8 +688,7 @@ DISPLAY_SLIDER: PROCEDURE
 
 Icons:
     DATA $E000,$E2FE,$8282,$00FE
-DATA $3800,$D644,$54CE,$0038
-'    DATA $4438,$CED6,$54D6,$0038
+    DATA $3800,$D644,$54CE,$0038
 
 Slider:
     DATA $7C7C,$7C7C,$7C7C,$7C7C
