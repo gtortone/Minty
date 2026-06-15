@@ -34,15 +34,13 @@
    #define ECS_BUF_SIZE    32
    extern PSG* psg0;
    extern const uint8_t ECS_LUT[16];
+   uint8_t ayRead = 0;
    volatile uint8_t ayWrite = 0;
-   volatile uint8_t ayRead = 0;
    volatile uint8_t ayRegister[ECS_BUF_SIZE] = {0};
    volatile uint8_t ayValue[ECS_BUF_SIZE] = {0};
 #endif
 
 extern Cartridge cart;     // main data structure for cart emulation
-
-unsigned char busLookup[8];
 
 volatile uint16_t addrInCopy;
 
@@ -51,19 +49,18 @@ extern struct mapHole holes[NSLOTS];
 
 __attribute__((optimize("O3")))
 void __time_critical_func(core1_main()) {
-   volatile unsigned int lastBusState, busState;
-   volatile uint16_t addrIn;
-   volatile uint16_t dataOut;
-   volatile uint32_t dataIn = 0;
-   volatile unsigned char busBit;
-   volatile bool deviceAddress = false;
-   volatile uint8_t curPageArr[16];        
-   volatile uint8_t seg = 0;
-   volatile uint32_t romaddr;
-   volatile uint8_t idx;
+   unsigned int gpio_snapshot, busState;
+   uint16_t addrIn = 0;
+   uint16_t dataOut = 0;
+   uint32_t dataIn = 0;
+   bool deviceAddress = false;
+   uint8_t curPageArr[16];        
+   uint8_t seg = 0;
+   uint32_t romaddr;
+   uint8_t idx;
 
 #if CONFIG_JLP
-   volatile uint16_t crc = 0;
+   uint16_t crc = 0;
 #endif
 
    multicore_lockout_victim_init();
@@ -71,7 +68,7 @@ void __time_critical_func(core1_main()) {
    sleep_ms(480);
 
    busState = BUS_NACT;
-   lastBusState = BUS_NACT;
+   gpio_snapshot = 0;
 
    dataOut = 0;
 
@@ -85,23 +82,20 @@ void __time_critical_func(core1_main()) {
    memset((uint8_t *) curPageArr, 0, sizeof(curPageArr));
 
    while (1) {
-      // Wait for the bus state to change
 
+      // Wait for the bus state to change
       do {
-      } while (!((sio_hw->gpio_in ^ lastBusState) & BUS_STATE_MASK));
+      } while (!((sio_hw->gpio_in ^ gpio_snapshot) & BUS_STATE_MASK));
       
       // We detected a change, but reread the bus state to make sure that all three pins have settled
-      lastBusState = sio_hw->gpio_in;
+      gpio_snapshot = sio_hw->gpio_in;
 
-      busState = (bool)(lastBusState & BC1_MASK) << 2 |
-                  (bool)(lastBusState & BC2_MASK) << 1 |
-                  (bool)(lastBusState & BDIR_MASK);
-
-      busBit = busLookup[busState];
+      busState = (bool)(gpio_snapshot & BC1_MASK) << 2 |
+                 (bool)(gpio_snapshot & BC2_MASK) << 1 |
+                 (bool)(gpio_snapshot & BDIR_MASK);
 
       // Avoiding switch statements here because timing is critical and needs to be deterministic
-      if (!busBit) {
-         
+      if (busState == BUS_DTB) {     
          // -----------------------
          // DTB
          // -----------------------
@@ -118,9 +112,7 @@ void __time_critical_func(core1_main()) {
             SET_DATA_MODE_IN;
          }
       } else {
-         busBit >>= 1;
-         if (!busBit) {
-            
+         if ((busState == BUS_ADAR) || (busState == BUS_BAR)) {
             // -----------------------
             // BAR, ADAR
             // -----------------------
@@ -137,7 +129,7 @@ void __time_critical_func(core1_main()) {
                }
             }
 
-            /// ELSE is BAR   
+            // ELSE is BAR   
             // Prefetch data here because there won't be enough time to get it during DTB.
             // However, we can't take forever because of all the time we had to wait for
             // the address to appear on the bus.
@@ -152,27 +144,25 @@ void __time_critical_func(core1_main()) {
             while (sio_hw->gpio_in & BDIR_MASK) ; 
 
             addrIn = sio_hw->gpio_in & 0xFFFF;
-            addrInCopy = addrIn;
-
             deviceAddress = false;
 
 #if CONFIG_JLP
+            // addrInCopy is to pass address to other core for JLP functions processing
+            addrInCopy = addrIn;
+            
             // check for JLP support and accelerators/RAM enabled 
             if ( cart.JLPSupport ) {
-
                   if ( (cart.JLPAccel || cart.JLPFlash) && ((addrIn >= 0x8000) && (addrIn <= 0x9FFF)) ) {
-
                      if ((cart.JLPFlash) && (addrIn == 0x8023)) {
                         dataOut = 0;
                         deviceAddress = true;
-                     } else if ((cart.JLPFlash) && addrIn == 0x8024) {
+                     } else if ((cart.JLPFlash) && (addrIn == 0x8024)) {
                         dataOut = (cart.JLPFlashSize * JLP_FLASH_ROWS_PER_SECTOR) - 1;
                         deviceAddress = true;
                      } else {
                         dataOut = cart.RAM[addrIn - 0x8000];
                         deviceAddress = true;
                      }
-
                      continue;
                   }
             } 
@@ -248,8 +238,7 @@ void __time_critical_func(core1_main()) {
             }
 
          } else {
-            busBit >>= 1;
-            if (!busBit) {
+            if (busState == BUS_DWS) {
 
                // -----------------------
                // DWS WRITE
@@ -315,17 +304,15 @@ void __time_critical_func(core1_main()) {
 #if CONFIG_JLP
                   }
 #endif
-
-               } else {
-                  
-                  // -----------------------
-                  // NACT, IAB, DW, INTAK
-                  // -----------------------
-
-                  // reconnect to bus
-                  SET_DATA_MODE_IN;
                }
+            }  
+            else {
+               // -----------------------
+               // NACT, IAB, DW, INTAK
+               // -----------------------
 
+               // reconnect to bus
+               SET_DATA_MODE_IN;
             }
          }
       }
@@ -544,16 +531,6 @@ void RunGame() {
 
 void Inty_cart_main() {
    printf("Inty_cart_main\n");
-
-   // Initialize the bus state variables
-   busLookup[BUS_NACT] = 4;     // 100
-   busLookup[BUS_BAR] = 1;      // 001
-   busLookup[BUS_IAB] = 4;      // 100
-   busLookup[BUS_DWS] = 2;      // 010   // test without dws handling
-   busLookup[BUS_ADAR] = 1;     // 001
-   busLookup[BUS_DW] = 4;       // 100
-   busLookup[BUS_DTB] = 0;      // 000
-   busLookup[BUS_INTAK] = 4;    // 100
 
    multicore_launch_core1(core1_main);
 
