@@ -60,9 +60,9 @@ int volumeId = 1;    // default SD storage
 #endif
 
 // recycle cartridge ROM to allocate temporary buffers
-// start from 0x4000 to allow launcher ROM size <= 16Kb
+// start from 0x4000 to allow launcher ROM size up to 16Kb
 SCREEN_ENTRY *screen_entries = (SCREEN_ENTRY *) (cart.ROM + 0x2000);
-// buffer for [vars] section of cfg file to pass to INTY launcher
+// buffer for information data to pass to INTY launcher
 INFO_ENTRY *info_entries = (INFO_ENTRY *) (cart.ROM + 0x7000);
 
 int filefrom = 0, fileto = 0;
@@ -336,6 +336,9 @@ void RunLauncher() {
    cart.RAM[BOARD_ID_ADDR] = BOARD_ID;
    cart.RAM[STATUS_ADDR] = 1;      // block cart access until initialisation is done
    cart.RAM[CMD_ADDR] = 0;
+   cart.RAM[MSIZE_HI_ADDR] = ((MAX_ROM_SIZE*2/1024)   & 0xFF00) >> 8;  // MSB
+   cart.RAM[MSIZE_LO_ADDR] = ((MAX_ROM_SIZE*2/1024)   & 0x00FF);       // LSB
+   cart.RAM[ECS_VOL_ADDR] = 0xFF; // TO DO : retrieve from cfg file
 
    // Start Launcher on INTY side
    sleep_ms(200);

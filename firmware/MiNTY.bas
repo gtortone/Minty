@@ -28,12 +28,15 @@
     DIM Selected_Entry, Max_Entry
     DIM #Disp_Color, #tmp
     DIM SelEnt_Start,SelEnt_Length
+    DIM Volume,#MaxSize
 
 	CONST DEBOUNCE_DELAY  = 5					' Number of cycles to detect button press
 
     ' RAM addresses for exchanges with PI
     CONST ADDRESS_TVMODE    = $8100
     CONST ADDRESS_ECS_PRES  = $8101
+    CONST ADDRESS_MaxSize   = $8102 ' Max supported ROM size in kB (16 bits)
+    CONST ADDRESS_ECS_VOL   = $8104
     CONST ADDRESS_status    = $8119
     CONST ADDRESS_dev       = $8120
     CONST ADDRESS_has_sd    = $8121
@@ -52,6 +55,7 @@
     CONST ADDRESS_ftotal    = $9032 ' Total number of entries (16 bits)
     CONST ADDRESS_path      = $9100
     CONST ADDRESS_section   = $9300
+    
     ' PI current status
     CONST PI_STAT_BUZZY     = 1
     CONST PI_STAT_READY     = 0
@@ -110,6 +114,9 @@
     DEF FN PI_GET_INFO_DISP = PEEK(ADDRESS_INFO_DISP)
     DEF FN PI_SET_TVMODE(mode) = POKE(ADDRESS_TVMODE),mode
     DEF FN PI_SET_ECS_PRES(presence) = POKE(ADDRESS_ECS_PRES),presence
+    DEF FN PI_SET_ECS_VOL(volume) = POKE(ADDRESS_ECS_VOL),volume
+    DEF FN PI_GET_ECS_VOL = PEEK(ADDRESS_ECS_VOL)
+    DEF FN PI_GET_MAXSIZE = ((PEEK(ADDRESS_MaxSize) * 256) + PEEK(ADDRESS_MaxSize+1))
 
      ' Display splash screen
 	MODE 0,0,2,0,2
@@ -240,6 +247,8 @@ MENU_LOOP:
     Input = CONT
 
     SELECT CASE INPUT
+        CASE $21
+            Debounce = DEBOUNCE_DELAY:GOSUB SETTINGS_SCREEN:GOTO START
         CASE $28
             Debounce = DEBOUNCE_DELAY:GOSUB SELECT_ENTRY:GOTO START
         CASE $41
@@ -291,28 +300,11 @@ MENU_LOOP:
         END IF
     END IF
 
-    ' Not supported anymore
-    ' CHANGE STORAGE DEVICE
-    'IF (Input=$21 and PI_HAS_SD=1) THEN     ' KEYPAD_3
-    '    Debounce = DEBOUNCE_DELAY
-    '    Selected_Entry = 0
-    '    GOSUB CHANGE_DEVICE
-    '    GOTO START
-    'END IF
-   
     GOTO MENU_LOOP
 
 '
 ' PROCEDURES
 '
-' Not supported anymore
-'CHANGE_DEVICE: PROCEDURE
-'    PI_SELECTDEVICE(1-PI_CURRENTDEVICE)    'switch device
-'    PI_CMD(CMD_SWITCHDEVICE)
-'    PlaySnd(InputSound)
-'    GOSUB WAIT_CARD_ANSWER
-'    END
-
 NEXT_PAGE: PROCEDURE
     PI_CMD(CMD_NEXTPAGE)
     PlaySnd(InputSound)
@@ -324,6 +316,45 @@ PREVIOUS_PAGE: PROCEDURE
     PI_CMD(CMD_PREVIOUSPAGE)
     PlaySnd(InputSound)
     GOSUB WAIT_CARD_ANSWER
+    END
+
+SETTINGS_SCREEN: PROCEDURE
+    PlaySnd(InputSound)
+    CLS
+    ResetSprite(1)
+    ResetSprite(2)
+    ResetSprite(3)
+    SCREEN Title_cards,0,0,8,1,8
+    SPRITE 4,  8 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
+    SPRITE 5, 24 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
+    SPRITE 6, 40 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
+    SPRITE 7, 56 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
+    PRINT AT SCREENPOS(12, 0) COLOR CS_YELLOW, "Settings"
+
+    Volume = PI_GET_ECS_VOL
+    PRINT AT SCREENPOS( 1, 2)  COLOR CS_TAN, "Volume"
+    PRINT AT SCREENPOS(16, 2) COLOR CS_DARKGREEN,<3>Volume
+    
+    PRINT AT SCREENPOS( 1, 3)  COLOR CS_TAN, "Force ECS emu"
+    PRINT AT SCREENPOS(16, 3) COLOR CS_DARKGREEN,"YES"
+    
+    PRINT AT SCREENPOS( 1, 4)  COLOR CS_TAN, "Force JLP emu"
+    PRINT AT SCREENPOS(16, 4) COLOR CS_DARKGREEN," NO"
+
+    PRINT AT SCREENPOS( 1, 8) COLOR CS_TAN, "Max ROM size"
+    #MaxSize = PI_GET_MAXSIZE
+    PRINT AT SCREENPOS(15, 8) COLOR CS_TAN, <3>#MaxSize,"kB"
+
+    PRINT AT SCREENPOS( 2,10) COLOR CS_YELLOW, "<ENTER>  to save"
+    PRINT AT SCREENPOS( 2,11) COLOR CS_YELLOW, "<CLEAR>  to exit"
+    WHILE (CONT <> $88)  'CLEAR
+        IF FRAME%8 = 0 THEN
+            WaveFrame = (WaveFrame+1)%4
+            DEFINE 6,1,VARPTR Title_wave(WaveFrame * 4)
+        END IF
+        WAIT
+    WEND
+    Debounce = DEBOUNCE_DELAY
     END
 
 HELP_SCREEN: PROCEDURE
@@ -342,11 +373,8 @@ HELP_SCREEN: PROCEDURE
     PRINT AT SCREENPOS(1,3) COLOR CS_TAN, "0 or DN      Go Dn"
     PRINT AT SCREENPOS(1,4) COLOR CS_TAN, "7 or B-UP  Page Up"
     PRINT AT SCREENPOS(1,5) COLOR CS_TAN, "9 or B-DN  Page Dn"
-    ' Not supported anymore
-    'IF PI_HAS_SD=1 THEN
-    '    PRINT AT SCREENPOS(0,6) COLOR CS_TAN, "3:         sw FL/SD"
-    'END IF
-    PRINT AT SCREENPOS(1,7) COLOR CS_TAN, "2        File Info"
+    PRINT AT SCREENPOS(1,6) COLOR CS_TAN, "2        File Info"
+    PRINT AT SCREENPOS(1,7) COLOR CS_TAN, "3         Settings"    
     PRINT AT SCREENPOS(1,8) COLOR CS_TAN, "CLEAR       Dir Up"
     PRINT AT SCREENPOS(1,9) COLOR CS_TAN, "ENTER       Select"
     PRINT AT SCREENPOS(3,11) COLOR CS_YELLOW, "<CLR>  to exit"

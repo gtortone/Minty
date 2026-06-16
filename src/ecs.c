@@ -34,14 +34,15 @@ const uint8_t ECS_LUT[16] = {
 };
 
 bool ay_callback(repeating_timer_t *rt) {
+   uint8_t AudioVolume = 0xFF;
+   
    PSG_calc(psg0);
+   // mix 3 channels, apply 8 bits volume control, normalise and map to 10 bits output
+   uint16_t EcsAudioOut = ( abs((int32_t)psg0->ch_out[0] + 
+                                (int32_t)psg0->ch_out[1] + 
+                                (int32_t)psg0->ch_out[2]) * (int32_t)(AudioVolume + 1) / 3 ) >> 10;
 
-   uint16_t leftAudio = abs(
-         (int32_t)psg0->ch_out[0] + 
-         (int32_t)psg0->ch_out[1] + 
-         (int32_t)psg0->ch_out[2]) * PWM_WRAP >> 14;
-
-   pwm_set_gpio_level(ECS_AUDIO, leftAudio);
+   pwm_set_gpio_level(ECS_AUDIO, EcsAudioOut);
 
    return true;
 }

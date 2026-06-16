@@ -127,64 +127,28 @@
     IF (NTSC <>0) THEN PI_SET_TVMODE(isNTSC) ELSE PI_SET_TVMODE(isPAL)
     IF (ECS.AVAILABLE <> 0) THEN PI_SET_ECS_PRES(ECS_Present) ELSE PI_SET_ECS_PRES(ECS_Absent)
     
-    ' Load waiting animation frames into GRAM
     CLS
-    DEFINE 0,10,In_Progress
-    WAIT
-    DEFINE 10,10,VARPTR In_Progress(40)
     WAIT
 
     ' Get current directory informations
     #f_from  = PI_GET_FFROM
     #f_to    = PI_GET_FTO
-    #f_total = PI_GET_FTOTAL
 
     IF #f_from < #f_to THEN
         ' RUN GAME
-        Selected_Entry=0
-        PI_SELECTENTRY(Selected_Entry)
+        PI_SELECTENTRY(0)
         PI_CMD(CMD_RUNFILE)
-		I = 0
-		WHILE PI_STATUS = PI_STAT_BUZZY
-			SPRITE 0, 84 + VISIBLE, 56 + ZOOMY2, SPR00 + I*8 + SPR_RED
-			I = (I+1)
-			IF I=20 THEN I=0
-			WAIT:WAIT
-		WEND
-		ResetSprite(0)
-        ' Infinite loop till getting reseted by card
-        ASM InfiniteLoop:
-        ASM    B InfiniteLoop
     ELSE
         ' No file on card => display error message
-        CLS
         PRINT AT SCREENPOS(2,6) COLOR CS_RED, "NO FILE ON CARD"
     END IF
+    ' Infinite loop till getting reseted by card
+    ASM InfiniteLoop:
+    ASM    B InfiniteLoop
+
 '
 ' DATA
 '
     INCLUDE "Pinty_logo.bas"
     INCLUDE "text.bas"
     INCLUDE "Sounds.bas"
-
-In_Progress:
-    DATA $002C,$0000,$0000,$0000
-    DATA $0214,$0000,$0000,$0000
-    DATA $0208,$0001,$0000,$0000
-    DATA $0004,$0101,$0000,$0000
-    DATA $0200,$0100,$0001,$0000
-    DATA $0000,$0001,$0101,$0000
-    DATA $0000,$0100,$0100,$0002
-    DATA $0000,$0000,$0001,$0402
-    DATA $0000,$0000,$0100,$0C00
-    DATA $0000,$0000,$0000,$1802
-    DATA $0000,$0000,$0000,$3400
-    DATA $0000,$0000,$0000,$2840
-    DATA $0000,$0000,$8000,$1040
-    DATA $0000,$0000,$8080,$2000
-    DATA $0000,$8000,$0080,$0040
-    DATA $0000,$8080,$8000,$0000
-    DATA $4000,$0080,$0080,$0000
-    DATA $4020,$8000,$0000,$0000
-    DATA $0030,$0080,$0000,$0000
-    DATA $4018,$0000,$0000,$0000
