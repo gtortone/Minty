@@ -103,6 +103,11 @@ void ChangeDirectory(int entry_num) {
 
 int LoadGame(int entry_num) {
 
+   // get intellivision details for ECS emulation
+   tv_mode = cart.RAM[TV_MODE_ADDR];
+   ecs_present = cart.RAM[ECS_PRES_ADDR];
+   ecs_volume = cart.RAM[ECS_VOL_ADDR];
+
 #if CONFIG_SD_STORAGE
    // save config file only on SD 
    if (volumeId == 1) {
@@ -112,7 +117,7 @@ int LoadGame(int entry_num) {
 
       // save ECS audio volume level
 #if CONFIG_ECS_AUDIO
-      cfg.ecs_volume = cart.RAM[ECS_VOL_ADDR];
+      cfg.ecs_volume = 255 - ecs_volume;
 #else
       cfg.ecs_volume = 255;
 #endif
@@ -129,10 +134,7 @@ int LoadGame(int entry_num) {
    }
 #endif
 
-   // get intellivision details for ECS emulation
-   tv_mode = cart.RAM[TV_MODE_ADDR];
-   ecs_present = cart.RAM[ECS_PRES_ADDR];
-   ecs_volume = cart.RAM[ECS_VOL_ADDR];
+
 
    int result = load_file_by_id(screen_entries[entry_num].id, curPath);
    if (result != 0) {
@@ -384,7 +386,8 @@ void RunLauncher() {
             if (st.type & VFS_TYPE_DIR) 
                strcpy(curPath, cfg.lastPath);
 
-            cart.RAM[ECS_VOL_ADDR] = cfg.ecs_volume; 
+            ecs_volume = 255 - cfg.ecs_volume; 
+            cart.RAM[ECS_VOL_ADDR] = ecs_volume;
          }
 
          vfs_close(cfgfile);
