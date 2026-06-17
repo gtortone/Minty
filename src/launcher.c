@@ -110,6 +110,13 @@ int LoadGame(int entry_num) {
       // save last path to config file
       strcpy(cfg.lastPath, curPath);
 
+      // save ECS audio volume level
+#if CONFIG_ECS_AUDIO
+      cfg.ecs_volume = cart.RAM[ECS_VOL_ADDR];
+#else
+      cfg.ecs_volume = 255;
+#endif
+
       sprintf(filename, "/sd/%s", CONFIG_FILENAME);
       printf("save cfg file: %s\n", filename);
 
@@ -376,6 +383,8 @@ void RunLauncher() {
             vfs_stat(cfg.lastPath, &st);
             if (st.type & VFS_TYPE_DIR) 
                strcpy(curPath, cfg.lastPath);
+
+            cart.RAM[ECS_VOL_ADDR] = cfg.ecs_volume; 
          }
 
          vfs_close(cfgfile);
