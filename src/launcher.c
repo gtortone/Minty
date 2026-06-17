@@ -47,9 +47,10 @@ extern Cartridge cart;     // main data structure for cart emulation
 extern struct mapEntry slots[NSLOTS];
 extern struct mapHole holes[NSLOTS];
 
-// concole configurqtion
+// concole configuration
 uint8_t tv_mode;      // 0: PAL, 1: NTSC
 uint8_t ecs_present;  // 0: ECS absent, 1: ECS present
+uint8_t ecs_volume = 0xFF;   
 
 char curPath[512] = "";
 
@@ -60,9 +61,9 @@ int volumeId = 1;    // default SD storage
 #endif
 
 // recycle cartridge ROM to allocate temporary buffers
-// start from 0x4000 to allow launcher ROM size <= 16Kb
+// start from 0x4000 to allow launcher ROM size up to 16Kb
 SCREEN_ENTRY *screen_entries = (SCREEN_ENTRY *) (cart.ROM + 0x2000);
-// buffer for [vars] section of cfg file to pass to INTY launcher
+// buffer for information data to pass to INTY launcher
 INFO_ENTRY *info_entries = (INFO_ENTRY *) (cart.ROM + 0x7000);
 
 int filefrom = 0, fileto = 0;
@@ -124,6 +125,7 @@ int LoadGame(int entry_num) {
    // get intellivision details for ECS emulation
    tv_mode = cart.RAM[TV_MODE_ADDR];
    ecs_present = cart.RAM[ECS_PRES_ADDR];
+   ecs_volume = cart.RAM[ECS_VOL_ADDR];
 
    int result = load_file_by_id(screen_entries[entry_num].id, curPath);
    if (result != 0) {
@@ -336,6 +338,11 @@ void RunLauncher() {
    cart.RAM[BOARD_ID_ADDR] = BOARD_ID;
    cart.RAM[STATUS_ADDR] = 1;      // block cart access until initialisation is done
    cart.RAM[CMD_ADDR] = 0;
+   cart.RAM[MSIZE_HI_ADDR] = ((MAX_ROM_SIZE*2/1024)   & 0xFF00) >> 8;  // MSB
+   cart.RAM[MSIZE_LO_ADDR] = ((MAX_ROM_SIZE*2/1024)   & 0x00FF);       // LSB
+   cart.RAM[ECS_VOL_ADDR] = ecs_volume;
+   cart.RAM[JLP_EMU_ADDR] = CONFIG_JLP;       // JLP emulation available
+   cart.RAM[ECS_EMU_ADDR] = CONFIG_ECS_AUDIO; // ECS EMU available
 
    // Start Launcher on INTY side
    sleep_ms(200);

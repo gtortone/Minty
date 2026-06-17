@@ -6,12 +6,12 @@ typedef struct {
    unsigned int id;
    char isDir;
    char filename[64];            // limit filename to 64 chars
-} SCREEN_ENTRY;                  // 69 bytes per entry, 512 entries max = 35Kb
+} SCREEN_ENTRY;                  // 69 bytes per entry, 512 entries max = 34Kb (40kB allocated)
 
 typedef struct {
    unsigned int section;
    char line[10][20];
-} INFO_ENTRY;                   // 200 bytes per page + 4 bytes for section name
+} INFO_ENTRY;                   // 204 bytes per page (44kb minimum allocated allowing for 220 pages) 
 
 int entry_compare(const void *p1, const void *p2);
 char *get_filename_ext(char *filename);

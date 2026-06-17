@@ -4,6 +4,11 @@
 // Inty RAM addresses shared with cart firmware
 #define TV_MODE_ADDR    0x0100      // 0: PAL, 1: NTSC
 #define ECS_PRES_ADDR   0x0101      // 0: ECS absent, 1: ECS present
+#define MSIZE_HI_ADDR   0x0102      // high byte of maximum ROM size
+#define MSIZE_LO_ADDR   0x0103      // low byte of maximum ROM size
+#define ECS_VOL_ADDR    0x0104      // ECS PSG emulation sound output volume
+#define JLP_EMU_ADDR    0x0105      // JLP emulation available
+#define ECS_EMU_ADDR    0x0106      // ECS EMU available
 #define STATUS_ADDR     0x0119      // 0: Pi is ready, 1: Pi is Buzzy
 #define DEV_ADDR        0x0120      // 0: flash, 1: SD
 #define HAS_SD_ADDR     0x0121      // 0: no SD support, 1: SD support

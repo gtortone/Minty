@@ -28,6 +28,7 @@ extern struct mapEntry slots[NSLOTS];
 
 extern uint8_t tv_mode;      // 0: PAL, 1: NTSC
 extern uint8_t ecs_present;  // 0: ECS absent, 1: ECS present
+extern uint8_t ecs_volume;
 
 // RAM base address for launcher 
 const unsigned int base = 0x17F;
@@ -291,7 +292,7 @@ int load_cfg(char *filename) {
             if ( sscanf(line, "ecs = %d", &ecs_value) == 1 ) {
                if (ecs_value == 1) {
                   cart.ECSSupport = true;
-                  init_ecs(tv_mode);
+                  init_ecs(tv_mode, ecs_volume);
                   printf("ECS support found\n");
                }
             }

@@ -16,7 +16,7 @@ text_bitmaps_0:
 	DATA $08F8,$E600,$0A03,$FF0A
 	DATA $0818,$CE08,$0909,$1E09
 
-text_bitmaps_1:
+'text_bitmaps_1:
 	DATA $9942,$A1A1,$4299,$003C
 	DATA $4949,$1109,$4921,$0078
 	DATA $2424,$2120,$2422,$00C7
@@ -34,7 +34,7 @@ text_bitmaps_1:
 	DATA $0008,$03E6,$0A0A,$00FF
 	DATA $0808,$09CE,$0909,$001E
 
-text_bitmaps_2:
+'text_bitmaps_2:
 	DATA $A199,$99A1,$3C42,$0000
 	DATA $0949,$2111,$7849,$0000
 	DATA $2024,$2221,$C724,$0000
@@ -52,7 +52,7 @@ text_bitmaps_2:
 	DATA $E600,$0A03,$FF0A,$0000
 	DATA $CE08,$0909,$1E09,$0000
 
-text_bitmaps_3:
+'text_bitmaps_3:
 	DATA $A1A1,$4299,$003C,$0000
 	DATA $1109,$4921,$0078,$3000
 	DATA $2120,$2422,$00C7,$0000
@@ -70,7 +70,7 @@ text_bitmaps_3:
 	DATA $03E6,$0A0A,$00FF,$6000
 	DATA $09CE,$0909,$001E,$0000
 
-text_bitmaps_4:
+'text_bitmaps_4:
 	DATA $99A1,$3C42,$0000,$0000
 	DATA $2111,$7849,$0000,$1030
 	DATA $2221,$C724,$0000,$0000
@@ -88,7 +88,7 @@ text_bitmaps_4:
 	DATA $0A03,$FF0A,$0000,$2060
 	DATA $0909,$1E09,$0000,$0000
 
-text_bitmaps_5:
+'text_bitmaps_5:
 	DATA $4299,$003C,$0000,$0000
 	DATA $4921,$0078,$3000,$1010
 	DATA $2422,$00C7,$0000,$0000
@@ -106,7 +106,7 @@ text_bitmaps_5:
 	DATA $0A0A,$00FF,$6000,$2020
 	DATA $0909,$001E,$0000,$0000
 
-text_bitmaps_6:
+'text_bitmaps_6:
 	DATA $3C42,$0000,$0000,$0000
 	DATA $7849,$0000,$1030,$1C10
 	DATA $C724,$0000,$0000,$7000
@@ -124,7 +124,7 @@ text_bitmaps_6:
 	DATA $FF0A,$0000,$2060,$AE20
 	DATA $1E09,$0000,$0000,$0000
 
-text_bitmaps_7:
+'text_bitmaps_7:
 	DATA $003C,$0000,$0000,$0000
 	DATA $0078,$3000,$1010,$121C
 	DATA $00C7,$0000,$0000,$0970
@@ -142,7 +142,7 @@ text_bitmaps_7:
 	DATA $00FF,$6000,$2020,$28AE
 	DATA $001E,$0000,$0000,$0000
 
-text_bitmaps_8:
+'text_bitmaps_8:
 	DATA $0000,$0000,$0000,$0000
 	DATA $0000,$1030,$1C10,$1212
 	DATA $0000,$0000,$7000,$3809
@@ -160,7 +160,7 @@ text_bitmaps_8:
 	DATA $0000,$2060,$AE20,$3028
 	DATA $0000,$0000,$0000,$0000
 
-text_bitmaps_9:
+'text_bitmaps_9:
 	DATA $0000,$0000,$0000,$0000
 	DATA $3000,$1010,$121C,$1212
 	DATA $0000,$0000,$0970,$4838
@@ -178,7 +178,7 @@ text_bitmaps_9:
 	DATA $6000,$2020,$28AE,$2830
 	DATA $0000,$0000,$0000,$0000
 
-text_bitmaps_10:
+'text_bitmaps_10:
 	DATA $0000,$0000,$0000,$0000
 	DATA $1030,$1C10,$1212,$3C12
 	DATA $0000,$7000,$3809,$7D48
