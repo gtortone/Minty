@@ -11,8 +11,10 @@
 
 #if CONFIG_ECS_AUDIO
 
+
 static repeating_timer_t timer;
 PSG* psg0;
+uint8_t ecs_AudioVolume;
 
 const uint8_t ECS_LUT[16] = {
    0x00,
@@ -33,14 +35,12 @@ const uint8_t ECS_LUT[16] = {
    0x0F
 };
 
-bool ay_callback(repeating_timer_t *rt) {
-   uint8_t AudioVolume = 0xFF;
-   
+bool ay_callback(repeating_timer_t *rt) {   
    PSG_calc(psg0);
    // mix 3 channels, apply 8 bits volume control, normalise and map to 10 bits output
    uint16_t EcsAudioOut = ( abs((int32_t)psg0->ch_out[0] + 
                                 (int32_t)psg0->ch_out[1] + 
-                                (int32_t)psg0->ch_out[2]) * (int32_t)(AudioVolume + 1) / 3 ) >> 10;
+                                (int32_t)psg0->ch_out[2]) * (int32_t)(ecs_AudioVolume + 1) / 3 ) >> 10;
 
    pwm_set_gpio_level(ECS_AUDIO, EcsAudioOut);
 
@@ -49,7 +49,7 @@ bool ay_callback(repeating_timer_t *rt) {
 
 #endif
 
-void init_ecs(uint8_t tv_mode) {
+void init_ecs(uint8_t tv_mode, uint8_t volume) {
 
 #if CONFIG_ECS_AUDIO
    gpio_set_function(ECS_AUDIO, GPIO_FUNC_PWM);
@@ -60,6 +60,7 @@ void init_ecs(uint8_t tv_mode) {
    pwm_config_set_clkdiv(&cfg, 1.0f);
    pwm_config_set_wrap(&cfg, PWM_WRAP);
    pwm_init(audioSlice, &cfg, true);
+   ecs_AudioVolume = volume;
 
    if (tv_mode == 0) 
       psg0 = PSG_new(2000000, SAMPLING_FREQ);

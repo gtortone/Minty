@@ -28,15 +28,17 @@
     DIM Selected_Entry, Max_Entry
     DIM #Disp_Color, #tmp
     DIM SelEnt_Start,SelEnt_Length
-    DIM Volume,#MaxSize
+    DIM Volume
 
-	CONST DEBOUNCE_DELAY  = 5					' Number of cycles to detect button press
+	CONST DEBOUNCE_DELAY  = 4					' Number of cycles to detect button press
 
     ' RAM addresses for exchanges with PI
     CONST ADDRESS_TVMODE    = $8100
     CONST ADDRESS_ECS_PRES  = $8101
     CONST ADDRESS_MaxSize   = $8102 ' Max supported ROM size in kB (16 bits)
     CONST ADDRESS_ECS_VOL   = $8104
+    CONST ADDRESS_JLP_EMU   = $8105
+    CONST ADDRESS_ECS_EMU   = $8106
     CONST ADDRESS_status    = $8119
     CONST ADDRESS_dev       = $8120
     CONST ADDRESS_has_sd    = $8121
@@ -114,9 +116,11 @@
     DEF FN PI_GET_INFO_DISP = PEEK(ADDRESS_INFO_DISP)
     DEF FN PI_SET_TVMODE(mode) = POKE(ADDRESS_TVMODE),mode
     DEF FN PI_SET_ECS_PRES(presence) = POKE(ADDRESS_ECS_PRES),presence
-    DEF FN PI_SET_ECS_VOL(volume) = POKE(ADDRESS_ECS_VOL),volume
+    DEF FN PI_SET_ECS_VOL(v) = POKE(ADDRESS_ECS_VOL),v
     DEF FN PI_GET_ECS_VOL = PEEK(ADDRESS_ECS_VOL)
     DEF FN PI_GET_MAXSIZE = ((PEEK(ADDRESS_MaxSize) * 256) + PEEK(ADDRESS_MaxSize+1))
+    DEF FN PI_GET_JLP_EMU = PEEK(ADDRESS_JLP_EMU)
+    DEF FN PI_GET_ECS_EMU = PEEK(ADDRESS_ECS_EMU)
 
      ' Display splash screen
 	MODE 0,0,2,0,2
@@ -132,17 +136,17 @@
     ' Display detected HW
     I = PI_GET_HW
     IF I=1 THEN 
-        PRINT AT SCREENPOS(0, 11) COLOR CS_WHITE,"HW : PiRTO"
+        PRINT AT SCREENPOS(0, 11) COLOR CS_WHITE,"PiRTO"
     ELSEIF I=2 THEN 
-        PRINT AT SCREENPOS(0, 11) COLOR CS_WHITE,"HW : PiRTO2"
+        PRINT AT SCREENPOS(0, 11) COLOR CS_WHITE,"PiRTO2"
     ELSEIF I=3 THEN 
-        PRINT AT SCREENPOS(0, 11) COLOR CS_WHITE,"HW : PiRTO2+SD"
+        PRINT AT SCREENPOS(0, 11) COLOR CS_WHITE,"PiRTO2+SD"
     ELSEIF I=4 THEN
-        PRINT AT SCREENPOS(0, 11) COLOR CS_WHITE,"HW : PiRTO2-DUO"
+        PRINT AT SCREENPOS(0, 11) COLOR CS_WHITE,"PiRTO2-DUO"
     ELSEIF I=5 THEN 
-        PRINT AT SCREENPOS(0, 11) COLOR CS_WHITE,"HW : PiNTY"
+        PRINT AT SCREENPOS(0, 11) COLOR CS_WHITE,"PiNTY"
     ELSE 
-        PRINT AT SCREENPOS(0, 11) COLOR CS_WHITE,"HW : Unknown"
+        PRINT AT SCREENPOS(0, 11) COLOR CS_WHITE,"Unknown HW"
     END IF
     
     ' Display text
@@ -167,8 +171,8 @@
     WEND
 
     ' Send INTY condfiguration to PI
-    IF (NTSC <>0) THEN PI_SET_TVMODE(isNTSC) ELSE PI_SET_TVMODE(isPAL)
-    IF (ECS.AVAILABLE <> 0) THEN PI_SET_ECS_PRES(ECS_Present) ELSE PI_SET_ECS_PRES(ECS_Absent)
+    PI_SET_TVMODE(NTSC)
+    PI_SET_ECS_PRES(ECS.AVAILABLE)
 
     CLS
     MODE 0,6,0,7,0
@@ -199,22 +203,15 @@
 '    GOSUB test_init
 
 START:
-    CLS
-    SCREEN Title_cards,0,0,8,1,8
-    SPRITE 4,  8 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
-    SPRITE 5, 24 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
-    SPRITE 6, 40 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
-    SPRITE 7, 56 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
-    WaveFrame = 0
-
+    GOSUB DISPLAY_HEADER
     SCREEN Help_Cards,0,17,3,1,3
 
     ' Display current path
-    #tmp = PEEK(ADDRESS_path + 1) AND $7F
+    #tmp = PEEK(ADDRESS_path + 1)
     ' First letter need to change Color Stack
     #BACKTAB(20) = ASCII_table(#tmp) + CS_GREEN + $2000
     FOR I = 1 TO 19
-        #tmp = PEEK(ADDRESS_path + I + 1) AND $7F
+        #tmp = PEEK(ADDRESS_path + I + 1)
         #BACKTAB(20+I) = ASCII_table(#tmp) + CS_GREEN
     NEXT I
 
@@ -246,29 +243,14 @@ MENU_LOOP:
 
     Input = CONT
 
-    SELECT CASE INPUT
-        CASE $21
-            Debounce = DEBOUNCE_DELAY:GOSUB SETTINGS_SCREEN:GOTO START
-        CASE $28
-            Debounce = DEBOUNCE_DELAY:GOSUB SELECT_ENTRY:GOTO START
-        CASE $41
-            Debounce = DEBOUNCE_DELAY:GOSUB INFO_SCREEN:GOTO START
-        CASE $81
-            Debounce = DEBOUNCE_DELAY:GOSUB HELP_SCREEN:GOTO START
-        CASE $88
-            Debounce = DEBOUNCE_DELAY:GOSUB UP_DIRECTORY:GOTO START
-        CASE $60
-            IF (#f_to < #f_total) THEN Debounce = DEBOUNCE_DELAY:GOSUB NEXT_PAGE:GOTO START
-        CASE $C0
-            IF (#f_to < #f_total) THEN Debounce = DEBOUNCE_DELAY:GOSUB NEXT_PAGE:GOTO START
-        CASE $24
-            IF (#f_to < #f_total) THEN Debounce = DEBOUNCE_DELAY:GOSUB NEXT_PAGE:GOTO START
-        CASE $A0
-            IF (#f_from > 0) THEN Debounce = DEBOUNCE_DELAY:GOSUB PREVIOUS_PAGE:GOTO START
-        CASE $84
-            IF (#f_from > 0) THEN Debounce = DEBOUNCE_DELAY:GOSUB PREVIOUS_PAGE:GOTO START
-    END SELECT
-  
+    IF Input = $21 THEN Debounce = DEBOUNCE_DELAY:GOSUB SETTINGS_SCREEN:GOTO START
+    IF Input = $28 THEN Debounce = DEBOUNCE_DELAY:GOSUB SELECT_ENTRY:GOTO START
+    IF Input = $41 THEN Debounce = DEBOUNCE_DELAY:GOSUB INFO_SCREEN:GOTO START
+    IF Input = $81 THEN Debounce = DEBOUNCE_DELAY:GOSUB HELP_SCREEN:GOTO START
+    IF Input = $88 THEN Debounce = DEBOUNCE_DELAY:GOSUB UP_DIRECTORY:GOTO START
+    IF ((Input = $60) OR (Input = $C0) OR (Input = $24)) THEN IF (#f_to < #f_total) THEN Debounce = DEBOUNCE_DELAY:GOSUB NEXT_PAGE:GOTO START
+    IF ((Input = $A0) OR (Input = $84)) THEN IF (#f_from > 0) THEN Debounce = DEBOUNCE_DELAY:GOSUB PREVIOUS_PAGE:GOTO START
+
     ' DOWN
     IF (Input=$48 OR Input=$01 OR Input=$11 OR Input=$19 OR Input=$09 OR Input=$03 OR Input=$13 OR Input=$12) THEN      'KEYPAD_0 or S/SE/SW
         Debounce = DEBOUNCE_DELAY
@@ -320,54 +302,74 @@ PREVIOUS_PAGE: PROCEDURE
 
 SETTINGS_SCREEN: PROCEDURE
     PlaySnd(InputSound)
-    CLS
-    ResetSprite(1)
-    ResetSprite(2)
-    ResetSprite(3)
-    SCREEN Title_cards,0,0,8,1,8
-    SPRITE 4,  8 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
-    SPRITE 5, 24 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
-    SPRITE 6, 40 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
-    SPRITE 7, 56 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
-    PRINT AT SCREENPOS(12, 0) COLOR CS_YELLOW, "Settings"
+    GOSUB DISPLAY_HEADER
+    PRINT AT SCREENPOS(9, 0) COLOR CS_YELLOW, "Information"
+  
+    PRINT AT SCREENPOS( 1,2)  COLOR CS_TAN, "Tv Standard"
+    IF NTSC THEN 
+        PRINT AT SCREENPOS(15, 2) COLOR CS_DARKGREEN,"NTSC"
+    ELSE
+        PRINT AT SCREENPOS(16, 2) COLOR CS_DARKGREEN,"PAL"
+    END IF
 
-    Volume = PI_GET_ECS_VOL
-    PRINT AT SCREENPOS( 1, 2)  COLOR CS_TAN, "Volume"
-    PRINT AT SCREENPOS(16, 2) COLOR CS_DARKGREEN,<3>Volume
-    
-    PRINT AT SCREENPOS( 1, 3)  COLOR CS_TAN, "Force ECS emu"
-    PRINT AT SCREENPOS(16, 3) COLOR CS_DARKGREEN,"YES"
-    
-    PRINT AT SCREENPOS( 1, 4)  COLOR CS_TAN, "Force JLP emu"
-    PRINT AT SCREENPOS(16, 4) COLOR CS_DARKGREEN," NO"
+    PRINT AT SCREENPOS( 1, 3) COLOR CS_TAN, "JLP emulation"
+    IF PI_GET_JLP_EMU THEN
+        PRINT AT SCREENPOS(16, 3) COLOR CS_DARKGREEN,"YES"
+    ELSE
+        PRINT AT SCREENPOS(17, 3) COLOR CS_DARKGREEN,"NO"
+    END IF
 
-    PRINT AT SCREENPOS( 1, 8) COLOR CS_TAN, "Max ROM size"
-    #MaxSize = PI_GET_MAXSIZE
-    PRINT AT SCREENPOS(15, 8) COLOR CS_TAN, <3>#MaxSize,"kB"
+    PRINT AT SCREENPOS( 1, 5) COLOR CS_TAN, "Max ROM size"
+    PRINT AT SCREENPOS(14, 5) COLOR CS_DARKGREEN, <3>PI_GET_MAXSIZE,"kB"
 
-    PRINT AT SCREENPOS( 2,10) COLOR CS_YELLOW, "<ENTER>  to save"
+    PRINT AT SCREENPOS( 1, 7)  COLOR CS_TAN, "ECS present"
+    IF ECS.AVAILABLE THEN 
+        PRINT AT SCREENPOS(16, 7) COLOR CS_DARKGREEN,"YES"
+    ELSE
+        PRINT AT SCREENPOS(17, 7) COLOR CS_DARKGREEN,"NO"
+    END IF
+
+    PRINT AT SCREENPOS( 1, 8) COLOR CS_TAN, "ECS audio emu"
+    IF PI_GET_ECS_EMU THEN
+        PRINT AT SCREENPOS(16, 8) COLOR CS_DARKGREEN,"YES"   
+        Volume = PI_GET_ECS_VOL
+        PRINT AT SCREENPOS( 1, 9)  COLOR CS_TAN, "Volume <4-6>"
+        PRINT AT SCREENPOS(16, 9) COLOR CS_GREEN,<3>Volume
+    ELSE
+        PRINT AT SCREENPOS(17, 8) COLOR CS_DARKGREEN,"NO"   
+    END IF
+
     PRINT AT SCREENPOS( 2,11) COLOR CS_YELLOW, "<CLEAR>  to exit"
     WHILE (CONT <> $88)  'CLEAR
+        IF PI_GET_ECS_EMU THEN
+            IF Debounce > 0 THEN
+                Debounce = Debounce - 1
+            ELSE
+                IF ((CONT.KEY = 4) AND (Volume > 0)) THEN 
+                    Volume = Volume - 1
+                    Debounce = DEBOUNCE_DELAY
+                    PRINT AT SCREENPOS(16, 9) COLOR CS_GREEN,<3>Volume
+                END IF
+                IF ((CONT.KEY = 6) AND (Volume < 255)) THEN 
+                    Volume = Volume + 1
+                    Debounce = DEBOUNCE_DELAY
+                    PRINT AT SCREENPOS(16, 9) COLOR CS_GREEN,<3>Volume
+                END IF
+            END IF
+        END IF
         IF FRAME%8 = 0 THEN
             WaveFrame = (WaveFrame+1)%4
             DEFINE 6,1,VARPTR Title_wave(WaveFrame * 4)
         END IF
         WAIT
     WEND
+    PI_SET_ECS_VOL(Volume)
     Debounce = DEBOUNCE_DELAY
     END
 
 HELP_SCREEN: PROCEDURE
     PlaySnd(InputSound)
-    CLS
-    ResetSprite(1)
-    ResetSprite(2)
-    ResetSprite(3)
-    SCREEN Title_cards,0,0,8,1,8
-    SPRITE 4,  8 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
-    SPRITE 5, 24 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
-    SPRITE 6, 40 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
-    SPRITE 7, 56 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
+    GOSUB DISPLAY_HEADER
     PRINT AT SCREENPOS(11,0) COLOR CS_YELLOW, "Main help"
     PRINT AT SCREENPOS(1,2) COLOR CS_TAN, "8 or UP      Go Up"
     PRINT AT SCREENPOS(1,3) COLOR CS_TAN, "0 or DN      Go Dn"
@@ -377,7 +379,7 @@ HELP_SCREEN: PROCEDURE
     PRINT AT SCREENPOS(1,7) COLOR CS_TAN, "3         Settings"    
     PRINT AT SCREENPOS(1,8) COLOR CS_TAN, "CLEAR       Dir Up"
     PRINT AT SCREENPOS(1,9) COLOR CS_TAN, "ENTER       Select"
-    PRINT AT SCREENPOS(3,11) COLOR CS_YELLOW, "<CLR>  to exit"
+    PRINT AT SCREENPOS( 2,11) COLOR CS_YELLOW, "<CLEAR>  to exit"
     WHILE (CONT <> $88)  'CLEAR
         IF FRAME%8 = 0 THEN
             WaveFrame = (WaveFrame+1)%4
@@ -390,20 +392,12 @@ HELP_SCREEN: PROCEDURE
 
 INFO_HELP_SCREEN: PROCEDURE
     PlaySnd(InputSound)
-    CLS
-    ResetSprite(1)
-    ResetSprite(2)
-    ResetSprite(3)
-    SCREEN Title_cards,0,0,8,1,8
-    SPRITE 4,  8 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
-    SPRITE 5, 24 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
-    SPRITE 6, 40 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
-    SPRITE 7, 56 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
+    GOSUB DISPLAY_HEADER
     PRINT AT SCREENPOS(11,0) COLOR CS_YELLOW, "Info help"
     PRINT AT SCREENPOS(1,4) COLOR CS_TAN, "8 or UP      Go Up"
     PRINT AT SCREENPOS(1,5) COLOR CS_TAN, "0 or DN      Go Dn"
     PRINT AT SCREENPOS(1,8) COLOR CS_TAN, "CLEAR         EXIT"
-    PRINT AT SCREENPOS(3,11) COLOR CS_YELLOW, "<CLR>  to exit"
+    PRINT AT SCREENPOS( 2,11) COLOR CS_YELLOW, "<CLEAR>  to exit"
     WHILE (CONT <> $88)  'CLEAR
         IF FRAME%8 = 0 THEN
             WaveFrame = (WaveFrame+1)%4
@@ -506,25 +500,21 @@ SELECT_ENTRY: PROCEDURE
             ' RUN GAME
             GOSUB WAIT_CARD_ANSWER
             
-            ' If error is file to big, display error message and wait for user to press clear
-            IF PI_GET_ERROR = ERR_FILE_TO_BIG THEN
+            ' If error display error message and wait for user to press clear
+            IF PI_GET_ERROR <> ERR_NO_ERROR THEN
                 PRINT AT SCREENPOS(0,4)  COLOR CS_RED, "                   "
-                PRINT AT SCREENPOS(0,5)  COLOR CS_RED, "   File too big!   "
                 PRINT AT SCREENPOS(0,6)  COLOR CS_RED, "                   "
                 PRINT AT SCREENPOS(0,10) COLOR CS_RED, "                   "
-                PRINT AT SCREENPOS(0,11) COLOR CS_RED, "   CLR to return   "
+                PRINT AT SCREENPOS(0,11) COLOR CS_RED, " <CLEAR> to return "
+                IF PI_GET_ERROR = ERR_FILE_TO_BIG THEN 
+                    PRINT AT SCREENPOS(0,5)  COLOR CS_RED, "   File too big!   "
+                ELSE
+                    PRINT AT SCREENPOS(0,5)  COLOR CS_RED, "Couldn't open file!"
+                END IF
                 WHILE (CONT <> $88)  'CLEAR
                     WAIT
                 WEND
-            ELSEIF PI_GET_ERROR = ERR_COULD_NOT_OPEN_FILE THEN
-                PRINT AT SCREENPOS(0,4)  COLOR CS_RED, "                   "
-                PRINT AT SCREENPOS(0,5)  COLOR CS_RED, "Couldn't open file!"
-                PRINT AT SCREENPOS(0,6)  COLOR CS_RED, "                   "
-                PRINT AT SCREENPOS(0,10) COLOR CS_RED, "                   "
-                PRINT AT SCREENPOS(0,11) COLOR CS_RED, "   CLR to return   "
-                WHILE (CONT <> $88)  'CLEAR
-                    WAIT
-                WEND
+                Debounce = DEBOUNCE_DELAY
             ELSE
                 ' Infinite loop till getting reseted by card
                 ASM InfiniteLoop:
@@ -656,6 +646,19 @@ DISPLAY_SLIDER: PROCEDURE
 
     FOR I=59 TO 219 STEP 20:#BACKTAB(I)=$0827:NEXT I
     #BACKTAB(239) = $082F
+    END
+
+DISPLAY_HEADER: PROCEDURE
+    CLS
+    ResetSprite(1)
+    ResetSprite(2)
+    ResetSprite(3)
+    SCREEN Title_cards,0,0,8,1,8
+    SPRITE 4,  8 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
+    SPRITE 5, 24 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
+    SPRITE 6, 40 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
+    SPRITE 7, 56 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
+    WaveFrame = 0
     END
 
 'test_init: PROCEDURE
