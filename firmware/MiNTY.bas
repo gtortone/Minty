@@ -108,6 +108,7 @@
     DEF FN PI_SELECTDEVICE(device) = POKE(ADDRESS_dev),device
     DEF FN PI_CURRENTDEVICE = PEEK(ADDRESS_dev)
     DEF FN PI_SELECTENTRY(entry) = POKE(ADDRESS_Select),(entry+1)
+    DEF FN PI_GETENTRY = (PEEK(ADDRESS_Select) - 1)
     DEF FN PI_GET_FTYPE(file) = PEEK(ADDRESS_ftype+file)
     DEF FN PI_GET_FFROM  = ((PEEK(ADDRESS_ffrom)  * 256) + PEEK(ADDRESS_ffrom+1))
     DEF FN PI_GET_FTO    = ((PEEK(ADDRESS_fto)    * 256) + PEEK(ADDRESS_fto+1))
@@ -538,7 +539,7 @@ UP_DIRECTORY: PROCEDURE
     PI_CMD(CMD_UPDIRECTORY)
     PlaySnd(InputSound)
     GOSUB WAIT_CARD_ANSWER
-    Selected_Entry = 0
+    Selected_Entry = PI_GETENTRY
     END
 
 WAIT_CARD_ANSWER: PROCEDURE

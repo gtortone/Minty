@@ -268,13 +268,33 @@ void IntyMenu(int type) {       // 1=start, 2=next page, 3=prev page, 4=dir up
       case UP_DIR:
          // go up one level if not in root directory     
          if (!( (strcmp(curPath, "/sd") == 0) || (strcmp(curPath, "/fl") == 0) )) {
-            int len = strlen(curPath);
-            if (len > 0) {
-               while (len && curPath[--len] != '/') ;
-               curPath[len] = 0;
+            char* curDir = strrchr(curPath,'/');
+            if (curDir) {
+               int n;
+               *curDir = 0; // curPath ends at last slash
+               curDir++;    // curDir contains last visited directory
+
+               printf("UpDir : Leaving %s new dir %s\n", curDir, curPath);
+
+               // read new directory
+               num_dir_entries = read_directory(curPath, screen_entries);
+               if (num_dir_entries < 0) {
+                     // could not read directory, show empty list and send info to INTY launcher
+                     num_dir_entries = 0;
+                     cart.RAM[SDPRES_ADDR] = 0;
+               }
+               // search for previously visited directory
+               for (n = num_dir_entries; n > 0; n--) {
+                  if (strcmp(curDir, screen_entries[n-1].filename) == 0) break;
+               }
+               filefrom = (int)((n-1) / 10) * 10;
+               fileto = filefrom + 10;
+               if (fileto > num_dir_entries)
+                  fileto = num_dir_entries;
+               cart.RAM[SELECTION_ADDR] = n - filefrom;
             }
          }
-         // and fell into new page read
+         break;
       case READ_PAGE:
          num_dir_entries = read_directory(curPath, screen_entries);
          if (num_dir_entries < 0) {
