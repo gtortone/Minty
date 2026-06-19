@@ -53,15 +53,15 @@ extern struct mapHole holes[NSLOTS];
 
 __attribute__((optimize("O3")))
 void __time_critical_func(core1_main()) {
-   unsigned int gpio_snapshot, busState;
-   uint16_t addrIn = 0;
-   uint16_t dataOut = 0;
-   uint32_t dataIn = 0;
-   bool deviceAddress = false;
-   uint8_t curPageArr[16];        
-   uint8_t seg = 0;
-   uint32_t romaddr;
-   uint8_t idx;
+   volatile unsigned int gpio_snapshot, busState;
+   volatile uint16_t addrIn = 0;
+   volatile uint16_t dataOut = 0;
+   volatile uint32_t dataIn = 0;
+   volatile bool deviceAddress = false;
+   volatile uint8_t curPageArr[16];        
+   volatile uint8_t seg = 0;
+   volatile uint32_t romaddr;
+   volatile uint8_t idx;
 
 #if CONFIG_JLP
    uint16_t crc = 0;
