@@ -8,6 +8,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "hardware/watchdog.h"
+#include "hardware/timer.h"
 #include "pico/multicore.h"
 #include "pico/platform.h"
 #include "pico/stdlib.h"
@@ -43,6 +45,8 @@
 extern Cartridge cart;     // main data structure for cart emulation
 
 volatile uint16_t addrInCopy;
+
+volatile uint8_t spyData = 0xFF;
 
 extern struct mapEntry slots[NSLOTS];
 extern struct mapHole holes[NSLOTS];
@@ -106,8 +110,7 @@ void __time_critical_func(core1_main()) {
             // The data was prefetched during BAR/ADAR. Output data here.  
             DATA_OUT(dataOut);
             SET_DATA_MODE_OUT;
-            // wait 20ns (@200Mhz)
-            asm inline("nop;nop;nop;nop;");
+            asm inline("nop;nop;nop;nop;nop;"); // wait 20ns (@250Mhz)
             while (sio_hw->gpio_in & BC1_MASK) ;  // wait BC1 go down
             SET_DATA_MODE_IN;
          }
@@ -122,8 +125,7 @@ void __time_critical_func(core1_main()) {
                   // The data was prefetched during BAR/ADAR. Output data here.  
                   DATA_OUT(dataOut);
                   SET_DATA_MODE_OUT;
-                  // wait 20ns (@200Mhz)
-                  asm inline("nop;nop;nop;nop;");
+                  asm inline("nop;nop;nop;nop;nop;"); // wait 20ns (@250Mhz)
                   while (sio_hw->gpio_in & BC1_MASK) ;  // wait BC1 go down 
                   SET_DATA_MODE_IN;
                }
@@ -246,7 +248,7 @@ void __time_critical_func(core1_main()) {
                
                SET_DATA_MODE_IN;
                
-               dataIn = sio_hw->gpio_in & 0xFFFF;
+               dataIn = sio_hw->gpio_in & 0xFFFF;          
 
 #if CONFIG_ECS_AUDIO
                if (cart.ECSSupport) {
@@ -312,7 +314,17 @@ void __time_critical_func(core1_main()) {
                // -----------------------
 
                // reconnect to bus
-               SET_DATA_MODE_IN;
+               SET_DATA_MODE_IN; 
+
+               if ((busState == BUS_NACT) && (addrIn == 0x01FF)) {
+                  asm inline("nop;nop;nop;nop;nop;"); // wait 20ns (@250Mhz)
+                  asm inline("nop;nop;nop;nop;nop;"); // wait 20ns (@250Mhz)
+                  asm inline("nop;nop;nop;nop;nop;"); // wait 20ns (@250Mhz)
+                  asm inline("nop;nop;nop;nop;nop;"); // wait 20ns (@250Mhz)
+                  asm inline("nop;nop;nop;nop;nop;"); // wait 20ns (@250Mhz)
+                  spyData = sio_hw->gpio_in & 0xFF;
+                  while (!(sio_hw->gpio_in & BUS_STATE_MASK)) ;  // wait MACT state end
+               }
             }
          }
       }
@@ -336,11 +348,13 @@ static void generate_random(uint16_t *arr, int n) {
 #endif
 
 void RunGame() {
+
 #if CONFIG_JLP  
    // initialize random seed and preallocate an array of random numbers
    uint16_t randarr[4];
    uint8_t randidx = 0;
    bool randrefill = false;
+   uint64_t resetTimeout = 0;
 
    generate_random(randarr, sizeof(randarr));
 #endif
@@ -357,6 +371,16 @@ void RunGame() {
 #endif
 
    while (1) {
+
+      if (spyData == 0x5a) {
+         resetTimeout = make_timeout_time_ms(2000);
+         printf("Card Reset request 1/2\n");
+      }
+      if ((spyData == 0x55) && (get_absolute_time() < resetTimeout)) {
+            printf("Card Reset request 2/2\n");
+            watchdog_enable(1 ,1);
+            while(1);
+      }
 
 #if CONFIG_ECS_AUDIO
 
