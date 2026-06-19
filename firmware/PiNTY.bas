@@ -32,6 +32,8 @@
 	CONST DEBOUNCE_DELAY  = 5					' Number of cycles to detect button press
 
     ' RAM addresses for exchanges with PI
+    CONST ADDRESS_MAJOR     = $80FE
+    CONST ADDRESS_MINOR     = $80FF
     CONST ADDRESS_TVMODE    = $8100
     CONST ADDRESS_ECS_PRES  = $8101
     CONST ADDRESS_status    = $8119
@@ -90,7 +92,9 @@
     DEF FN PI_GET_HW     = PEEK(ADDRESS_hw)
     DEF FN PI_SET_TVMODE(mode) = POKE(ADDRESS_TVMODE),mode
     DEF FN PI_SET_ECS_PRES(presence) = POKE(ADDRESS_ECS_PRES),presence
-    
+    DEF FN PI_GET_MAJOR = PEEK(ADDRESS_MAJOR)
+    DEF FN PI_GET_MINOR = PEEK(ADDRESS_MINOR)
+
     ' Display splash screen
 	MODE 0,0,2,0,2
 	WAIT
@@ -102,6 +106,9 @@
 	WAIT
 	SCREEN screen_cards,0,5,11,7,11
 
+    ' Display firmware version number
+    PRINT AT SCREENPOS(16,11) COLOR CS_YELLOW,"v",<1>PI_GET_MAJOR,".",<1>PI_GET_MINOR
+    
     ' Display text
     DEFINE 48,16,text_bitmaps_0
     FOR I=0 TO 15

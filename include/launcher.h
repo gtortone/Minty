@@ -2,6 +2,8 @@
 #define LAUNCHER_H_
 
 // Inty RAM addresses shared with cart firmware
+#define VERSION_MAJOR_ADDR  0x00FE
+#define VERSION_MINOR_ADDR  0x00FF
 #define TV_MODE_ADDR    0x0100      // 0: PAL, 1: NTSC
 #define ECS_PRES_ADDR   0x0101      // 0: ECS absent, 1: ECS present
 #define MSIZE_HI_ADDR   0x0102      // high byte of maximum ROM size
