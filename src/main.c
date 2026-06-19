@@ -14,6 +14,7 @@
 #include "board.h"
 #include "cartridge.h"
 #include "debug.h"
+#include "version.h"
 
 #if CONFIG_USB_DEVICE
    #include "tusb.h"
@@ -67,7 +68,7 @@ int main(void) {
       }
    }
 
-   printf("START\n");
+   printf("START - Minty v%s\n", VERSION);
 
    // check why loop is ended...
    if (gpio_get(MSYNC) == 1) {
