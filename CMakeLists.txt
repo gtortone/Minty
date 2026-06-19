@@ -98,6 +98,26 @@ add_subdirectory(
 
 add_executable(${PROJECT})
 
+# set version header file
+execute_process(
+    COMMAND git describe --tags --abbrev=0
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    OUTPUT_VARIABLE GIT_TAG
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
+string(REPLACE "." ";" VERSION_LIST "${GIT_TAG}")
+
+if(VERSION_LIST)
+   list(GET VERSION_LIST 0 VERSION_MAJOR)
+   list(GET VERSION_LIST 1 VERSION_MINOR)
+else()
+   set(VERSION_MAJOR 0)
+   set(VERSION_MINOR 0)
+endif()
+
+configure_file(${CMAKE_SOURCE_DIR}/include/version.h.in ${CMAKE_SOURCE_DIR}/include/version.h @ONLY)
+
 set_target_properties(Minty PROPERTIES
     OUTPUT_NAME "Minty_${PICO_BOARD}"
 )

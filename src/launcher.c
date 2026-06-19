@@ -14,6 +14,7 @@
 #include "filesystem.h"
 #include "intellicart.h"
 #include "launcher.h"
+#include "version.h"
 
 #ifdef PINTYCARD
    #include "pintyrom.h"
@@ -364,8 +365,8 @@ void RunLauncher() {
    getRAMRange(&cart.ramfrom, &cart.ramto, &cart.ramwidth);
 
    // initialise exchange RAM data
-   cart.RAM[VERSION_MAJOR_ADDR] = 2;
-   cart.RAM[VERSION_MINOR_ADDR] = 0;
+   cart.RAM[VERSION_MAJOR_ADDR] = VERSION_MAJOR;
+   cart.RAM[VERSION_MINOR_ADDR] = VERSION_MINOR;
    cart.RAM[BOARD_ID_ADDR] = BOARD_ID;
    cart.RAM[STATUS_ADDR] = 1;      // block cart access until initialisation is done
    cart.RAM[CMD_ADDR] = 0;
