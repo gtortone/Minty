@@ -317,13 +317,12 @@ void __time_critical_func(core1_main()) {
                SET_DATA_MODE_IN; 
 
                if ((busState == BUS_NACT) && (addrIn == 0x01FF)) {
-                  asm inline("nop;nop;nop;nop;nop;"); // wait 20ns (@250Mhz)
-                  asm inline("nop;nop;nop;nop;nop;"); // wait 20ns (@250Mhz)
-                  asm inline("nop;nop;nop;nop;nop;"); // wait 20ns (@250Mhz)
-                  asm inline("nop;nop;nop;nop;nop;"); // wait 20ns (@250Mhz)
-                  asm inline("nop;nop;nop;nop;nop;"); // wait 20ns (@250Mhz)
-                  spyData = sio_hw->gpio_in & 0xFF;
-                  while (!(sio_hw->gpio_in & BUS_STATE_MASK)) ;  // wait MACT state end
+
+                  do {
+                     spyData = sio_hw->gpio_in & 0xFF;
+                  } while (spyData != (sio_hw->gpio_in & 0xFF));
+
+                  while (!(sio_hw->gpio_in & BUS_STATE_MASK)) ;  // wait NACT state end
                }
             }
          }
@@ -375,11 +374,11 @@ void RunGame() {
 
       if (spyData == 0x5a) {
          resetTimeout = make_timeout_time_ms(2000);
-         printf("Card Reset request 1/2\n");
+         //printf("Card Reset request 1/2\n");
       }
       if ((spyData == 0x55) && (get_absolute_time() < resetTimeout)) {
-            printf("Card Reset request 2/2\n");
-            watchdog_enable(1 ,1);
+            //printf("Card Reset request 2/2\n");
+            watchdog_enable(1, 1);
             while(1);
       }
 
