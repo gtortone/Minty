@@ -107,8 +107,14 @@ execute_process(
 )
 
 string(REPLACE "." ";" VERSION_LIST "${GIT_TAG}")
-list(GET VERSION_LIST 0 VERSION_MAJOR)
-list(GET VERSION_LIST 1 VERSION_MINOR)
+
+if(VERSION_LIST)
+   list(GET VERSION_LIST 0 VERSION_MAJOR)
+   list(GET VERSION_LIST 1 VERSION_MINOR)
+else()
+   set(VERSION_MAJOR 0)
+   set(VERSION_MINOR 0)
+endif()
 
 configure_file(${CMAKE_SOURCE_DIR}/include/version.h.in ${CMAKE_SOURCE_DIR}/include/version.h @ONLY)
 
