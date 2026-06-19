@@ -354,10 +354,11 @@ void RunGame() {
    uint16_t randarr[4];
    uint8_t randidx = 0;
    bool randrefill = false;
-   uint64_t resetTimeout = 0;
 
    generate_random(randarr, sizeof(randarr));
 #endif
+   uint64_t resetTimeout = 0;
+
    resetCart();              // start game !
 
 #if CONFIG_JLP
