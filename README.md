@@ -83,19 +83,19 @@ Replace `BOARD` with build target available on table of features.
 
 ```
 cmake -B build/BOARD/debug -DPICO_BOARD=BOARD -DCMAKE_BUILD_TYPE=Debug
-make -j -C build/pirto_ii_duo/debug
+make -j -C build/BOARD/debug
    or
 cmake -B build/BOARD/release -DPICO_BOARD=BOARD -DCMAKE_BUILD_TYPE=Release
-make -j -C build/pirto_ii_duo/release
+make -j -C build/BOARD/release
 ```
 
-After compilation `Minty.bin` and `Minty.uf2` are generated.
+After compilation `Minty.BOARD.bin` and `Minty.BOARD.uf2` are generated.
 
-To use `Minty.bin` to flash a board `picotool` is required. Run following
+To use .bin file to flash a board `picotool` is required. Run following
 command after setting Pi Pico in BOOT mode:
 
 ```
-picotool load -f Minty.bin; picotool reboot
+picotool load -f Minty.BOARD.bin; picotool reboot
 ```
 
 ## Credits
