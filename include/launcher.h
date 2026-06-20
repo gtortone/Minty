@@ -33,6 +33,7 @@
 #define PATH_ADDR       0x1100      // current path
 #define SECTION_ADDR    0x1300      // current section
 
+#define INIT_PAGE       0
 #define READ_PAGE       1
 #define NEXT_PAGE       2
 #define PREV_PAGE       3
