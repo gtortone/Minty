@@ -108,7 +108,7 @@
     DEF FN PI_SELECTDEVICE(device) = POKE(ADDRESS_dev),device
     DEF FN PI_CURRENTDEVICE = PEEK(ADDRESS_dev)
     DEF FN PI_SELECTENTRY(entry) = POKE(ADDRESS_Select),(entry+1)
-    DEF FN PI_GETENTRY = (PEEK(ADDRESS_Select) - 1)
+    DEF FN PI_GETENTRY = PEEK(ADDRESS_Select)
     DEF FN PI_GET_FTYPE(file) = PEEK(ADDRESS_ftype+file)
     DEF FN PI_GET_FFROM  = ((PEEK(ADDRESS_ffrom)  * 256) + PEEK(ADDRESS_ffrom+1))
     DEF FN PI_GET_FTO    = ((PEEK(ADDRESS_fto)    * 256) + PEEK(ADDRESS_fto+1))
@@ -164,7 +164,7 @@
     NEXT I
 
     PlaySnd(WelcomeSound)
-    FOR I = 1 TO 90:WAIT:NEXT I
+    FOR I = 1 TO 60:WAIT:NEXT I
     ' Next 10 animation frames for text
     FOR I=1 TO 10 
         DEFINE 48,16,VARPTR text_bitmaps_0(64 * I)
@@ -172,7 +172,7 @@
     NEXT I
 
 	' Wait for card to be ready and minimum delay
-	I = 30
+	I = 15
     WHILE (PI_STATUS<>PI_STAT_READY) OR (I>0)
         IF I>0 THEN I = I - 1
         WAIT
@@ -205,8 +205,8 @@
     ' load font into grams (23 to 63 are occupied)
     GOSUB Init_font
 
-    ' Start up with selecting the first entry
-    Selected_Entry=0
+    ' Start up with selecting the last used entry
+    Selected_Entry = PI_GETENTRY
 
 '    GOSUB test_init
 
@@ -217,10 +217,10 @@ START:
     ' Display current path
     #tmp = PEEK(ADDRESS_path + 1)
     ' First letter need to change Color Stack
-    #BACKTAB(20) = ASCII_table(#tmp) + CS_GREEN + $2000
+    #BACKTAB(20) = ASCII_table(#tmp) + CS_DARKGREEN + $2000
     FOR I = 1 TO 19
         #tmp = PEEK(ADDRESS_path + I + 1)
-        #BACKTAB(20+I) = ASCII_table(#tmp) + CS_GREEN
+        #BACKTAB(20+I) = ASCII_table(#tmp) + CS_DARKGREEN
     NEXT I
 
     ' Get current directory informations and display slider

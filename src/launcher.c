@@ -109,11 +109,17 @@ int LoadGame(int entry_num) {
    ecs_present = cart.RAM[ECS_PRES_ADDR];
    ecs_volume = cart.RAM[ECS_VOL_ADDR];
 
+   int result = load_file_by_id(screen_entries[entry_num].id, curPath);
+   if (result != 0) {
+      printf("E: failed to load file\n");
+      return result;
+   }
+
 #if CONFIG_SD_STORAGE
    // save config file only on SD 
    if (volumeId == 1) {
       
-      // save last path to config file
+      // save last loaded game to config file
       strcpy(cfg.lastPath, curPath);
 
       // save ECS audio volume level
@@ -134,14 +140,6 @@ int LoadGame(int entry_num) {
       }
    }
 #endif
-
-
-
-   int result = load_file_by_id(screen_entries[entry_num].id, curPath);
-   if (result != 0) {
-      printf("E: failed to load file\n");
-      return result;
-   }
 
    // ROM file has internal cfg info
    if(!is_rom_file(curPath)) {
@@ -292,11 +290,11 @@ void IntyMenu(int type) {       // 1=start, 2=next page, 3=prev page, 4=dir up
                fileto = filefrom + 10;
                if (fileto > num_dir_entries)
                   fileto = num_dir_entries;
-               cart.RAM[SELECTION_ADDR] = n - filefrom;
+               cart.RAM[SELECTION_ADDR] = n - filefrom - 1;
             }
          }
          break;
-      case READ_PAGE:
+      case INIT_PAGE:
          num_dir_entries = read_directory(curPath, screen_entries);
          if (num_dir_entries < 0) {
             // could not read directory, show empty list and send info to INTY launcher
@@ -319,6 +317,9 @@ void IntyMenu(int type) {       // 1=start, 2=next page, 3=prev page, 4=dir up
             filefrom = filefrom - 10;
             fileto = filefrom + 10;
          }
+         break;
+      case READ_PAGE:
+         // Nothing to be done 
          break;
    }
 
@@ -392,6 +393,9 @@ void RunLauncher() {
    strcpy(curPath, "/fl");
 #endif
 
+   cart.RAM[DEV_ADDR] = volumeId;
+   cart.RAM[SDPRES_ADDR] = 1;
+
 #if CONFIG_SD_STORAGE
    if (volumeId == 1) {
       // try to read configuration file
@@ -406,8 +410,34 @@ void RunLauncher() {
          if (cfg.magicNumber == CONFIG_MAGIC_NUMBER) {
 
             vfs_stat(cfg.lastPath, &st);
-            if (st.type & VFS_TYPE_DIR) 
+            if (st.type & VFS_TYPE_DIR) {
                strcpy(curPath, cfg.lastPath);
+            } else {
+               char* curFile = strrchr(cfg.lastPath,'/');
+               if (curFile) {
+                  int n;
+                  *curFile = 0; // curPath ends at last slash
+                  curFile++;    // curFile contains last launched file
+                  strcpy(curPath, cfg.lastPath);
+
+                  // read  directory
+                  num_dir_entries = read_directory(curPath, screen_entries);
+                  if (num_dir_entries < 0) {
+                        // could not read directory, show empty list and send info to INTY launcher
+                        num_dir_entries = 0;
+                        cart.RAM[SDPRES_ADDR] = 0;
+                  }
+                  // search for previously launched file
+                  for (n = num_dir_entries; n > 0; n--) {
+                     if (strcmp(curFile, screen_entries[n-1].filename) == 0) break;
+                  }
+                  filefrom = (int)((n-1) / 10) * 10;
+                  fileto = filefrom + 10;
+                  if (fileto > num_dir_entries)
+                     fileto = num_dir_entries;
+                  cart.RAM[SELECTION_ADDR] = n - filefrom - 1;
+               }
+            }
 
             ecs_volume = 255 - cfg.ecs_volume; 
             cart.RAM[ECS_VOL_ADDR] = ecs_volume;
@@ -421,11 +451,11 @@ void RunLauncher() {
    cart.RAM[HAS_SD_ADDR] = 0;
 #endif
 
-   cart.RAM[DEV_ADDR] = volumeId;
-   cart.RAM[SDPRES_ADDR] = 1;
-
-   // Initialise display list
-   IntyMenu(READ_PAGE);
+   // Initialise Display list
+   if (filefrom)
+      IntyMenu(READ_PAGE);
+   else
+      IntyMenu(INIT_PAGE);
 
    printf("max size of ROM file: %d bytes\n", MAX_ROM_SIZE*2);
   
@@ -445,7 +475,7 @@ void RunLauncher() {
 
          switch (cmd) {
             case 1:            // initialise file list with current path
-               IntyMenu(READ_PAGE);
+               IntyMenu(INIT_PAGE);
                break;
             case 2:            // select entry
                {
@@ -453,7 +483,7 @@ void RunLauncher() {
 
                   if (screen_entries[entry_num].isDir) {  // directory
                      ChangeDirectory(entry_num);
-                     IntyMenu(READ_PAGE);
+                     IntyMenu(INIT_PAGE);
                   } else {
                      int result = LoadGame(entry_num);
                      if (result == 0) {
