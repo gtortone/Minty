@@ -316,7 +316,7 @@ void __time_critical_func(core1_main()) {
                // reconnect to bus
                SET_DATA_MODE_IN; 
 
-               if ((busState == BUS_NACT) && (addrIn == 0x01FF)) {
+               if ((busState == BUS_NACT) && ((addrIn == 0x01FF) || (addrIn == 0x01FE))) {
 
                   do {
                      spyData = sio_hw->gpio_in & 0xFF;
