@@ -57,6 +57,8 @@ int volumeId = 0;    // default flash storage
 int volumeId = 1;    // default SD storage
 #endif
 
+char curPath[512] = "";
+
 // recycle cartridge ROM to allocate temporary buffers (min size is 2x50x1024 i.e. going till 0x18FFF)
 // start from 0x4000 to allow launcher ROM size up to 16Kb
 SCREEN_ENTRY *screen_entries = (SCREEN_ENTRY *) (cart.ROM + 0x2000);
@@ -66,8 +68,7 @@ INFO_ENTRY *info_entries = (INFO_ENTRY *) (cart.ROM + 0x7000);
 // buffer for information data to pass to INTY launcher
 // 204 bytes per page (20400 bytes allocated allowing for 100 pages)
 // 0x7000 + (204 * 100)/2 = 0x97D8
-char *curPath = (char *)(cart.ROM + 0x9800);
-// current Path (max 512 bytes) => up to 9A00
+
 
 int filefrom = 0, fileto = 0;
 
@@ -120,7 +121,7 @@ int LoadGame(int entry_num) {
 #if CONFIG_SD_STORAGE
    // save config file only on SD 
    if (volumeId == 1) {
-      
+
       // save last loaded game to config file
       strcpy(cfg.lastPath, curPath);
 

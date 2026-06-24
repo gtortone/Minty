@@ -400,17 +400,17 @@ void apply_pokes(char *filename) {
    }
 }
 
-int add_info_page(int cur_page, INFO_ENTRY *info_entries, cfgSection section) {
+int add_info_page(int cur_page, INFO_ENTRY **info_entries, cfgSection section) {
    // if no more pages overwrite last page
    if (cur_page < MAX_INFO_PAGES) {
       cur_page++;
-      info_entries++;
+      (*info_entries)++;
    }
-   info_entries->section = section;
+   (*info_entries)->section = section;
    // clear new page
    for (int i=0; i<10 ; i++)
       for (int j=0; j<20; j++)
-         info_entries->line[i][j] = 0;
+         (*info_entries)->line[i][j] = 0;
          
    return cur_page;
 }
@@ -480,7 +480,7 @@ int collect_info(char *filename, INFO_ENTRY *info_entries) {
             // if page is full start a new one
             if (cur_line == 10) {
                cur_line = 0;
-               cur_page = add_info_page(cur_page, info_entries, MAPPING);
+               cur_page = add_info_page(cur_page, &info_entries, MAPPING);
             }
             sprintf(tmp_buffer, "$%04X - $%04X", lo, hi-1);
             snprintf(info_entries->line[cur_line++], 20, "%-19s", tmp_buffer);
@@ -512,7 +512,7 @@ int collect_info(char *filename, INFO_ENTRY *info_entries) {
                // store memattr info in info_entries, if page is full start a new one
                if (cur_line == 10) {
                   cur_line = 0;
-                  cur_page = add_info_page(cur_page, info_entries, MEMATTR);
+                  cur_page = add_info_page(cur_page, &info_entries, MEMATTR);
                }
                sprintf(tmp_buffer, "$%04X - $%04X", i * 0x800, (i * 0x800) + ((hi - lo) * 0x100) - 1);
                snprintf(info_entries->line[cur_line++], 20, "%-19s", tmp_buffer);
@@ -551,7 +551,7 @@ int collect_info(char *filename, INFO_ENTRY *info_entries) {
                // store memattr info in info_entries, if page is full start a new one
                if (cur_line == 10) {
                   cur_line = 0;
-                  cur_page = add_info_page(cur_page, info_entries, VARS);
+                  cur_page = add_info_page(cur_page, &info_entries, VARS);
                }
                snprintf(info_entries->line[cur_line++], 20, "%-19s", key);
                snprintf(info_entries->line[cur_line++], 20, "%19s", value);      
@@ -621,7 +621,7 @@ int collect_info(char *filename, INFO_ENTRY *info_entries) {
                   // if page is full start a new one
                   if (cur_line == 10) {
                      cur_line = 0;
-                     cur_page = add_info_page(cur_page, info_entries, cfgsec);
+                     cur_page = add_info_page(cur_page, &info_entries, cfgsec);
                   }
                   printf("key: %s, value: %s\n", key, value);
                   snprintf(info_entries->line[cur_line++], 20, "%-19s", key);
