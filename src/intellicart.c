@@ -30,9 +30,6 @@ extern uint8_t tv_mode;      // 0: PAL, 1: NTSC
 extern uint8_t ecs_present;  // 0: ECS absent, 1: ECS present
 extern uint8_t ecs_volume;
 
-// RAM base address for launcher 
-const unsigned int base = 0x17F;
-
 void init_cart(void) {
 
    memset((uint16_t *) cart.ROM, 0, sizeof(cart.ROM));
