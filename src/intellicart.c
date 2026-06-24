@@ -43,16 +43,19 @@ void init_cart(void) {
    cart.ramwidth = 0;
 
    cart.pagingSupport = false;
-
+#if CONFIG_JLP
    cart.JLPSupport = false;
    cart.JLPFlash = false;
    cart.JLPFlashSize = 0;
    cart.JLPAccel = 0;
    cart.flashfile[0] = '\0';
-
+#endif
+#if CONFIG_ECS_AUDIO
    cart.ECSSupport = 0;
+#endif
 }
 
+#if CONFIG_JLP
 inline void config_jlp(int jlp_value, int jlpflash_value, char *filename) {
 
    if (jlp_value != 0) {
@@ -127,11 +130,10 @@ inline void config_jlp(int jlp_value, int jlpflash_value, char *filename) {
 
    }  // end if(JLPFlash)
 }
+#endif
 
 int load_cfg(char *filename) {
-
-   char line[128];
-   char cfgfile[512] = {0};
+   char tmp_buffer[512] = {0};
    cfgSection cfgsec; 
    vfs_file_t *f;
    int ret;
@@ -143,11 +145,11 @@ int load_cfg(char *filename) {
 #endif
 
    char *dot = strrchr(filename, '.');
-   strncpy(cfgfile, filename, (dot - filename));
-   strcat(cfgfile, ".cfg");
+   strncpy(tmp_buffer, filename, (dot - filename));
+   strcat(tmp_buffer, ".cfg");
 
    // config file not available, try to config memory using fingerprint
-   if ((f = vfs_open(cfgfile, "r")) == NULL) {
+   if ((f = vfs_open(tmp_buffer, "r")) == NULL) {
       int fp = 0;
 
       for (int i = 0; i < 128; i++)
@@ -183,7 +185,7 @@ int load_cfg(char *filename) {
       return num_pokes;
    }
 
-   printf("load_cfg: use %s config file\n", cfgfile);
+   printf("load_cfg: use %s config file\n", tmp_buffer);
   
    cleanSlots();
    cleanHoles();
@@ -192,31 +194,31 @@ int load_cfg(char *filename) {
 
    while (!(vfs_eof(f))) {
 
-      if (vfs_gets(f, line, sizeof(line)) == NULL)
+      if (vfs_gets(f, tmp_buffer, sizeof(tmp_buffer)) == NULL)
          continue;
 
-      strcpy(line, trim(line));
-      to_lower(line);
+      strcpy(tmp_buffer, trim(tmp_buffer));
+      to_lower(tmp_buffer);
 
-      //printf("line: %s, len: %d\n", line, strlen(line));
+      //printf("line: %s, len: %d\n", tmp_buffer, strlen(tmp_buffer));
 
       // skip comments
-      if ( (line[0] == ';') || !(stralpha(line)) )
+      if ( (tmp_buffer[0] == ';') || !(stralpha(tmp_buffer)) )
          continue;
 
-      if (strstr(line, "[mapping]") != NULL) {
+      if (strstr(tmp_buffer, "[mapping]") != NULL) {
          cfgsec = MAPPING;
          printf("[mapping] section\n");
          continue;
-      } else if (strstr(line, "[memattr]") != NULL) {
+      } else if (strstr(tmp_buffer, "[memattr]") != NULL) {
          cfgsec = MEMATTR;
          printf("[memattr] section\n");
          continue;
-      } else if (strstr(line, "[vars]") != NULL) {
+      } else if (strstr(tmp_buffer, "[vars]") != NULL) {
          cfgsec = VARS;
          printf("[vars] section\n");
          continue;
-      } else if (strstr(line, "[macro]") != NULL) {
+      } else if (strstr(tmp_buffer, "[macro]") != NULL) {
          cfgsec = MACRO;
          printf("[macro] section\n");
          continue;
@@ -228,11 +230,11 @@ int load_cfg(char *filename) {
 
          uint32_t a, b, c, p;
 
-         if(strstr(line, "page") != NULL) {
+         if(strstr(tmp_buffer, "page") != NULL) {
 
-            ret = sscanf(line, "$%lx - $%lx = $%lx%*[^p]page%lx", &a, &b, &c, &p);
+            ret = sscanf(tmp_buffer, "$%lx - $%lx = $%lx%*[^p]page%lx", &a, &b, &c, &p);
             if (ret != 4) {
-               printf("E: parsing error in line: \n\t %s\n", line);
+               printf("E: parsing error in line: \n\t %s\n", tmp_buffer);
                return num_pokes;
             }
             cart.pagingSupport = true;
@@ -240,9 +242,9 @@ int load_cfg(char *filename) {
 
          } else {
 
-            ret = sscanf(line, "$%lx - $%lx = $%lx", &a, &b, &c); 
+            ret = sscanf(tmp_buffer, "$%lx - $%lx = $%lx", &a, &b, &c); 
             if (ret != 3) {
-               printf("E: parsing error in line: \n\t %s\n", line);
+               printf("E: parsing error in line: \n\t %s\n", tmp_buffer);
                return num_pokes;
             }
             addSlot(a, b, c, 0, ROM_SLOT);
@@ -256,13 +258,13 @@ int load_cfg(char *filename) {
          int w;
          char type[4];
 
-         ret = sscanf(line, "$%lx - $%lx = %3s %d", &a, &b, type, &w);
+         ret = sscanf(tmp_buffer, "$%lx - $%lx = %3s %d", &a, &b, type, &w);
          if (ret != 4) {
-            printf("E: parsing error in line: \n\t %s\n", line);
+            printf("E: parsing error in line: \n\t %s\n", tmp_buffer);
             return num_pokes;
          }
          if ( (strcmp(type, "rom") != 0) && (strcmp(type, "ram") != 0) ) {
-            printf("E: parsing error in line: \n\t %s\n", line);
+            printf("E: parsing error in line: \n\t %s\n", tmp_buffer);
             return num_pokes;
          }
          if (w == 8)
@@ -273,14 +275,14 @@ int load_cfg(char *filename) {
       } else if (cfgsec == VARS) {
 
 #if CONFIG_JLP
-         if ( sscanf(line, "jlp = %d", &jlp_value) == 1  ||
-               sscanf(line, "jlp_accel = %d", &jlp_value) == 1  || 
-               sscanf(line, "jlpaccel = %d", &jlp_value) == 1 ) {
+         if ( sscanf(tmp_buffer, "jlp = %d", &jlp_value) == 1  ||
+               sscanf(tmp_buffer, "jlp_accel = %d", &jlp_value) == 1  || 
+               sscanf(tmp_buffer, "jlpaccel = %d", &jlp_value) == 1 ) {
             printf("JLP config found\n");
          }
 
-         if ( sscanf(line, "jlp_flash = %d", &jlpflash_value) == 1  ||
-               sscanf(line, "jlpflash = %d", &jlpflash_value) == 1 ) {
+         if ( sscanf(tmp_buffer, "jlp_flash = %d", &jlpflash_value) == 1  ||
+               sscanf(tmp_buffer, "jlpflash = %d", &jlpflash_value) == 1 ) {
 
             printf("JLP flash config found\n");
          }
@@ -289,7 +291,7 @@ int load_cfg(char *filename) {
 #if CONFIG_ECS_AUDIO
          if (ecs_present == 0) {
             int ecs_value = 0;
-            if ( sscanf(line, "ecs = %d", &ecs_value) == 1 ) {
+            if ( sscanf(tmp_buffer, "ecs = %d", &ecs_value) == 1 ) {
                if (ecs_value == 1) {
                   cart.ECSSupport = true;
                   init_ecs(tv_mode, ecs_volume);
@@ -305,14 +307,14 @@ int load_cfg(char *filename) {
          uint32_t poke_address, poke_value;
          char cmd[16];
             
-         ret = sscanf(line, "%15s %lx %lx", cmd, &poke_address, &poke_value);
+         ret = sscanf(tmp_buffer, "%15s %lx %lx", cmd, &poke_address, &poke_value);
 
          if (ret == 3 && (strcasecmp(cmd, "p") == 0 || strcasecmp(cmd, "poke") == 0)) {
             num_pokes++;
             printf("Poke %d detected : %lx @ %lx\n",num_pokes,poke_value,poke_address);
          }
          else {
-            printf("E: not a MACRO/poke cmd in line: \n\t %s\n", line);
+            printf("E: not a MACRO/poke cmd in line: \n\t %s\n", tmp_buffer);
          }
       }
    }
@@ -333,32 +335,31 @@ int load_cfg(char *filename) {
 }
 
 void apply_pokes(char *filename) {
-   char line[256];
-   char cfgfile[512] = {0};
+   char tmp_buffer[512] = {0};
    cfgSection cfgsec; 
    vfs_file_t *f;
    int ret;
 
    char *dot = strrchr(filename, '.');
-   strncpy(cfgfile, filename, (dot - filename));
-   strcat(cfgfile, ".cfg");
+   strncpy(tmp_buffer, filename, (dot - filename));
+   strcat(tmp_buffer, ".cfg");
 
    printf("applying pokes\n");
 
-   f = vfs_open(cfgfile, "r");
+   f = vfs_open(tmp_buffer, "r");
 
    cfgsec = NONE;
    while (!(vfs_eof(f))) {
-      vfs_gets(f, line, sizeof(line));
-      strcpy(line, trim(line));
+      vfs_gets(f, tmp_buffer, sizeof(tmp_buffer));
+      strcpy(tmp_buffer, trim(tmp_buffer));
 
       // skip comments
-      if ( (line[0] == ';') || !(stralpha(line)) ) {
+      if ( (tmp_buffer[0] == ';') || !(stralpha(tmp_buffer)) ) {
          continue;
       }
 
       // detect start of MACRO section
-      if (strstr(line, "[macro]") != NULL) {
+      if (strstr(tmp_buffer, "[macro]") != NULL) {
          cfgsec = MACRO;
          printf("[macro] section\n");
          continue;
@@ -366,7 +367,7 @@ void apply_pokes(char *filename) {
 
       if (cfgsec == MACRO) {
          // detect end of MACRO section
-         if (strstr(line, "[") != NULL) {
+         if (strstr(tmp_buffer, "[") != NULL) {
             cfgsec = NONE;
             printf("End of MACRO section\n");
          }
@@ -376,7 +377,7 @@ void apply_pokes(char *filename) {
             uint32_t poke_address, poke_value;
             char cmd[16];
             
-            ret = sscanf(line, "%15s %lx %lx", cmd, &poke_address, &poke_value);
+            ret = sscanf(tmp_buffer, "%15s %lx %lx", cmd, &poke_address, &poke_value);
 
             if (ret == 3 && (strcasecmp(cmd, "p") == 0 || strcasecmp(cmd, "poke") == 0)) {
                // Modify actual value @corresponding address in binary
@@ -392,17 +393,31 @@ void apply_pokes(char *filename) {
                }
             }
             else {
-               printf("E: not a MACRO/poke cmd in line: \n\t %s\n", line);
+               printf("E: not a MACRO/poke cmd in line: \n\t %s\n", tmp_buffer);
             }
          }
       }
    }
 }
 
+int add_info_page(int cur_page, INFO_ENTRY *info_entries, cfgSection section) {
+   // if no more pages overwrite last page
+   if (cur_page < MAX_INFO_PAGES) {
+      cur_page++;
+      info_entries++;
+   }
+   info_entries->section = section;
+   // clear new page
+   for (int i=0; i<10 ; i++)
+      for (int j=0; j<20; j++)
+         info_entries->line[i][j] = 0;
+         
+   return cur_page;
+}
+
 int collect_info(char *filename, INFO_ENTRY *info_entries) {
 
-   char line[256];
-   char cfgfile[512] = {0};
+   char tmp_buffer[512] = {0};
    vfs_file_t *f;
    cfgSection cfgsec = NONE;
    cfgSection new_cfgsec = NONE;
@@ -465,18 +480,12 @@ int collect_info(char *filename, INFO_ENTRY *info_entries) {
             // if page is full start a new one
             if (cur_line == 10) {
                cur_line = 0;
-               cur_page++;
-               info_entries++;
-               info_entries->section = MAPPING;
-               // clear new page
-               for (int i=0; i<10 ; i++)
-                  for (int j=0; j<20; j++)
-                     info_entries->line[i][j] = 0;
+               cur_page = add_info_page(cur_page, info_entries, MAPPING);
             }
-            sprintf(line, "$%04X - $%04X", lo, hi-1);
-            snprintf(info_entries->line[cur_line++], 20, "%-19s", line);
-            sprintf(line, "$%04X", target);
-            snprintf(info_entries->line[cur_line++], 20, "%19s", line);
+            sprintf(tmp_buffer, "$%04X - $%04X", lo, hi-1);
+            snprintf(info_entries->line[cur_line++], 20, "%-19s", tmp_buffer);
+            sprintf(tmp_buffer, "$%04X", target);
+            snprintf(info_entries->line[cur_line++], 20, "%19s", tmp_buffer);
 
             // skip actual ROM data
             for (int j = lo; j < hi; j++) {
@@ -503,16 +512,10 @@ int collect_info(char *filename, INFO_ENTRY *info_entries) {
                // store memattr info in info_entries, if page is full start a new one
                if (cur_line == 10) {
                   cur_line = 0;
-                  cur_page++;
-                  info_entries++;
-                  info_entries->section = MEMATTR;
-                  // clear new page
-                  for (int i=0; i<10 ; i++)
-                     for (int j=0; j<20; j++)
-                        info_entries->line[i][j] = 0;
+                  cur_page = add_info_page(cur_page, info_entries, MEMATTR);
                }
-               sprintf(line, "$%04X - $%04X", i * 0x800, (i * 0x800) + ((hi - lo) * 0x100) - 1);
-               snprintf(info_entries->line[cur_line++], 20, "%-19s", line);
+               sprintf(tmp_buffer, "$%04X - $%04X", i * 0x800, (i * 0x800) + ((hi - lo) * 0x100) - 1);
+               snprintf(info_entries->line[cur_line++], 20, "%-19s", tmp_buffer);
                if(attr & 0x04)
                   snprintf(info_entries->line[cur_line++], 20, "%19s", "RAM 8");
                else
@@ -548,13 +551,7 @@ int collect_info(char *filename, INFO_ENTRY *info_entries) {
                // store memattr info in info_entries, if page is full start a new one
                if (cur_line == 10) {
                   cur_line = 0;
-                  cur_page++;
-                  info_entries++;
-                  info_entries->section = VARS;
-                  // clear new page
-                  for (int i=0; i<10 ; i++)
-                     for (int j=0; j<20; j++)
-                        info_entries->line[i][j] = 0;
+                  cur_page = add_info_page(cur_page, info_entries, VARS);
                }
                snprintf(info_entries->line[cur_line++], 20, "%-19s", key);
                snprintf(info_entries->line[cur_line++], 20, "%19s", value);      
@@ -566,12 +563,12 @@ int collect_info(char *filename, INFO_ENTRY *info_entries) {
    else {
       // not a ROM file, try to collect info from corresponding config file
       char *dot = strrchr(filename, '.');
-      strncpy(cfgfile, filename, (dot - filename));
-      strcat(cfgfile, ".cfg");  
+      strncpy(tmp_buffer, filename, (dot - filename));
+      strcat(tmp_buffer, ".cfg");  
      
-      f = vfs_open(cfgfile, "r");
+      f = vfs_open(tmp_buffer, "r");
       if (f == NULL) {
-         printf("collect_info: could not open file %s\n", cfgfile);
+         printf("collect_info: could not open file %s\n", tmp_buffer);
          snprintf(info_entries->line[cur_line++], 20, "%-19s", "file Type");
          snprintf(info_entries->line[cur_line++], 20, "%19s", "BIN (no cfg)");
       }
@@ -580,24 +577,24 @@ int collect_info(char *filename, INFO_ENTRY *info_entries) {
          snprintf(info_entries->line[cur_line++], 20, "%19s", "BIN+CFG");
          // now parse the file to collect info entries
          while (!(vfs_eof(f))) {
-            vfs_gets(f, line, sizeof(line));
-            strcpy(line, trim(line));
+            vfs_gets(f, tmp_buffer, sizeof(tmp_buffer));
+            strcpy(tmp_buffer, trim(tmp_buffer));
 
             // skip comments
-            if ( (line[0] == ';') || !(stralpha(line)) ) {
+            if ( (tmp_buffer[0] == ';') || !(stralpha(tmp_buffer)) ) {
                continue;
             }
 
-            if (strstr(line, "[mapping]") != NULL) {
+            if (strstr(tmp_buffer, "[mapping]") != NULL) {
                new_cfgsec = MAPPING;
                printf("[mapping] section\n");
-            } else if (strstr(line, "[memattr]") != NULL) {
+            } else if (strstr(tmp_buffer, "[memattr]") != NULL) {
                new_cfgsec = MEMATTR;
                printf("[memattr] section\n");
-            } else if (strstr(line, "[vars]") != NULL) {
+            } else if (strstr(tmp_buffer, "[vars]") != NULL) {
                new_cfgsec = VARS;
                printf("[vars] section\n");
-            } else if (strstr(line, "[macro]") != NULL) {
+            } else if (strstr(tmp_buffer, "[macro]") != NULL) {
                new_cfgsec = MACRO;
                printf("[macro] section\n");
             }
@@ -610,12 +607,12 @@ int collect_info(char *filename, INFO_ENTRY *info_entries) {
             }
 
             if (cfgsec != NONE) {
-               printf("collecting info from line: %s\n", line);
-               char *equal_sign = strchr(line, '=');
+               printf("collecting info from line: %s\n", tmp_buffer);
+               char *equal_sign = strchr(tmp_buffer, '=');
                if (equal_sign) {
                   // split the line into key and value
                   *equal_sign = 0;
-                  char *key = trim(line);
+                  char *key = trim(tmp_buffer);
                   char *value = trim(equal_sign + 1);
                   // remove trailing comment
                   char *comment_sign = strchr(value, ';');
@@ -624,19 +621,13 @@ int collect_info(char *filename, INFO_ENTRY *info_entries) {
                   // if page is full start a new one
                   if (cur_line == 10) {
                      cur_line = 0;
-                     cur_page++;
-                     info_entries++;
-                     info_entries->section = cfgsec;
-                     // clear new page
-                     for (int i=0; i<10 ; i++)
-                        for (int j=0; j<20; j++)
-                           info_entries->line[i][j] = 0;
+                     cur_page = add_info_page(cur_page, info_entries, cfgsec);
                   }
                   printf("key: %s, value: %s\n", key, value);
                   snprintf(info_entries->line[cur_line++], 20, "%-19s", key);
                   snprintf(info_entries->line[cur_line++], 20, "%19s", value);
                } else {
-                  printf("E: invalid line:\t %s\n", line);
+                  printf("E: invalid line:\t %s\n", tmp_buffer);
                }
             }
          }

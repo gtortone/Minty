@@ -18,7 +18,7 @@ char* trim(char *s) {
 bool stralpha(char *s) {
 
    if (*s == '\0') 
-      return 0;
+      return false;
 
    while (*s) {
       if (isalnum((unsigned char)*s))
