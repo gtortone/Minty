@@ -260,11 +260,12 @@ int load_file(char *filename) {
                   vfs_read(f, inputBuffer, 2);
 
                   //printf("tag 0x06:  byte[3]: 0x%X, byte[4]: 0x%X\n", inputBuffer[0], inputBuffer[1]);
-
+#if CONFIG_JLP
                   int jlp_value = inputBuffer[0] >> 6;
                   int jlpflash_value = inputBuffer[1];
 
                   config_jlp(jlp_value, jlpflash_value, filename);
+#endif
                }
 
             } else {

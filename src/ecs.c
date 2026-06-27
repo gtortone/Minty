@@ -9,9 +9,6 @@
 #include "board.h"
 #include "ecs.h"
 
-#if CONFIG_ECS_AUDIO
-
-
 static repeating_timer_t timer;
 PSG* psg0;
 uint8_t ecs_AudioVolume;
@@ -47,11 +44,9 @@ bool ay_callback(repeating_timer_t *rt) {
    return true;
 }
 
-#endif
 
 void init_ecs(uint8_t tv_mode, uint8_t volume) {
 
-#if CONFIG_ECS_AUDIO
    gpio_set_function(ECS_AUDIO, GPIO_FUNC_PWM);
 
    uint audioSlice = pwm_gpio_to_slice_num(ECS_AUDIO);
@@ -71,7 +66,6 @@ void init_ecs(uint8_t tv_mode, uint8_t volume) {
    PSG_setVolumeMode(psg0, EMU2149_VOL_AY_3_8910);
 
    add_repeating_timer_us(-(1.0/SAMPLING_FREQ) * 1000000, ay_callback, NULL, &timer);
-#endif
 
 }
 

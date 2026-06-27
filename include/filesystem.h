@@ -11,7 +11,9 @@ typedef struct {
 typedef struct {
    unsigned int section;
    char line[10][20];
-} INFO_ENTRY;                   // 204 bytes per page (44kb minimum allocated allowing for 220 pages) 
+} INFO_ENTRY;                   // 204 bytes per page (20400 bytes allocated allowing for 100 pages) 
+
+#define MAX_INFO_PAGES 100
 
 int entry_compare(const void *p1, const void *p2);
 char *get_filename_ext(char *filename);

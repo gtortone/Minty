@@ -34,8 +34,6 @@
 // config file
 vfs_file_t *cfgfile;
 vfs_stat_t st;
-char filename[32];
-unsigned int br, bw;
 
 struct boardConfig cfg = {
    .version = CONFIG_VERSION,
@@ -53,19 +51,24 @@ uint8_t tv_mode;      // 0: PAL, 1: NTSC
 uint8_t ecs_present;  // 0: ECS absent, 1: ECS present
 uint8_t ecs_volume = 0xFF;   
 
-char curPath[512] = "";
-
 #if CONFIG_FLASH_FAT_STORAGE
 int volumeId = 0;    // default flash storage
 #else
 int volumeId = 1;    // default SD storage
 #endif
 
-// recycle cartridge ROM to allocate temporary buffers
+char curPath[512] = "";
+
+// recycle cartridge ROM to allocate temporary buffers (min size is 2x50x1024 i.e. going till 0x18FFF)
 // start from 0x4000 to allow launcher ROM size up to 16Kb
 SCREEN_ENTRY *screen_entries = (SCREEN_ENTRY *) (cart.ROM + 0x2000);
-// buffer for information data to pass to INTY launcher
+// maximum 512 entries allowed, 69 bytes per entry, 512 entries max = 34Kb (40kB allocated)
+// 0x2000 + (512 * 69)/2 = 0x6500
 INFO_ENTRY *info_entries = (INFO_ENTRY *) (cart.ROM + 0x7000);
+// buffer for information data to pass to INTY launcher
+// 204 bytes per page (20400 bytes allocated allowing for 100 pages)
+// 0x7000 + (204 * 100)/2 = 0x97D8
+
 
 int filefrom = 0, fileto = 0;
 
@@ -118,7 +121,7 @@ int LoadGame(int entry_num) {
 #if CONFIG_SD_STORAGE
    // save config file only on SD 
    if (volumeId == 1) {
-      
+
       // save last loaded game to config file
       strcpy(cfg.lastPath, curPath);
 
@@ -128,15 +131,13 @@ int LoadGame(int entry_num) {
 #else
       cfg.ecs_volume = 255;
 #endif
+      printf("save cfg file: %s\n", CONFIG_FILENAME);
 
-      sprintf(filename, "/sd/%s", CONFIG_FILENAME);
-      printf("save cfg file: %s\n", filename);
-
-      if ( (cfgfile = vfs_open(filename, "w")) != NULL) {
+      if ( (cfgfile = vfs_open(CONFIG_FILENAME, "w")) != NULL) {
          vfs_write(cfgfile, &cfg, sizeof(struct boardConfig));
          vfs_close(cfgfile);
       } else {
-         printf("E: config file %s not written\n", filename);
+         printf("E: config file %s not written\n", CONFIG_FILENAME);
       }
    }
 #endif
@@ -398,10 +399,9 @@ void RunLauncher() {
 
 #if CONFIG_SD_STORAGE
    if (volumeId == 1) {
-      // try to read configuration file
-      sprintf(filename, "/sd/%s", CONFIG_FILENAME);
-      
-      if ( (cfgfile = vfs_open(filename, "r")) != NULL) {
+
+      // try to read configuration file    
+      if ( (cfgfile = vfs_open(CONFIG_FILENAME, "r")) != NULL) {
 
          vfs_read(cfgfile, &cfg, sizeof(struct boardConfig));
 
