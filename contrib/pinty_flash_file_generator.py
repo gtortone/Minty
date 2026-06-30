@@ -18,15 +18,15 @@ Information-only UF2 fields (not editable):
 - UF2 family ID
 - UF2 payload size
 
-Presets:
-- RP2350 (default)
-- RP2040
+Generated file names are automatically proposed from the selected source folder,
+but can still be manually edited afterwards.
 """
 
 from __future__ import annotations
 
 import os
 import queue
+import re
 import shutil
 import struct
 import subprocess
@@ -63,9 +63,6 @@ TARGET_CONFIGS = {
 DEFAULTS = {
     "target": "RP2350",
     "pad_value": "0xFF",
-    "fs_name": "littlefs.bin",
-    "merged_name": "merged.bin",
-    "uf2_name": "merged.uf2",
 }
 
 UF2_MAGIC_START0 = 0x0A324655
@@ -140,6 +137,20 @@ def auto_find_mklittlefs() -> str | None:
     return shutil.which(exe) or shutil.which("mklittlefs")
 
 
+def sanitize_name(name: str) -> str:
+    name = name.strip()
+    if not name:
+        return "littlefs"
+    name = re.sub(r"[^A-Za-z0-9._-]+", "_", name)
+    name = name.strip("._-")
+    return name or "littlefs"
+
+
+def derived_names_from_folder(folder: str) -> tuple[str, str, str]:
+    base = sanitize_name(Path(folder).name if folder else "littlefs")
+    return (f"{base}_littlefs.bin", f"{base}_merged.bin", f"{base}_merged.uf2")
+
+
 class TextLogger:
     def __init__(self, widget: tk.Text):
         self.widget = widget
@@ -189,9 +200,9 @@ class App(tk.Tk):
         self.var_family_id = tk.StringVar()
         self.var_uf2_payload_size = tk.StringVar()
 
-        self.var_fs_name = tk.StringVar(value=DEFAULTS["fs_name"])
-        self.var_merged_name = tk.StringVar(value=DEFAULTS["merged_name"])
-        self.var_uf2_name = tk.StringVar(value=DEFAULTS["uf2_name"])
+        self.var_fs_name = tk.StringVar()
+        self.var_merged_name = tk.StringVar()
+        self.var_uf2_name = tk.StringVar()
 
     def _ui(self) -> None:
         root = ttk.Frame(self, padding=10)
@@ -235,6 +246,7 @@ class App(tk.Tk):
         self.btn_build = ttk.Button(actions, text="Build All", command=self._start_build)
         self.btn_build.pack(side="left")
         ttk.Button(actions, text="Preview Paths", command=self._preview_paths).pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="Reset Derived Names", command=self._update_derived_names).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="Clear Log", command=lambda: self.logger.clear()).pack(side="left", padx=(8, 0))
         self.progress = ttk.Progressbar(actions, mode="indeterminate")
         self.progress.pack(side="right", fill="x", expand=True, padx=(10, 0))
@@ -246,11 +258,9 @@ class App(tk.Tk):
         self.logger = TextLogger(self.text_log)
         self.logger.write(
             "Ready.\n"
-            "Simplified workflow:\n"
-            "  1) Build a LittleFS image from the selected folder\n"
-            "  2) Pad the Firmware Binary to the selected size and append the filesystem image\n"
-            "  3) Convert the merged BIN to UF2 for RP2350 or RP2040\n\n"
-            "UF2-sensitive fields are shown for information only and follow the selected preset.\n\n"
+            "Generated file names are automatically proposed from the selected source folder,\n"
+            "but you can still edit them manually afterwards.\n"
+            "Use 'Reset Derived Names' to restore the automatic proposal.\n\n"
         )
 
     def _entry_row(self, parent, row: int, label: str, var: tk.StringVar) -> None:
@@ -260,8 +270,7 @@ class App(tk.Tk):
 
     def _readonly_row(self, parent, row: int, label: str, var: tk.StringVar) -> None:
         ttk.Label(parent, text=label, width=24).grid(row=row, column=0, sticky="w", padx=(0, 10), pady=4)
-        entry = ttk.Entry(parent, textvariable=var, state="readonly")
-        entry.grid(row=row, column=1, sticky="ew", pady=4)
+        ttk.Entry(parent, textvariable=var, state="readonly").grid(row=row, column=1, sticky="ew", pady=4)
         parent.grid_columnconfigure(1, weight=1)
 
     def _browse_row(self, parent, row: int, label: str, var: tk.StringVar, cb) -> None:
@@ -278,10 +287,17 @@ class App(tk.Tk):
             combo.bind("<<ComboboxSelected>>", cb)
         parent.grid_columnconfigure(1, weight=1)
 
+    def _update_derived_names(self) -> None:
+        fs_name, merged_name, uf2_name = derived_names_from_folder(self.var_folder.get().strip())
+        self.var_fs_name.set(fs_name)
+        self.var_merged_name.set(merged_name)
+        self.var_uf2_name.set(uf2_name)
+
     def _pick_folder(self) -> None:
         p = filedialog.askdirectory(title="Select source folder")
         if p:
             self.var_folder.set(p)
+            self._update_derived_names()
             if not self.var_output_dir.get():
                 self.var_output_dir.set(p)
 
@@ -319,6 +335,8 @@ class App(tk.Tk):
             self.var_image_size.set(preset["image_size"])
         if force_all or not self.var_pad_size.get().strip():
             self.var_pad_size.set(preset["pad_size"])
+        if force_all:
+            self._update_derived_names()
 
     def _preview_paths(self) -> None:
         try:
@@ -332,22 +350,17 @@ class App(tk.Tk):
             f"  Filesystem image   : {cfg.fs_image}\n"
             f"  Merged BIN         : {cfg.merged_bin}\n"
             f"  UF2                : {cfg.uf2_file}\n"
-            f"  Target MCU         : {cfg.target}\n"
-            f"  Flash address      : 0x{cfg.flash_address:08X}\n"
-            f"  UF2 family ID      : 0x{cfg.family_id:08X}\n"
-            f"  UF2 payload size   : {cfg.uf2_payload_size}\n\n"
+            f"  Proposed from      : {cfg.folder.name}\n\n"
         )
 
     def _read_config(self) -> BuildConfig:
         target = self.var_target.get().strip() or DEFAULTS["target"]
         if target not in TARGET_CONFIGS:
             raise ValueError(f"Unsupported target MCU: {target}")
-
         folder = Path(self.var_folder.get().strip())
         firmware_binary = Path(self.var_firmware_binary.get().strip())
         output_dir = Path(self.var_output_dir.get().strip())
         mklfs = self.var_mklittlefs.get().strip() or auto_find_mklittlefs() or ""
-
         if not folder.exists() or not folder.is_dir():
             raise ValueError("Please select a valid source folder.")
         if not firmware_binary.exists() or not firmware_binary.is_file():
@@ -359,7 +372,6 @@ class App(tk.Tk):
             raise ValueError("Could not find mklittlefs. Select it manually or place it next to the script.")
         if not Path(mklfs).exists() and not shutil.which(mklfs):
             raise ValueError("mklittlefs not found at the selected location.")
-
         cfg = BuildConfig(
             target=target,
             family_id=parse_int(self.var_family_id.get(), "UF2 family ID"),
@@ -368,9 +380,9 @@ class App(tk.Tk):
             firmware_binary=firmware_binary.resolve(),
             output_dir=output_dir.resolve(),
             mklittlefs_path=str(Path(mklfs).resolve()) if Path(mklfs).exists() else mklfs,
-            fs_image=(output_dir / (self.var_fs_name.get().strip() or DEFAULTS["fs_name"])).resolve(),
-            merged_bin=(output_dir / (self.var_merged_name.get().strip() or DEFAULTS["merged_name"])).resolve(),
-            uf2_file=(output_dir / (self.var_uf2_name.get().strip() or DEFAULTS["uf2_name"])).resolve(),
+            fs_image=(output_dir / sanitize_name(self.var_fs_name.get().strip())).resolve(),
+            merged_bin=(output_dir / sanitize_name(self.var_merged_name.get().strip())).resolve(),
+            uf2_file=(output_dir / sanitize_name(self.var_uf2_name.get().strip())).resolve(),
             image_size=parse_int(self.var_image_size.get(), "image size"),
             block_size=parse_int(self.var_block_size.get(), "block size"),
             page_size=parse_int(self.var_page_size.get(), "page size"),
@@ -378,7 +390,6 @@ class App(tk.Tk):
             pad_value=parse_int(self.var_pad_value.get(), "pad value"),
             uf2_payload_size=parse_int(self.var_uf2_payload_size.get(), "UF2 payload size"),
         )
-
         if cfg.image_size <= 0:
             raise ValueError("Image size must be > 0.")
         if cfg.block_size <= 0:
@@ -394,12 +405,9 @@ class App(tk.Tk):
         if cfg.block_size > cfg.image_size:
             raise ValueError("Block size cannot be larger than image size.")
         if cfg.firmware_binary.stat().st_size > cfg.firmware_pad_size:
-            raise ValueError(
-                f"Firmware Binary size ({cfg.firmware_binary.stat().st_size}) is larger than selected pad size ({cfg.firmware_pad_size})."
-            )
+            raise ValueError(f"Firmware Binary size ({cfg.firmware_binary.stat().st_size}) is larger than selected pad size ({cfg.firmware_pad_size}).")
         if cfg.uf2_payload_size <= 0 or cfg.uf2_payload_size > UF2_DATA_BYTES_PER_BLOCK:
             raise ValueError(f"UF2 payload size must be between 1 and {UF2_DATA_BYTES_PER_BLOCK} bytes.")
-
         return cfg
 
     def _set_enabled(self, enabled: bool) -> None:
@@ -425,7 +433,6 @@ class App(tk.Tk):
         except Exception as exc:
             messagebox.showerror(APP_TITLE, str(exc))
             return
-
         self._set_enabled(False)
         self.progress.start(10)
         self.logger.write("Starting build...\n")
@@ -434,14 +441,10 @@ class App(tk.Tk):
 
     def _worker(self, cfg: BuildConfig) -> None:
         try:
-            self._post("log", f"Target MCU        : {cfg.target}\n")
-            self._post("log", f"Source folder     : {cfg.folder}\n")
-            self._post("log", f"Firmware Binary   : {cfg.firmware_binary}\n")
-            self._post("log", f"Output directory  : {cfg.output_dir}\n")
-            self._post("log", f"mklittlefs        : {cfg.mklittlefs_path}\n")
-            self._post("log", f"Flash address     : 0x{cfg.flash_address:08X}\n")
-            self._post("log", f"UF2 family ID     : 0x{cfg.family_id:08X}\n")
-            self._post("log", f"UF2 payload size  : {cfg.uf2_payload_size}\n\n")
+            self._post("log", f"Derived file base  : {cfg.folder.name}\n")
+            self._post("log", f"Filesystem image   : {cfg.fs_image.name}\n")
+            self._post("log", f"Merged BIN         : {cfg.merged_bin.name}\n")
+            self._post("log", f"UF2                : {cfg.uf2_file.name}\n\n")
             build_littlefs_image(cfg, self._post_log)
             merge_firmware_and_fs(cfg, self._post_log)
             convert_merged_bin_to_uf2(cfg, self._post_log)
@@ -474,21 +477,10 @@ class App(tk.Tk):
 def build_littlefs_image(cfg: BuildConfig, log) -> None:
     payload = compute_dir_size(cfg.folder)
     log("[1/3] Building LittleFS image...\n")
-    log(f"  Target MCU       : {cfg.target}\n")
     log(f"  Source folder    : {cfg.folder}\n")
+    log(f"  Output image     : {cfg.fs_image}\n")
     log(f"  Payload size     : {payload} bytes ({human_size(payload)})\n")
-    log(f"  Image size       : {cfg.image_size} bytes ({human_size(cfg.image_size)})\n")
-    log(f"  Block size       : {cfg.block_size} bytes\n")
-    log(f"  Page size        : {cfg.page_size} bytes\n")
-    cmd = [
-        cfg.mklittlefs_path,
-        "-c", str(cfg.folder),
-        "-b", str(cfg.block_size),
-        "-p", str(cfg.page_size),
-        "-s", str(cfg.image_size),
-        str(cfg.fs_image),
-    ]
-
+    cmd = [cfg.mklittlefs_path, "-c", str(cfg.folder), "-b", str(cfg.block_size), "-p", str(cfg.page_size), "-s", str(cfg.image_size), str(cfg.fs_image)]
     log("  Command          : " + " ".join(quote_arg(x) for x in cmd) + "\n")
     result = subprocess.run(cmd, capture_output=True, text=True, check=False)
     if result.stdout.strip():
@@ -499,8 +491,7 @@ def build_littlefs_image(cfg: BuildConfig, log) -> None:
         raise RuntimeError(f"mklittlefs failed with exit code {result.returncode}")
     if not cfg.fs_image.exists():
         raise RuntimeError("Filesystem image was not created.")
-    log(f"  Output image     : {cfg.fs_image}\n")
-    log(f"  Output size      : {cfg.fs_image.stat().st_size} bytes ({human_size(cfg.fs_image.stat().st_size)})\n\n")
+    log("\n")
 
 
 def merge_firmware_and_fs(cfg: BuildConfig, log) -> None:
@@ -510,13 +501,7 @@ def merge_firmware_and_fs(cfg: BuildConfig, log) -> None:
     pad_len = cfg.firmware_pad_size - len(firmware_data)
     merged = firmware_data + bytes([cfg.pad_value]) * pad_len + fs_data
     cfg.merged_bin.write_bytes(merged)
-    log(f"  Firmware size    : {len(firmware_data)} bytes ({human_size(len(firmware_data))})\n")
-    log(f"  Pad size         : {cfg.firmware_pad_size} bytes ({human_size(cfg.firmware_pad_size)})\n")
-    log(f"  Padding added    : {pad_len} bytes ({human_size(pad_len)})\n")
-    log(f"  FS image size    : {len(fs_data)} bytes ({human_size(len(fs_data))})\n")
-    log(f"  Pad value        : 0x{cfg.pad_value:02X}\n")
-    log(f"  Output BIN       : {cfg.merged_bin}\n")
-    log(f"  Merged size      : {len(merged)} bytes ({human_size(len(merged))})\n\n")
+    log(f"  Output BIN       : {cfg.merged_bin}\n\n")
 
 
 def bin_to_uf2(data: bytes, start_addr: int, payload_size: int, family_id: int) -> bytes:
@@ -526,20 +511,8 @@ def bin_to_uf2(data: bytes, start_addr: int, payload_size: int, family_id: int) 
     for index, chunk in enumerate(chunks):
         target_addr = start_addr + index * payload_size
         payload = chunk + bytes(UF2_DATA_BYTES_PER_BLOCK - len(chunk))
-        header = struct.pack(
-            "<IIIIIIII",
-            UF2_MAGIC_START0,
-            UF2_MAGIC_START1,
-            UF2_FLAG_FAMILY_ID_PRESENT,
-            target_addr,
-            len(chunk),
-            index,
-            total,
-            family_id,
-        )
+        header = struct.pack("<IIIIIIII", UF2_MAGIC_START0, UF2_MAGIC_START1, UF2_FLAG_FAMILY_ID_PRESENT, target_addr, len(chunk), index, total, family_id)
         block = header + payload + struct.pack("<I", UF2_MAGIC_END)
-        if len(block) != 512:
-            raise AssertionError(f"UF2 block size is {len(block)}, expected 512")
         out.extend(block)
     return bytes(out)
 
@@ -547,17 +520,8 @@ def bin_to_uf2(data: bytes, start_addr: int, payload_size: int, family_id: int) 
 def convert_merged_bin_to_uf2(cfg: BuildConfig, log) -> None:
     log("[3/3] Converting merged BIN to UF2...\n")
     data = cfg.merged_bin.read_bytes()
-    uf2 = bin_to_uf2(data, cfg.flash_address, cfg.uf2_payload_size, cfg.family_id)
-    cfg.uf2_file.write_bytes(uf2)
-    log(f"  Target MCU       : {cfg.target}\n")
-    log(f"  Family ID        : 0x{cfg.family_id:08X}\n")
-    log(f"  Flash address    : 0x{cfg.flash_address:08X}\n")
-    log(f"  Payload size     : {cfg.uf2_payload_size} bytes\n")
-    log(f"  Input BIN        : {cfg.merged_bin}\n")
-    log(f"  Input size       : {len(data)} bytes ({human_size(len(data))})\n")
-    log(f"  Output UF2       : {cfg.uf2_file}\n")
-    log(f"  Output size      : {len(uf2)} bytes ({human_size(len(uf2))})\n")
-    log(f"  UF2 blocks       : {len(uf2) // 512}\n\n")
+    cfg.uf2_file.write_bytes(bin_to_uf2(data, cfg.flash_address, cfg.uf2_payload_size, cfg.family_id))
+    log(f"  Output UF2       : {cfg.uf2_file}\n\n")
 
 
 def main() -> int:
