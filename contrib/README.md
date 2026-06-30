@@ -1,6 +1,6 @@
 # PiNTY flash file creation tool
 
-This tutorial shows how to generate a .uf2 file and hozw to write it to a PiNTY card.
+This tutorial shows how to generate a .uf2 file and how to write it to a PiNTY card.
 
 ##  Required files
 
