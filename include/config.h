@@ -6,7 +6,7 @@
 
 #define CONFIG_VERSION        2
 #define CONFIG_MAGIC_NUMBER   (uint16_t) 0xCAFE
-#define CONFIG_FILENAME       ".Minty.cfg"
+#define CONFIG_FILENAME       "/sd/.Minty.cfg"
 
 struct boardConfig {
    uint8_t version;

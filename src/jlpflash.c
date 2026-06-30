@@ -8,6 +8,7 @@
 
 extern Cartridge cart;
 
+#if CONFIG_JLP
 void readFlash(int row, uint16_t addr) {
 
    int c;
@@ -114,5 +115,5 @@ void eraseFlash(int row) {
 
    vfs_close(cart.filesave);
 }
-
+#endif
 

@@ -20,21 +20,24 @@ typedef struct {
    uint8_t ramwidth;
 
    bool pagingSupport;
-
+#if CONFIG_JLP
    bool JLPSupport;
    bool JLPFlash;
    uint8_t JLPFlashSize;   // number of 1.5KB JLP flash sectors
    bool JLPAccel;
    char flashfile[512];
    vfs_file_t *filesave;
+#endif
 
+#if CONFIG_ECS_AUDIO
    bool ECSSupport;
+#endif
 } Cartridge;
 
 #define JLP_FEATURE_ACCEL(status)   (status & (1U << 0))
 #define JLP_FEATURE_FLASH(status)   (status & (1U << 1))
 
-#define JLP_FLASH_ROWS_PER_SECTOR    8
+#define JLP_FLASH_ROWS_PER_SECTOR   8
 #define JLP_FLASH_ROW_BYTES         96 * 2     // 96 * uint16_t
 #define JLP_FLASH_SECTOR_BYTES      JLP_FLASH_ROWS_PER_SECTOR * JLP_FLASH_ROW_BYTES
 #define JLP_RAM_ADDRESS             cart.RAM[0x25]
