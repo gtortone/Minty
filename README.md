@@ -104,6 +104,8 @@ Thanks a lot to Andrea Ottaviani for his PiRTOII firmware (https://github.com/ao
 
 Thanks a lot to sukkopera for his PirtoII board with microSD card slot (https://github.com/SukkoPera/PiRTOII)
 
+Many thanks to NicoNicoTsuu for taking the time to explain us how Onion works and helping us to clean up our code (https://niconicotsuu.itch.io/?__cf_chl_f_tk=xHjBoXB3EDoSWd4X6ZW7FxXscVhZIba5IoodncNR_7g-1783194035-1.0.1.1-PT1UIgsdl0lNuueNxxEafUF5X9YgPDIi_SVHw44odM0).
+
 A special thanks to Minty new developer Yannick Erb for his priceless contribution on launcher and various patches and improvements on the firmware.
 
 
