@@ -70,7 +70,7 @@ Setup ROMs:
    <img src="images/controller.png"/>
 </div>
 
-## Build (TL;DR)
+## Build
 
 ### Requirements
 
