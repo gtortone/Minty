@@ -413,7 +413,7 @@ void RunLauncher() {
             if (st.type & VFS_TYPE_DIR) {
                strcpy(curPath, cfg.lastPath);
             } else {
-               char* curFile = strrchr(cfg.lastPath,'/');
+               char* curFile = strrchr(cfg.lastPath+1,'/');
                if (curFile) {
                   int n;
                   *curFile = 0; // curPath ends at last slash
