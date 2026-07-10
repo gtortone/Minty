@@ -58,14 +58,14 @@ void init_ecs(uint8_t tv_mode, uint8_t volume) {
    ecs_AudioVolume = volume;
 
    if (tv_mode == 0) 
-      psg0 = PSG_new(2000000, SAMPLING_FREQ);
+      psg0 = PSG_new(PAL_ECS_FREQ/2, 1000000/ECS_PERIOD);
    else
-      psg0 = PSG_new(1789772, SAMPLING_FREQ);
+      psg0 = PSG_new(NTSC_ECS_FREQ/2, 1000000/ECS_PERIOD);
 
    PSG_reset(psg0);
    PSG_setVolumeMode(psg0, EMU2149_VOL_AY_3_8910);
 
-   add_repeating_timer_us(-(1.0/SAMPLING_FREQ) * 1000000, ay_callback, NULL, &timer);
+   add_repeating_timer_us(-ECS_PERIOD, ay_callback, NULL, &timer);
 
 }
 

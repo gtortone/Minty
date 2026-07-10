@@ -5,9 +5,10 @@
 
 #define PWM_WRAP 1024
 
+#define PAL_ECS_FREQ       4000000
+#define NTSC_ECS_FREQ      3579545
 #define SAMPLING_FREQ      48000
-#define FRAME_FREQ         60
-#define FRAME_LOOPS_CNT    SAMPLING_FREQ / FRAME_FREQ
+#define ECS_PERIOD         25
 
 void init_ecs(uint8_t tv_mode, uint8_t volume);
 
