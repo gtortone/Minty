@@ -184,7 +184,8 @@ void __time_critical_func(core1_main()) {
 
                   uint16_t size;
                   
-                  if (holes[idx].filled)
+                  // handle holes for not-paged ROM slots
+                  if (holes[idx].filled && (holes[idx].page == 0))
                      size = slots[idx].size[0] + holes[idx].size + 1;
                   else
                      size = slots[idx].size[0];
@@ -193,7 +194,7 @@ void __time_critical_func(core1_main()) {
 
                      romaddr = slots[idx].from[0] + (addrIn - slots[idx].target);
 
-                     if (holes[idx].filled) {
+                     if (holes[idx].filled && (holes[idx].page == 0)) {
 
                         if ( (addrIn >= holes[idx].from) && (addrIn <= (holes[idx].from + holes[idx].size)) ) {
                            dataOut = 0xFFFF;
@@ -214,11 +215,33 @@ void __time_critical_func(core1_main()) {
                   seg = addrIn >> 12;
                   uint8_t page = curPageArr[seg];
 
+                  uint16_t size;
+
+                  // handle holes for paged ROM slots
+                  if (holes[idx].filled && (holes[idx].page == page))
+                     size = slots[idx].size[page] + holes[idx].size + 1;
+                  else
+                     size = slots[idx].size[page];
+
                   if (slots[idx].usedmask & (1<<page)) {    // page is filled
 
-                     if ( (addrIn - slots[idx].target) < slots[idx].size[page] ) { 
+                     if ( (addrIn - slots[idx].target) < size ) { 
 
                         romaddr = slots[idx].from[page] + (addrIn - slots[idx].target);
+
+                        if (holes[idx].filled && (holes[idx].page == page)) {
+
+                           if ( (addrIn >= holes[idx].from) && (addrIn <= (holes[idx].from + holes[idx].size)) ) {
+                              dataOut = 0xFFFF;
+                              deviceAddress = true;
+                              continue;
+                           } 
+                           
+                           if ( addrIn > (holes[idx].from) )
+                              romaddr -= (holes[idx].size + 1);
+
+                        }
+
                         dataOut = cart.ROM[romaddr];
                         deviceAddress = true;
                      } 

@@ -59,6 +59,7 @@ void cleanHoles(void) {
    for(int i=0; i<NSLOTS; i++) {
       holes[i].from = 0;
       holes[i].size = 0;
+      holes[i].page = 0;
       holes[i].filled = false;
    }
 }
@@ -94,7 +95,8 @@ void addSlot(uint32_t from, uint32_t to, uint16_t target, uint8_t page, mapType 
       baseslot = (from >> 8);
 
    // detect collision  (only for ROM type for not paged addresses)
-   if ( (type == ROM_SLOT) && ((slots[baseslot].usedmask) & (1<<page)) && (page == 0)) {
+   //if ( (type == ROM_SLOT) && ((slots[baseslot].usedmask) & (1<<page)) && (page == 0)) {
+   if ( (slots[baseslot].usedmask) & (1<<page) ) {
 
       uint32_t from_in = slots[baseslot].from[page];
       uint32_t to_in = slots[baseslot].from[page] + slots[baseslot].size[page];
@@ -112,6 +114,7 @@ void addSlot(uint32_t from, uint32_t to, uint16_t target, uint8_t page, mapType 
             hole = true;
             holes[baseslot].from = target_to_in;
             holes[baseslot].size = (target_from - target_to_in) - 1;
+            holes[baseslot].page = page;
             holes[baseslot].filled = true;
          }
 
@@ -121,6 +124,7 @@ void addSlot(uint32_t from, uint32_t to, uint16_t target, uint8_t page, mapType 
             hole = true;
             holes[baseslot].from = target_to;
             holes[baseslot].size = (target_from_in - target_to) - 1; 
+            holes[baseslot].page = page;
             holes[baseslot].filled = true;
          }
       }
@@ -136,8 +140,8 @@ void addSlot(uint32_t from, uint32_t to, uint16_t target, uint8_t page, mapType 
    }
 
    if(hole) {
-      printf("--- hole 0x%X --- from: 0x%lX, size: %d\n",
-         baseslot, holes[baseslot].from, holes[baseslot].size);
+      printf("--- hole 0x%X --- from: 0x%lX, page: 0x%d, size: %d\n",
+         baseslot, holes[baseslot].from, holes[baseslot].page, holes[baseslot].size);
    }
 
    if ( (type == ROM_SLOT) || (type == ROM_PAGE_SLOT) )
@@ -161,6 +165,7 @@ void addSlot(uint32_t from, uint32_t to, uint16_t target, uint8_t page, mapType 
          // extend hole on near segments
          holes[i].from = holes[baseslot].from;
          holes[i].size = holes[baseslot].size;
+         holes[i].page = holes[baseslot].page;
          holes[i].filled = true;
       }
 
@@ -207,7 +212,7 @@ bool mapAddress(uint16_t addr, uint8_t page, uint32_t *romaddr, mapType *type) {
          if (addr < slots[slot].target)
             return false;
 
-         if (holes[slot].filled)
+         if ((holes[slot].page == page) && holes[slot].filled)
             size = slots[slot].size[page] + holes[slot].size + 1;
          else
             size = slots[slot].size[page];
@@ -216,7 +221,7 @@ bool mapAddress(uint16_t addr, uint8_t page, uint32_t *romaddr, mapType *type) {
 
             *romaddr = slots[slot].from[page] + (addr - slots[slot].target);
          
-            if (holes[slot].filled) {
+            if ((holes[slot].page == page) && holes[slot].filled) {
                // check if address is inside hole...
                if ( (addr >= holes[slot].from) && (addr <= (holes[slot].from + holes[slot].size)) )
                      return false;
