@@ -22,7 +22,7 @@
     ' Include Sound player library
     INCLUDE "SndPlayer.bas"
 
-	DIM I,J,K,WaveFrame
+	DIM I,J,K,WaveFrame,Action
     DIM #F_FROM, #F_TO, #F_TOTAL
     DIM Input, Debounce
     DIM Selected_Entry, Max_Entry
@@ -70,10 +70,22 @@
     CONST CMD_NEXTPAGE      = 3
     CONST CMD_PREVIOUSPAGE  = 4
     CONST CMD_UPDIRECTORY   = 5
-    CONST CMD_SWITCHDEVICE  = 6
     CONST CMD_READINFO      = 7
     CONST CMD_NEXTINFO      = 8
     CONST CMD_PREVINFO      = 9
+
+    ' Interface actions
+    CONST ACTION_NONE          = 0
+    CONST ACTION_SELECT        = 1
+    CONST ACTION_UP            = 2
+    CONST ACTION_DOWN          = 3
+    CONST ACTION_PAGEUP        = 4
+    CONST ACTION_PAGEDOWN      = 5
+    CONST ACTION_EXIT          = 6
+    CONST ACTION_DISPHELP      = 7
+    CONST ACTION_DISPINFO      = 8
+    CONST ACTION_DISPSETTINGS  = 9
+
     ' Type of mass storage devices
     CONST DEV_FLASH         = 0
     CONST DEV_SD            = 1
@@ -249,52 +261,79 @@ MENU_LOOP:
 
     IF Debounce>0 THEN Debounce = Debounce-1:GOTO MENU_LOOP
 
-    Input = CONT
+    GOSUB GetAction
 
-    IF Input = $21 THEN Debounce = DEBOUNCE_DELAY:GOSUB SETTINGS_SCREEN:GOTO START
-    IF Input = $28 THEN Debounce = DEBOUNCE_DELAY:GOSUB SELECT_ENTRY:GOTO START
-    IF Input = $41 THEN Debounce = DEBOUNCE_DELAY:GOSUB INFO_SCREEN:GOTO START
-    IF Input = $81 THEN Debounce = DEBOUNCE_DELAY:GOSUB HELP_SCREEN:GOTO START
-    IF Input = $88 THEN Debounce = DEBOUNCE_DELAY:GOSUB UP_DIRECTORY:GOTO START
-    IF ((Input = $60) OR (Input = $C0) OR (Input = $24)) THEN IF (#f_to < #f_total) THEN Debounce = DEBOUNCE_DELAY:GOSUB NEXT_PAGE:GOTO START
-    IF ((Input = $A0) OR (Input = $84)) THEN IF (#f_from > 0) THEN Debounce = DEBOUNCE_DELAY:GOSUB PREVIOUS_PAGE:GOTO START
-
-    ' DOWN
-    IF (Input=$48 OR Input=$01 OR Input=$11 OR Input=$19 OR Input=$09 OR Input=$03 OR Input=$13 OR Input=$12) THEN      'KEYPAD_0 or S/SE/SW
-        Debounce = DEBOUNCE_DELAY
-        IF ((Selected_Entry=Max_Entry) AND (#f_to < #f_total)) THEN
-            ' first entry of next page will be selected
+    ON Action GOTO M_NONE,M_SELECT,M_UP,M_DOWN,M_PAGEUP,M_PAGEDOWN,M_EXIT,M_DISPHELP,M_DISPINFO,M_DISPSETTINGS
+M_NONE:
+    GOTO MENU_LOOP
+M_SELECT:
+    GOSUB SELECT_ENTRY
+    GOTO START
+M_UP:
+    IF (Selected_Entry=0 and #f_from>0) THEN 
+        ' last entry of previous page will be selected
+        Selected_Entry = 9
+        GOSUB PREVIOUS_PAGE
+        GOTO START
+    END IF
+    IF Selected_Entry>0 THEN
+        Selected_Entry=Selected_Entry-1 
+        PlaySnd(InputSound)
+        GOSUB DISPLAY_FILELIST
+    END IF
+    GOTO MENU_LOOP
+M_DOWN:
+    IF ((Selected_Entry=Max_Entry) AND (#f_to < #f_total)) THEN
+        ' first entry of next page will be selected
+        GOSUB NEXT_PAGE
+        GOTO START
+    END IF
+    IF Selected_Entry < Max_Entry THEN
+        Selected_Entry=Selected_Entry+1
+        PlaySnd(InputSound)
+        GOSUB DISPLAY_FILELIST
+    END IF
+    GOTO MENU_LOOP
+M_PAGEUP:
+    IF (#f_from > 0) THEN
+        GOSUB PREVIOUS_PAGE
+        GOTO START
+    END IF
+    GOTO MENU_LOOP
+M_PAGEDOWN:
+    IF (#f_to < #f_total) THEN 
             GOSUB NEXT_PAGE
             GOTO START
-        END IF
-        IF Selected_Entry < Max_Entry THEN
-            Selected_Entry=Selected_Entry+1
-            PlaySnd(InputSound)
-            GOSUB DISPLAY_FILELIST
-        END IF
     END IF
-    
-    ' UP
-    IF (Input=$44 or Input=$04 or Input=$0C or Input=$1C or Input=$18 or Input=$14 or Input=$16 or Input=$06) THEN    'KEYPAD_8 or N/NNW/NNE
-        Debounce = DEBOUNCE_DELAY
-        IF (Selected_Entry=0 and #f_from>0) THEN 
-            ' last entry of previous page will be selected
-            Selected_Entry = 9
-            GOSUB PREVIOUS_PAGE
-            GOTO START
-        END IF
-        IF Selected_Entry>0 THEN
-            Selected_Entry=Selected_Entry-1 
-            PlaySnd(InputSound)
-            GOSUB DISPLAY_FILELIST
-        END IF
-    END IF
-
     GOTO MENU_LOOP
+M_EXIT:
+    GOSUB UP_DIRECTORY
+    GOTO START
+M_DISPHELP:
+    GOSUB HELP_SCREEN
+    GOTO START
+M_DISPINFO:
+    GOSUB INFO_SCREEN
+    GOTO START
+M_DISPSETTINGS:
+    GOSUB SETTINGS_SCREEN
+    GOTO START
+
 
 '
 ' PROCEDURES
 '
+GetAction: PROCEDURE
+    ' Get user input and return it in CONT variable
+    Input = CONT
+    Action = ACTION_NONE
+    IF Input <> 0 THEN
+        FOR I = 0 TO 30
+            IF Input = ContCode(I) THEN Action = MainAction(I):Debounce = DEBOUNCE_DELAY:RETURN
+        NEXT I
+    END IF
+    END
+
 NEXT_PAGE: PROCEDURE
     PI_CMD(CMD_NEXTPAGE)
     PlaySnd(InputSound)
@@ -459,42 +498,42 @@ INFO_SCREEN: PROCEDURE
         IF PI_GET_INFO_NUM > 0 THEN
             ' Info available for this entry, display it
             GOSUB DISP_INFO
-            Input = 0
-            WHILE (Input <> $88)  ' run until CLR key is pressed
-                IF Debounce>0 THEN 
-                    Debounce = Debounce-1
-                ELSE
-                    ' Get new input and process it
-                    Input = CONT
-                    IF (Input=$48 OR Input=$01 OR Input=$11 OR Input=$19 OR Input=$09 OR Input=$03 OR Input=$13 OR Input=$12) THEN
-                        ' Display next info page
-                        PlaySnd(InputSound)
-                        Debounce = DEBOUNCE_DELAY
-                        PI_CMD(CMD_NEXTINFO)
-                        GOSUB WAIT_CARD_ANSWER
-                        GOSUB DISP_INFO
-                    END IF
-                    IF (Input=$44 or Input=$04 or Input=$0C or Input=$1C or Input=$18 or Input=$14 or Input=$16 or Input=$06) THEN
-                        ' Display prev info page
-                        PlaySnd(InputSound)
-                        Debounce = DEBOUNCE_DELAY
-                        PI_CMD(CMD_PREVINFO)
-                        GOSUB WAIT_CARD_ANSWER
-                        GOSUB DISP_INFO
-                    END IF
-                    IF (Input=$81) THEN
-                        Debounce = DEBOUNCE_DELAY
-                        GOSUB INFO_HELP_SCREEN
-                        GOSUB DISP_INFO
-                    END IF                    
-                END IF
-                ' Update animation frame
-                IF FRAME%8 = 0 THEN
-                    WaveFrame = (WaveFrame+1)%4
-                    DEFINE 6,1,VARPTR Title_wave(WaveFrame * 4)
-                END IF
-                WAIT
-            WEND
+
+I_LOOP:
+            ' Update animation frame
+            IF FRAME%8 = 0 THEN
+                WaveFrame = (WaveFrame+1)%4
+                DEFINE 6,1,VARPTR Title_wave(WaveFrame * 4)
+            END IF
+            WAIT           
+            IF Debounce>0 THEN 
+                Debounce = Debounce-1
+            ELSE
+                GOSUB GetAction
+                ON Action GOTO I_NONE,I_NONE,I_UP,I_DOWN,I_NONE,I_NONE,I_EXIT,I_DISPHELP,I_NONE,I_NONE
+I_DOWN:
+                ' Display next info page
+                PlaySnd(InputSound)
+                Debounce = DEBOUNCE_DELAY
+                PI_CMD(CMD_NEXTINFO)
+                GOSUB WAIT_CARD_ANSWER
+                GOSUB DISP_INFO
+                GOTO I_LOOP
+I_UP:
+                PlaySnd(InputSound)
+                Debounce = DEBOUNCE_DELAY
+                PI_CMD(CMD_PREVINFO)
+                GOSUB WAIT_CARD_ANSWER
+                GOSUB DISP_INFO
+                GOTO I_LOOP
+I_DISPHELP:
+                GOSUB INFO_HELP_SCREEN
+                GOSUB DISP_INFO
+                GOTO I_LOOP
+I_NONE:
+                GOTO I_LOOP
+I_EXIT:
+            END IF
         END IF
     END IF
     Debounce = DEBOUNCE_DELAY
@@ -785,3 +824,39 @@ Help_text:
 
 Help_cards:
 	DATA $1872,$187A,$1882
+
+ContCode:
+    DATA 129,65,33,130,66,34,132,68,36,136,72,40,160,90,192,4,20,22,6,2,18,19,3,1,17,25,9,8,24,28,12
+
+MainAction:
+    DATA ACTION_DISPHELP        ' 1
+    DATA ACTION_DISPINFO        ' 2
+    DATA ACTION_DISPSETTINGS    ' 3
+    DATA ACTION_NONE            ' 4
+    DATA ACTION_NONE            ' 5
+    DATA ACTION_NONE            ' 6
+    DATA ACTION_PAGEDOWN        ' 7
+    DATA ACTION_UP              ' 8
+    DATA ACTION_PAGEUP          ' 9
+    DATA ACTION_EXIT            ' CLR
+    DATA ACTION_DOWN            ' 0
+    DATA ACTION_SELECT          ' ENT
+    DATA ACTION_PAGEUP          ' BUT_UP
+    DATA ACTION_PAGEDOWN        ' BUT_LEFT
+    DATA ACTION_PAGEDOWN        ' BUT_RIGHT
+    DATA ACTION_UP              ' N
+    DATA ACTION_UP              ' NNE
+    DATA ACTION_NONE            ' NE
+    DATA ACTION_NONE            ' NEE
+    DATA ACTION_PAGEDOWN        ' E
+    DATA ACTION_NONE            ' SEE
+    DATA ACTION_NONE            ' SE
+    DATA ACTION_DOWN            ' SSE
+    DATA ACTION_DOWN            ' S
+    DATA ACTION_DOWN            ' SSW
+    DATA ACTION_NONE            ' SW
+    DATA ACTION_NONE            ' SWW
+    DATA ACTION_PAGEUP          ' W
+    DATA ACTION_NONE            ' NWW
+    DATA ACTION_NONE            ' NW
+    DATA ACTION_UP              ' NNW
