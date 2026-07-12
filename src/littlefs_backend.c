@@ -51,8 +51,12 @@ static vfs_file_t* littlefs_open(const char *path, const char *mode, vfs_file_t 
    
    uint16_t flags = 0;
 
-   if (mode[0] == 'r')
-      flags = LFS_O_RDONLY;
+   if (mode[0] == 'r') {
+      if (mode[1] == '+')
+         flags = LFS_O_RDWR;
+      else  
+         flags = LFS_O_RDONLY;
+   }
    else if (mode[0] == 'w')
       flags = LFS_O_RDWR | LFS_O_CREAT;
    else if (mode[0] == 'a')

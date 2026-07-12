@@ -34,8 +34,8 @@ typedef struct {
 #endif
 } Cartridge;
 
-#define JLP_FEATURE_ACCEL(status)   (status & (1U << 0))
-#define JLP_FEATURE_FLASH(status)   (status & (1U << 1))
+#define JLP_FEATURE_ACCEL(status)   (status > 0) // Turn on Acceleration for any jlp value <> 0 should be (status & (1U << 0))
+#define JLP_FEATURE_FLASH(status)   (status > 1) // Turn on Flash for any jlp value > 1 should be (status & (1U << 1))
 
 #define JLP_FLASH_ROWS_PER_SECTOR   8
 #define JLP_FLASH_ROW_BYTES         96 * 2     // 96 * uint16_t
