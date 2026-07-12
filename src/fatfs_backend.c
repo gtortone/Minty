@@ -39,8 +39,11 @@ static vfs_file_t* fat_open(const char *path, const char *mode, vfs_file_t *out)
    
    BYTE flags = 0;
    
-   if (mode[0] == 'r')
+   if (mode[0] == 'r') {
       flags = FA_READ;
+      if (mode[1] == '+')
+         flags |= FA_WRITE;
+   }
    else if (mode[0] == 'w')
       flags = FA_WRITE | FA_CREATE_ALWAYS;
    else if (mode[0] == 'a')

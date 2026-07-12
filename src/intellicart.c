@@ -67,11 +67,21 @@ inline void config_jlp(int jlp_value, int jlpflash_value, char *filename) {
    }
 
    cart.JLPFlashSize = jlpflash_value;
-
-   if ( JLP_FEATURE_FLASH(jlp_value) && (cart.JLPFlashSize > 0) ) {
-      cart.JLPFlash = true;
+   if (cart.JLPFlashSize > 0) {
       printf("JLP flash ON\n");
       printf("JLP flash size: %d\n", cart.JLPFlashSize);
+      cart.JLPFlash = true;
+   } else {
+      if (JLP_FEATURE_FLASH(jlp_value)) {
+         printf("JLP flash ON\n");
+         printf("JLP flash requested but no flash size specified, use default size (16 sectors)\n");
+         cart.JLPFlash = true;
+         cart.JLPFlashSize = 16; // default size
+      }
+      else {
+         printf("JLP flash OFF\n");
+         cart.JLPFlash = false;
+      }
    }
 
    if (cart.JLPFlash) {
@@ -89,7 +99,7 @@ inline void config_jlp(int jlp_value, int jlpflash_value, char *filename) {
 
       if(vfs_stat(cart.flashfile, &st) == -1) {
 
-         uint8_t buffer[JLP_FLASH_SECTOR_BYTES];
+         uint8_t buffer[JLP_FLASH_ROW_BYTES];
          uint32_t size = cart.JLPFlashSize * JLP_FLASH_SECTOR_BYTES;
          
          // create JLP flash file

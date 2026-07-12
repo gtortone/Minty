@@ -1,3 +1,5 @@
+#if CONFIG_JLP
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -8,13 +10,10 @@
 
 extern Cartridge cart;
 
-#if CONFIG_JLP
 void readFlash(int row, uint16_t addr) {
 
    int c;
-   unsigned int br = 0;
    uint32_t offset = row * JLP_FLASH_ROW_BYTES;
-   volatile uint8_t temp[2];
 
    if ( (cart.filesave = vfs_open(cart.flashfile, "r")) == NULL) {
       printf("E: JLP flash read - open error\n");
@@ -23,25 +22,9 @@ void readFlash(int row, uint16_t addr) {
 
    vfs_lseek(cart.filesave, offset);
 
-   //printf("ROW:%d\n", row);
-   for(int i=0; i<(JLP_FLASH_ROW_BYTES/2); i++) {
-      c = vfs_read(cart.filesave, (uint8_t *) temp, 2); 
-      //printf("R[%d]: %X %X\n", i, temp[0], temp[1]);
-      if (c == -1) {
-         printf("E: JLP flash read row: %d - chunk read error %d/2 (i=%d) (offset=%ld)\n", 
-               row, c, i, offset);
-         vfs_close(cart.filesave);
-         return;
-      }
-
-      cart.RAM[(addr - 0x8000) + i] = (uint16_t) ((temp[0] << 8) | temp[1]);
-      br += 2;
-   }
-
-   if (br != JLP_FLASH_ROW_BYTES) {
-      printf("E: JLP flash read - size mismatch %d/%d\n", br, JLP_FLASH_ROW_BYTES);
-      vfs_close(cart.filesave);
-      return;
+   c = vfs_read(cart.filesave, (uint8_t *)&(cart.RAM[(addr - 0x8000)]), JLP_FLASH_ROW_BYTES);
+   if(c == -1) {
+      printf("E: JLP flash read - row read error\n");
    }
 
    vfs_close(cart.filesave);
@@ -51,48 +34,30 @@ void readFlash(int row, uint16_t addr) {
 void writeFlash(int row, uint16_t addr) {
 
    int c;
-   unsigned int bw = 0;
    uint32_t offset = row * JLP_FLASH_ROW_BYTES;
-   volatile uint8_t temp[2];
 
-   if ( (cart.filesave = vfs_open(cart.flashfile, "w")) == NULL) {
-      printf("E: JLP flash write - open error\n");
+   if ( (cart.filesave = vfs_open(cart.flashfile, "r+")) == NULL) {
+      printf("E: JLP flash write - open file error\n");
       return;
    }
 
    vfs_lseek(cart.filesave, offset);
 
-   //printf("ROW:%d\n", row);
-   for(int i=0; i<(JLP_FLASH_ROW_BYTES/2); i++) {
-      temp[0] = (cart.RAM[(addr - 0x8000) + i] >> 8) & 0xFF;
-      temp[1] = cart.RAM[(addr - 0x8000) + i] & 0xFF;
-      //printf("W[%d]: %X %X\n", i, temp[0], temp[1]);
-      c = vfs_write(cart.filesave, (uint8_t *) temp, 2);
-      if (c == -1) {
-         printf("E: JLP flash write row: %d - chunk write error %d/2 (i=%d) (offset=%ld)\n", 
-               row, c, i, offset);
-         vfs_close(cart.filesave);
-         return;
-      }
-      bw += 2;
+   c = vfs_write(cart.filesave, (uint8_t *)(uint8_t *)&(cart.RAM[(addr - 0x8000)]), JLP_FLASH_ROW_BYTES);
+   if(c == -1) {
+      printf("E: JLP flash write - row write error\n");
    }
-   if (bw != JLP_FLASH_ROW_BYTES) {
-      printf("E: JLP flash write - size mismatch %d/%d\n", bw, JLP_FLASH_ROW_BYTES);
-      vfs_close(cart.filesave);
-      return;
-   }
-
    vfs_close(cart.filesave);
 }
 
 void eraseFlash(int row) {
-
    int bw;
+   int total_bw;
    uint16_t sector = row % JLP_FLASH_ROWS_PER_SECTOR;
    uint32_t offset = sector * JLP_FLASH_SECTOR_BYTES;
-   uint8_t erase_pattern[JLP_FLASH_SECTOR_BYTES];
+   uint8_t erase_pattern[JLP_FLASH_ROW_BYTES];
 
-   if ( (cart.filesave = vfs_open(cart.flashfile, "w")) == NULL) {
+   if ( (cart.filesave = vfs_open(cart.flashfile, "r+")) == NULL) {
       printf("E: JLP flash erase - open error\n");
       return;
    }
@@ -101,14 +66,18 @@ void eraseFlash(int row) {
 
    vfs_lseek(cart.filesave, offset);
 
-   if ( (bw = vfs_write(cart.filesave, erase_pattern, sizeof(erase_pattern))) == -1) {
-      //printf("E: JLP flash erase - erase sector %d\n", sector);
-      vfs_close(cart.filesave);
-      return;
+   total_bw = 0;
+   for (int i = 0; i < JLP_FLASH_ROWS_PER_SECTOR; i++) {
+      if ( (bw = vfs_write(cart.filesave, erase_pattern, sizeof(erase_pattern))) == -1) {
+         //printf("E: JLP flash erase - erase sector %d\n", sector);
+         vfs_close(cart.filesave);
+         return;
+      }
+      total_bw += bw;
    }
 
-   if (bw != JLP_FLASH_SECTOR_BYTES) {
-      //printf("E: JLP flash erase - size mismatch %d/%d\n", bw, JLP_FLASH_SECTOR_BYTES);
+   if (total_bw != JLP_FLASH_SECTOR_BYTES) {
+      //printf("E: JLP flash erase - size mismatch %d/%d\n", total_bw, JLP_FLASH_SECTOR_BYTES);
       vfs_close(cart.filesave);
       return;
    }
