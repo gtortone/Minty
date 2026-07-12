@@ -37,6 +37,7 @@ struct mapEntry {
 struct mapHole {
    uint32_t from;
    uint16_t size;
+   uint8_t page;
    bool filled;
 };
 
