@@ -354,7 +354,7 @@ void RunGame() {
    uint8_t randidx = 0;
    bool randrefill = false;
 
-   generate_random(randarr, sizeof(randarr));
+   generate_random(randarr, sizeof(randarr)/sizeof(uint16_t));
 #endif
    uint64_t resetTimeout = 0;
 
@@ -544,7 +544,7 @@ void RunGame() {
 
          // refill random numbers
          if (randrefill) {
-            generate_random(randarr, sizeof(randarr));
+            generate_random(randarr, sizeof(randarr)/sizeof(uint16_t));
             randrefill = false;
          }
       }
