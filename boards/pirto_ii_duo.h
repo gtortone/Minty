@@ -33,12 +33,14 @@
 #define MI_SD_SPI_SCK_PIN  18
 #define MI_SD_SPI_TX_PIN   19
 
+#if CONFIG_ECS_AUDIO
+// ECS AUDIO AY-3-8910
+#define MI_ECS_AUDIO_PIN   28
+#else
 // UART
 #define MI_DBG_UART_ID        0
 #define MI_DBG_UART_RX_PIN    -1    // TX only
 #define MI_DBG_UART_TX_PIN    28
-
-// ECS AUDIO AY-3-8910
-//#define MI_ECS_AUDIO_PIN   28
+#endif
 
 #endif
