@@ -508,6 +508,7 @@ I_LOOP:
             WAIT           
             IF Debounce>0 THEN 
                 Debounce = Debounce-1
+                GOTO I_LOOP
             ELSE
                 GOSUB GetAction
                 ON Action GOTO I_NONE,I_NONE,I_UP,I_DOWN,I_NONE,I_NONE,I_EXIT,I_DISPHELP,I_NONE,I_NONE
