@@ -8,7 +8,7 @@
 #include "vfs.h"
 #include "filesystem.h"
 
-#define RAMSIZE   0x2000
+#define RAMSIZE   0x2800 // biggest contigus memory block useable for RAM is from 0x8000 to 0x9BFF (10kW = 20kB) based on memory map
 
 typedef struct {
    volatile uint16_t ROM[MAX_ROM_SIZE];
