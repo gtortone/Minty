@@ -3,11 +3,11 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define VFS_MAX_FILES 8
-#define VFS_MAX_DIRS  4
-#define VFS_MAX_MOUNTS  4
+#define VFS_MAX_FILES 2
+#define VFS_MAX_DIRS  1
+#define VFS_MAX_MOUNTS  1
 #define VFS_NAME_MAX    512 
-#define VFS_BACKEND_SIZE 1024
+#define VFS_BACKEND_SIZE (512 + 64)
 #define VFS_TREE_PATH_MAX 512
 
 typedef struct vfs_file vfs_file_t;
