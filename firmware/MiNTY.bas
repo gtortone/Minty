@@ -555,6 +555,7 @@ SELECT_ENTRY: PROCEDURE
             
             ' If error display error message and wait for user to press clear
             IF PI_GET_ERROR <> ERR_NO_ERROR THEN
+                GOSUB UNSELECT_ENTRY
                 PRINT AT SCREENPOS(0,4)  COLOR CS_RED, "                   "
                 PRINT AT SCREENPOS(0,6)  COLOR CS_RED, "                   "
                 PRINT AT SCREENPOS(0,10) COLOR CS_RED, "                   "

@@ -362,7 +362,6 @@ void RunLauncher() {
 		addSlot(0x0000, 0x0FFF, 0x5000, 0, ROM_SLOT);
 		addSlot(0x1000, (sizeof(mintyfw) / 2)-1, 0x6000, 0, ROM_SLOT);
    }
-	addSlot(0x8000, 0x8FFF, 0, 0, RAM8_SLOT);
    addSlot(0x8000, 0x9FFF, 0, 0, RAM8_SLOT);
    getRAMRange(&cart.ramfrom, &cart.ramto, &cart.ramwidth);
 
