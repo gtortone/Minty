@@ -277,6 +277,7 @@ M_UP:
         GOTO START
     END IF
     IF Selected_Entry>0 THEN
+        GOSUB UNSELECT_ENTRY
         Selected_Entry=Selected_Entry-1 
         PlaySnd(InputSound)
         GOSUB DISPLAY_FILELIST
@@ -289,6 +290,7 @@ M_DOWN:
         GOTO START
     END IF
     IF Selected_Entry < Max_Entry THEN
+        GOSUB UNSELECT_ENTRY
         Selected_Entry=Selected_Entry+1
         PlaySnd(InputSound)
         GOSUB DISPLAY_FILELIST
@@ -595,12 +597,18 @@ WAIT_CARD_ANSWER: PROCEDURE
 	ResetSprite(0)
     END
 
+UNSELECT_ENTRY:PROCEDURE
+    #BACKTAB(41 + Selected_Entry*20) = #BACKTAB(41 + Selected_Entry*20) AND $DFFF
+    #BACKTAB(41 + Selected_Entry*20 + 18) = #BACKTAB(41 + Selected_Entry*20 + 18) AND $DFFF
+    END
+
 DISPLAY_FILELIST: PROCEDURE
     Max_Entry = #f_to - #f_from
     SelEnt_Start = 0
     SelEnt_Length = 0
 
-    IF Max_Entry > 0 THEN 
+    
+    IF Max_Entry > 0 THEN
         Max_Entry = Max_Entry - 1
         FOR J=0 TO Max_Entry
             ' First icon needs also to change colorstack
@@ -612,14 +620,26 @@ DISPLAY_FILELIST: PROCEDURE
                 #Disp_Color = CS_TAN
                 #BACKTAB(J*20 + 40) = BG01 + CS_CYAN + #tmp
             END IF
-            IF J = Selected_Entry THEN #Disp_Color = CS_GREEN
-            FOR I=0 TO 17
-                #tmp = PEEK((ADDRESS_flist+I)+FNAME_LENGTH*J)
-                IF #tmp = 255 THEN #tmp = 0
-                #BACKTAB(41 + J*20 + I) = ASCII_table(#tmp) + #Disp_Color
-            NEXT I
+            IF J = Selected_Entry THEN           
+                FOR I=0 TO 17
+                    #tmp = PEEK((ADDRESS_flist+I)+FNAME_LENGTH*J)
+                    IF #tmp = 255 THEN #tmp = 0
+                    IF I = 0 THEN 
+                        #BACKTAB(41 + J*20 + I) = ASCII_table(#tmp) + CS_BLACK + $2000
+                        #BACKTAB(41 + J*20 + 18) = #BACKTAB(41 + J*20 + 18) + $2000
+                    ELSE
+                        #BACKTAB(41 + J*20 + I) = ASCII_table(#tmp) + CS_BLACK
+                    END IF
+                NEXT I   
+            ELSE
+                FOR I=0 TO 17
+                    #tmp = PEEK((ADDRESS_flist+I)+FNAME_LENGTH*J)
+                    IF #tmp = 255 THEN #tmp = 0
+                    #BACKTAB(41 + J*20 + I) = ASCII_table(#tmp) + #Disp_Color
+                NEXT I
+            END IF
         NEXT J
-		WHILE ((PEEK((ADDRESS_flist+SelEnt_Length)+FNAME_LENGTH*Selected_Entry)<>255) AND (SelEnt_Length<FNAME_LENGTH))
+        WHILE ((PEEK((ADDRESS_flist+SelEnt_Length)+FNAME_LENGTH*Selected_Entry)<>255) AND (SelEnt_Length<FNAME_LENGTH))
 			SelEnt_Length = SelEnt_Length + 1 
 		WEND
 	ELSE
@@ -653,13 +673,14 @@ DISPLAY_SELECTED_ENTRY: PROCEDURE
         SelEnt_Start = SelEnt_Start + 1
         IF SelEnt_Start > SelEnt_Length THEN SelEnt_Start = 0
         FOR I = 0 TO 17
+            IF I =  0 then #Disp_Color = $2000 ELSE #Disp_Color = $0000
             #tmp = SelEnt_Start + I
             IF #tmp = SelEnt_Length THEN
-                #BACKTAB(41 + Selected_Entry*20 + I) = ASCII_table(0) + CS_GREEN
+                #BACKTAB(41 + Selected_Entry*20 + I) = ASCII_table(0) + CS_BLACK + #Disp_Color
             ELSE
                 IF #tmp > SelEnt_Length THEN #tmp = #tmp - SelEnt_Length -1
                 #tmp = PEEK((ADDRESS_flist+#tmp)+FNAME_LENGTH*Selected_Entry)
-                #BACKTAB(41 + Selected_Entry*20 + I) = ASCII_table(#tmp) + CS_GREEN
+                #BACKTAB(41 + Selected_Entry*20 + I) = ASCII_table(#tmp) + CS_BLACK + #Disp_Color
             END IF
         NEXT I
     END IF

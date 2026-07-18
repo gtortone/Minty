@@ -51,7 +51,7 @@ static vfs_file_t* fat_open(const char *path, const char *mode, vfs_file_t *out)
    else
       return NULL;
    
-   char full[256];
+   char full[512];
    make_path(full, sizeof(full), path, out->mount);
    
    if ( f_open(&f->fil, full, flags) != FR_OK)
@@ -128,7 +128,7 @@ static vfs_dir_t* fat_opendir(const char *path, vfs_dir_t *out) {
 
    fat_dir_t *d = (fat_dir_t*) out->backend;
    
-   char full[128];
+   char full[512];
    
    make_path(full, sizeof(full), path, out->mount);
    

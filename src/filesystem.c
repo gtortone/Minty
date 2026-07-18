@@ -71,7 +71,6 @@ int is_valid_file(char *filename) {
 int read_directory(char *path, SCREEN_ENTRY *dst) {
 
    unsigned int id = 0;
-   int n = 0;
    SCREEN_ENTRY *orig_dst = dst;
    vfs_dirent_t ent;
 
@@ -82,7 +81,7 @@ int read_directory(char *path, SCREEN_ENTRY *dst) {
    };
 
    // stop at 512 entries to avoid overflowing the buffer
-   while ((vfs_readdir(dir, &ent) > 0) & (n<512)) {
+   while ((vfs_readdir(dir, &ent) > 0) & (id<512)) {
 
       if ((strcmp(ent.name, ".") == 0 || strcmp(ent.name, "..") == 0))
          continue;
@@ -104,13 +103,12 @@ int read_directory(char *path, SCREEN_ENTRY *dst) {
 #pragma GCC diagnostic pop
 
       dst++;
-      n++;
    }
    vfs_closedir(dir);
 
-   qsort(orig_dst, n, sizeof(SCREEN_ENTRY), entry_compare);
+   qsort(orig_dst, id, sizeof(SCREEN_ENTRY), entry_compare);
    
-   return n;
+   return id;
 }
 
 int load_file(char *filename) {

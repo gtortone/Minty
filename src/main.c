@@ -15,6 +15,7 @@
 #include "cartridge.h"
 #include "debug.h"
 #include "version.h"
+#include "interface.h"
 
 #if CONFIG_USB_DEVICE
    #include "tusb.h"
@@ -62,9 +63,11 @@ int main(void) {
    while (gpio_get(MSYNC) == 0 && to_ms_since_boot(get_absolute_time()) < 2000) {   // wait for Inty powerup
       if (to_ms_since_boot(get_absolute_time()) > t) {
          t += 100;
-         gpio_put(RESET, false);
-         sleep_ms(5);
-         gpio_put(RESET, true);
+         resetHigh();
+         sleep_ms(30);
+         resetLow();
+         sleep_ms(1);
+         resetHigh();
       }
    }
 

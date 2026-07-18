@@ -40,7 +40,7 @@ Multi-cart based on Raspberry Pi Pico hardware and PiRTOII firmware (https://git
 | [Pirto-II](https://github.com/aotta/PiRTOII) | RP2040 | 256 kB | ~100kB   | ❌  | ❌  | flash       | `pirto_ii_default` |
 | [Pirto-II-SD](https://github.com/SukkoPera/PiRTOII) | RP2040 | 256 kB | ~180kB | ✅  | ❌ | microSD     | `pirto_ii_sd` |
 | [Pirto-II-Duo](https://github.com/aotta/PiRTOIIDuo) | RP2350 | 512 kB | ~450 kB | ✅ | (Note 1) | microSD   | `pirto_ii_duo` |
-| [PintyCard](https://oshwlab.com/yannick.erb/intv-pirto-hb) | RP2354A | 512 kB | ~450kB | ✅ | ❌ | flash | `pintycard` |
+| [PintyCard](https://oshwlab.com/yannick.erb/intv-pirto-hb) | RP2354A | 512 kB | ~450kB | ✅ | ✅ | flash | `pintycard` |
 
 Note 1
 * route GP28 to EXT-AUDIO cartridge pin and add some passive [components](images/ecs-audio-mod.png)

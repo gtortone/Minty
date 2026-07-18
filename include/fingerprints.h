@@ -8,7 +8,7 @@
 #ifndef FINGERPRINTS_H_
 #define FINGERPRINTS_H_
 
-int fingerprints[] = {
+const int fingerprints[] = {
    15702, 0,                    // 4-TRIS (2001) (Joseph Zbiciak)
    11072, 0,                    // SDK-1600 Movable Object Demo (2002) (Joseph Zbiciak)
    10253, 0,                    // ABPA Backgammon (1978) (Mattel)
