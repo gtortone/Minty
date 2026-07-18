@@ -10,7 +10,7 @@ set(PICO_FLASH_SPI_CLKDIV 2)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
    set(CONFIG_USB_DEVICE 0)
-   set(MAX_ROM_SIZE 1024*220)    # ~440 kb 
+   set(MAX_ROM_SIZE 1024*225)    # ~450 kb 
 endif()
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
