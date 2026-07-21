@@ -183,6 +183,7 @@ void __time_critical_func(core1_main()) {
                // This is ROM check for section it falls in.
                uint8_t short_Address = addrIn & 0x00FF;
                // gather current used page for mem segment
+               seg = addrIn >> 12;
                uint8_t page = curPageArr[seg];
 
                if (slots[idx].RomAddr_H[0][page] != 0xF0) {
