@@ -7,17 +7,7 @@
 
 #define NSLOTS    256
 #define NPAGES     16
-
-/*
- * mapEntry is a struct to contain Intellicart config "row"
- *
- * e.g.  $0000 - $1FFF = $5000
- *
- * $0000:   ROM cart "from" address    (16 pages available)
- * $1FFF:   ROM cart "to" address      (16 pages available)
- * $5000:   Intellivision bus address
- *
- */
+#define NSECTIONS   2
 
 typedef enum {
     ROM_SLOT = 1,
@@ -26,29 +16,34 @@ typedef enum {
     RAM16_SLOT
 } mapType;
 
-struct mapEntry {
-   uint32_t from[NPAGES];
-   uint16_t size[NPAGES];
-   uint16_t target;
-   mapType type;
-   uint16_t usedmask;
-};
+/*
+   To get address in ROM area :
+   INTV address is 0xABCD
+   => look at slot[0xAB]
+   => Gather current active page for section 0xA and store it in page 
+   => check if from[0][page] <= 0xCD <= to[0][page], if yes return 
+      ((RomAddr_H[0][page] << 16 + RomAddr_L[0][page]) - (0xCD - from[0][page])) 
+   => check if from[1][page] <= 0xCD <= to[1][page], if yes return 
+      ((RomAddr_H[1][page] << 16 + RomAddr_L[1][page]) - (0xCD - from[1][page]))
+   => else return error (out of allocated ROM, should return 0xFFFF)
 
-struct mapHole {
-   uint32_t from;
-   uint16_t size;
-   uint8_t page;
-   bool filled;
+   RomAddr_H is also used to encode RAM type
+   0xE0 means RAM8
+   0xF0 means RAM16
+   any other value (4 high bits shall never be used) is for ROM 
+*/
+struct SlotEntry {
+   uint8_t from[NSECTIONS][NPAGES];
+   uint8_t to[NSECTIONS][NPAGES];
+   uint8_t RomAddr_H[NSECTIONS][NPAGES];
+   uint16_t RomAddr_L[NSECTIONS][NPAGES];
 };
-
 
 void printSlot(uint8_t idx, uint8_t page);
 void printFilledSlots(void);
 void cleanSlots(void);
-void cleanHoles(void);
 void addSlot(uint32_t from, uint32_t to, uint16_t target, uint8_t page, mapType type);
-bool mapSlot(uint16_t addr, uint8_t page, uint8_t *slot);
-bool mapAddress(uint16_t addr, uint8_t page, uint32_t *romaddr, mapType *type);
+bool mapAddress(uint16_t addr, uint8_t page, uint32_t *romaddr);
 void getRAMRange(uint16_t *ramfrom, uint16_t *ramto, uint8_t *ramwidth);
 void config_memory(int cfg);
 

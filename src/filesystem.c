@@ -17,8 +17,6 @@
 
 extern Cartridge cart;
 
-extern struct mapEntry slots[NSLOTS];
-
 extern uint8_t tv_mode;      // 0: PAL, 1: NTSC
 extern uint8_t ecs_present;  // 0: ECS absent, 1: ECS present
 extern uint8_t ecs_volume;
@@ -144,7 +142,6 @@ int load_file(char *filename) {
       char inputBuffer[3];
 
       cleanSlots();
-      cleanHoles();
 
       vfs_read(f, inputBuffer, sizeof(inputBuffer));
       
@@ -206,8 +203,6 @@ int load_file(char *filename) {
             addSlot(i * 0x800, (i * 0x800) + ((hi - lo) * 0x100) - 1, 0, 0, type);
          }
       }
-
-      getRAMRange(&cart.ramfrom, &cart.ramto, &cart.ramwidth);
 
       // check for metadata section 
       if (!vfs_eof(f)) {

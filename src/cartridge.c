@@ -48,8 +48,7 @@ volatile uint16_t addrInCopy;
 
 volatile uint8_t spyData = 0xFF;
 
-extern struct mapEntry slots[NSLOTS];
-extern struct mapHole holes[NSLOTS];
+extern struct SlotEntry slots[NSLOTS];
 
 __attribute__((optimize("O3")))
 void __time_critical_func(core1_main()) {
@@ -171,7 +170,43 @@ void __time_critical_func(core1_main()) {
 #endif
 
             idx = (addrIn >> 8);
+            
+            if ((slots[idx].RomAddr_H[0][0] == 0x10) || (slots[idx].RomAddr_H[0][0] == 0x20)) {
+               // This is RAM
+               //printf("Read 0x%04X => 0x%04X (RAM)\n", addrIn, (addrIn - cart.ramfrom));
+               romaddr = (addrIn - cart.ramfrom);
+               dataOut = cart.RAM[romaddr];
+               deviceAddress = true;
+               continue;
+            }
+            else {
+               // This is ROM check for section it falls in.
+               uint8_t short_Address = addrIn & 0x00FF;
+               // gather current used page for mem segment
+               uint8_t page = curPageArr[seg];
 
+               if (slots[idx].RomAddr_H[0][page] != 0xF0) {
+                  if ((short_Address >= slots[idx].from[0][page]) && (short_Address <= slots[idx].to[0][page])) {
+                     romaddr = (slots[idx].RomAddr_H[0][page] << 16) + slots[idx].RomAddr_L[0][page] + (short_Address - slots[idx].from[0][page]);
+                     dataOut = cart.ROM[romaddr];
+                     //printf("Read 0x%04X => 0x%08lX\n", addrIn, romaddr);
+                  }
+                  else if ((short_Address >= slots[idx].from[1][page]) && (short_Address <= slots[idx].to[1][page])) {
+                     romaddr = (slots[idx].RomAddr_H[1][page] << 16) + slots[idx].RomAddr_L[1][page] + (short_Address - slots[idx].from[1][page]);
+                     dataOut = cart.ROM[romaddr];
+                     //printf("Read 0x%04X => 0x%08lX\n", addrIn, romaddr);
+                  }
+                  else {
+                     // out of mapped mem return 0xFFFF
+                     dataOut = 0xFFFF;
+                     //printf("Read 0x%04X => 0xFFFF (out of mapped mem)\n", addrIn);
+                  }
+                  deviceAddress = true;
+                  continue;
+               }
+            }
+
+/*
             if (slots[idx].usedmask) {
 
                if (slots[idx].type == ROM_SLOT) {
@@ -261,7 +296,7 @@ void __time_critical_func(core1_main()) {
                   }
                } 
             }
-
+*/
          } else {
             if (busState == BUS_DWS) {
 
