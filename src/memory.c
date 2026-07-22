@@ -137,7 +137,7 @@ bool mapAddress(uint16_t addr, uint8_t page, uint32_t *romaddr) {
 
    uint8_t slot = (addr >> 8);
 
-   if ((slots[slot].RomAddr_H[0][0] == 0xE0) || (slots[slot].RomAddr_H[0][0] == 0xF0)) {
+   if ((slots[slot].RomAddr_H[0][0] == 0x10) || (slots[slot].RomAddr_H[0][0] == 0x20)) {
       // This is RAM return first RAM address directly
       *romaddr = slots[slot].RomAddr_L[0][0];
       return false;
