@@ -105,8 +105,8 @@ void addSlot(uint32_t from, uint32_t to, uint16_t target, uint8_t page, mapType 
       slot_section = (slots[first_slot].to[0][page] == 0)?0:1;
       slots[first_slot].from[slot_section][page] = target - (first_slot << 8);
       slots[first_slot].to[slot_section][page] = 0xFF; // if first slot is also last slot this will be overwritten later
-      slots[first_slot].RomAddr_H[slot_section][0] = (slot_RomAddr >> 16) & 0x0000000F; // 4 high bits of 20 bits address in ROM file
-      slots[first_slot].RomAddr_L[slot_section][0] = (slot_RomAddr & 0x0000FFFF); // 16 low bits of 20 bits address in ROM file
+      slots[first_slot].RomAddr_H[slot_section][page] = (slot_RomAddr >> 16) & 0x0000000F; // 4 high bits of 20 bits address in ROM file
+      slots[first_slot].RomAddr_L[slot_section][page] = (slot_RomAddr & 0x0000FFFF); // 16 low bits of 20 bits address in ROM file
       slot_RomAddr += (slots[first_slot].to[slot_section][page] - slots[first_slot].from[slot_section][page] + 1);
       
       // next slots are complete, so can't have holes!
@@ -122,8 +122,8 @@ void addSlot(uint32_t from, uint32_t to, uint16_t target, uint8_t page, mapType 
       if (last_slot > first_slot) {
          slot_section = (slots[last_slot].to[0][page] == 0)?0:1;
          slots[last_slot].from[slot_section][page] = 0x00;
-         slots[last_slot].RomAddr_H[slot_section][0] = (slot_RomAddr >> 16) & 0x0000000F; // 8 high bits of 20 bits address in ROM file
-         slots[last_slot].RomAddr_L[slot_section][0] = (slot_RomAddr & 0x0000FFFF); // 16 low bits of 20 bits address in ROM file
+         slots[last_slot].RomAddr_H[slot_section][page] = (slot_RomAddr >> 16) & 0x0000000F; // 8 high bits of 20 bits address in ROM file
+         slots[last_slot].RomAddr_L[slot_section][page] = (slot_RomAddr & 0x0000FFFF); // 16 low bits of 20 bits address in ROM file
       }
       slots[last_slot].to[slot_section][page] = (target + (to - from)) & 0xFF;
 
