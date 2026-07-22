@@ -64,10 +64,8 @@ int main(void) {
       if (to_ms_since_boot(get_absolute_time()) > t) {
          t += 100;
          resetHigh();
-         sleep_ms(30);
+         sleep_ms(5);
          resetLow();
-         sleep_ms(1);
-         resetHigh();
       }
    }
 
