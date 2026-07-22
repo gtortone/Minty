@@ -44,7 +44,7 @@ void cleanSlots(void) {
          for(int j=0;j<NPAGES;j++) {
             slots[i].from[k][j] = 0xFF;
             slots[i].to[k][j] = 0x00;
-            slots[i].RomAddr_H[k][j] = 0xF0;
+            slots[i].RomAddr_H[k][j] = UNUSED_SLOT;
             slots[i].RomAddr_L[k][j] = 0;
          }
       }
@@ -70,7 +70,7 @@ void cleanSlots(void) {
    *
    */
 
-void addSlot(uint32_t from, uint32_t to, uint16_t target, uint8_t page, mapType type) {
+void addSlot(uint32_t from, uint32_t to, uint16_t target, uint8_t page, uint8_t type) {
    
    printf("addSlot 0x%08lX - 0x%08lX : 0x%04X page %d type %d\n", from,to,target,page,type);
 
@@ -79,20 +79,19 @@ void addSlot(uint32_t from, uint32_t to, uint16_t target, uint8_t page, mapType 
 
       uint8_t first_slot = from >> 8;
       uint8_t last_slot  = to >> 8;
-      uint8_t slot_type = (type == RAM8_SLOT)?0x10:0x20;
       
       // RAM slots aren't paged, and have no hole, only first section is populated
       for (int idx=first_slot; idx<last_slot; idx++) {
          slots[idx].from[0][0]      = 0x00;
          slots[idx].to[0][0]        = 0xFF;
-         slots[idx].RomAddr_H[0][0] = slot_type;
+         slots[idx].RomAddr_H[0][0] = type;
       }
       // last slot can be inclomplete
       slots[last_slot].from[0][0]      = 0x00;
       slots[last_slot].to[0][0]        = to - (last_slot << 8);
-      slots[last_slot].RomAddr_H[0][0] = slot_type;
+      slots[last_slot].RomAddr_H[0][0] = type;
 
-      printf("Allocated slots 0x%X to 0x%X as RAM\n", first_slot, last_slot);
+      //printf("Allocated slots 0x%X to 0x%X as RAM (0x%02X)\n", first_slot, last_slot, type);
    }
    else {
       // ROM slots
@@ -102,7 +101,7 @@ void addSlot(uint32_t from, uint32_t to, uint16_t target, uint8_t page, mapType 
       uint32_t slot_RomAddr = from;
 
       // check if first section already used, if yes use second one (will create a hole)
-      slot_section = (slots[first_slot].to[0][page] == 0)?0:1;
+      slot_section = (slots[first_slot].RomAddr_H[0][page] == UNUSED_SLOT)?0:1;
       slots[first_slot].from[slot_section][page] = target - (first_slot << 8);
       slots[first_slot].to[slot_section][page] = 0xFF; // if first slot is also last slot this will be overwritten later
       slots[first_slot].RomAddr_H[slot_section][page] = (slot_RomAddr >> 16) & 0x0000000F; // 4 high bits of 20 bits address in ROM file
@@ -120,14 +119,14 @@ void addSlot(uint32_t from, uint32_t to, uint16_t target, uint8_t page, mapType 
 
       // last slot might be truncated again
       if (last_slot > first_slot) {
-         slot_section = (slots[last_slot].to[0][page] == 0)?0:1;
+         slot_section = (slots[last_slot].RomAddr_H[0][page] == UNUSED_SLOT)?0:1;
          slots[last_slot].from[slot_section][page] = 0x00;
          slots[last_slot].RomAddr_H[slot_section][page] = (slot_RomAddr >> 16) & 0x0000000F; // 8 high bits of 20 bits address in ROM file
          slots[last_slot].RomAddr_L[slot_section][page] = (slot_RomAddr & 0x0000FFFF); // 16 low bits of 20 bits address in ROM file
       }
       slots[last_slot].to[slot_section][page] = (target + (to - from)) & 0xFF;
 
-      printf("Allocated slots 0x%02X to 0x%02X from page %d as ROM\n", first_slot, last_slot, page);
+      //printf("Allocated slots 0x%02X to 0x%02X from page %d as ROM (0x%02X)\n", first_slot, last_slot, page, slots[last_slot].RomAddr_H[slot_section][page]);
    }
 }
 
@@ -135,21 +134,21 @@ void addSlot(uint32_t from, uint32_t to, uint16_t target, uint8_t page, mapType 
 // return ROM/cartridge address for Intellivision address
 bool mapAddress(uint16_t addr, uint8_t page, uint32_t *romaddr) {
 
-   uint8_t slot = (addr >> 8);
+   uint8_t idx = (addr >> 8);
 
-   if ((slots[slot].RomAddr_H[0][0] == 0x10) || (slots[slot].RomAddr_H[0][0] == 0x20)) {
+   if ((slots[idx].RomAddr_H[0][0] == RAM8_SLOT) || (slots[idx].RomAddr_H[0][0] == RAM16_SLOT)) {
       // This is RAM return first RAM address directly
-      *romaddr = slots[slot].RomAddr_L[0][0];
+      *romaddr = slots[idx].RomAddr_L[0][0];
       return false;
    }
    else {
       // check for section
       uint8_t short_Address = addr & 0xFF;
 
-      if ((short_Address >= slots[slot].from[0][page]) && (short_Address <= slots[slot].to[0][page]))
-         *romaddr = (slots[slot].RomAddr_H[0][page] << 16) + slots[slot].RomAddr_L[0][page] + (short_Address - slots[slot].from[0][page]);
-      else if ((short_Address >= slots[slot].from[1][page]) && (short_Address <= slots[slot].to[1][page]))
-         *romaddr = (slots[slot].RomAddr_H[1][page] << 16) + slots[slot].RomAddr_L[1][page] + (short_Address - slots[slot].from[1][page]);
+      if ((short_Address >= slots[idx].from[0][page]) && (short_Address <= slots[idx].to[0][page]))
+         *romaddr = (uint32_t)((slots[idx].RomAddr_H[0][page] << 16) + slots[idx].RomAddr_L[0][page]) + (uint32_t)(short_Address - slots[idx].from[0][page]);
+      else if ((short_Address >= slots[idx].from[1][page]) && (short_Address <= slots[idx].to[1][page]))
+         *romaddr = (uint32_t)((slots[idx].RomAddr_H[1][page] << 16) + slots[idx].RomAddr_L[1][page]) + (uint32_t)(short_Address - slots[idx].from[1][page]);
       else
          return false;
    }
@@ -167,14 +166,14 @@ void getRAMRange(uint16_t *ramfrom, uint16_t *ramto, uint8_t *ramwidth) {
 
    for(int slot=0;slot<NSLOTS;slot++) {
 
-      if ( (slots[slot].RomAddr_H[0][0] == 0x10) || (slots[slot].RomAddr_H[0][0] == 0x20) ) {
+      if ( (slots[slot].RomAddr_H[0][0] == RAM8_SLOT) || (slots[slot].RomAddr_H[0][0] == RAM16_SLOT) ) {
 
          uint16_t to_in = (slot << 8) + slots[slot].to[0][0];
       
          if ( (from == 0) && (to == 0) ) {
             from = (slot << 8) + slots[slot].from[0][0];
             to = to_in;
-            if(slots[slot].RomAddr_H[0][0] == 0x10)
+            if(slots[slot].RomAddr_H[0][0] == RAM8_SLOT)
                *ramwidth = 8;
             else
                *ramwidth = 16;

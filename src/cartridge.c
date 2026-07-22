@@ -171,7 +171,7 @@ void __time_critical_func(core1_main()) {
 
             idx = (addrIn >> 8);
             
-            if ((slots[idx].RomAddr_H[0][0] == 0x10) || (slots[idx].RomAddr_H[0][0] == 0x20)) {
+            if ((slots[idx].RomAddr_H[0][0] == RAM8_SLOT) || (slots[idx].RomAddr_H[0][0] == RAM16_SLOT)) {
                // This is RAM
                //printf("Read 0x%04X => 0x%04X (RAM)\n", addrIn, (addrIn - cart.ramfrom));
                romaddr = (addrIn - cart.ramfrom);
@@ -186,14 +186,14 @@ void __time_critical_func(core1_main()) {
                seg = addrIn >> 12;
                uint8_t page = curPageArr[seg];
 
-               if (slots[idx].RomAddr_H[0][page] != 0xF0) {
+               if (slots[idx].RomAddr_H[0][page] != UNUSED_SLOT) {
                   if ((short_Address >= slots[idx].from[0][page]) && (short_Address <= slots[idx].to[0][page])) {
-                     romaddr = (slots[idx].RomAddr_H[0][page] << 16) + slots[idx].RomAddr_L[0][page] + (short_Address - slots[idx].from[0][page]);
+                     romaddr = (uint32_t)((slots[idx].RomAddr_H[0][page] << 16) + (uint32_t)slots[idx].RomAddr_L[0][page]) + (uint32_t)(short_Address - slots[idx].from[0][page]);
                      dataOut = cart.ROM[romaddr];
                      //printf("Read 0x%04X => 0x%08lX\n", addrIn, romaddr);
                   }
                   else if ((short_Address >= slots[idx].from[1][page]) && (short_Address <= slots[idx].to[1][page])) {
-                     romaddr = (slots[idx].RomAddr_H[1][page] << 16) + slots[idx].RomAddr_L[1][page] + (short_Address - slots[idx].from[1][page]);
+                     romaddr = (uint32_t)((slots[idx].RomAddr_H[1][page] << 16) + (uint32_t)slots[idx].RomAddr_L[1][page]) + (uint32_t)(short_Address - slots[idx].from[1][page]);
                      dataOut = cart.ROM[romaddr];
                      //printf("Read 0x%04X => 0x%08lX\n", addrIn, romaddr);
                   }

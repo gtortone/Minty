@@ -79,7 +79,7 @@ inline void config_jlp(int jlp_value, int jlpflash_value, char *filename) {
       printf("JLP support ON\n");
 
       // Declare JLP RAM emulation
-      addSlot(0x8000, 0x9FFF, 0, 0, RAM16_SLOT);
+      // addSlot(0x8000, 0x9FFF, 0, 0, RAM16_SLOT);
 
       if (JLP_FEATURE_ACCEL(jlp_value)) {
          cart.JLPAccel = true;
@@ -242,7 +242,7 @@ int load_cfg(char *filename) {
                return num_pokes;
             }
             cart.pagingSupport = true;
-            addSlot(a, b, c, p, ROM_PAGE_SLOT);
+            addSlot(a, b, c, p, ROM_SLOT);
 
          } else {
 

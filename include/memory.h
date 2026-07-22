@@ -9,12 +9,10 @@
 #define NPAGES     16
 #define NSECTIONS   2
 
-typedef enum {
-    ROM_SLOT = 1,
-    ROM_PAGE_SLOT,
-    RAM8_SLOT,
-    RAM16_SLOT
-} mapType;
+#define ROM_SLOT     0x00
+#define RAM8_SLOT    0x10
+#define RAM16_SLOT   0x20
+#define UNUSED_SLOT  0xF0
 
 /*
    To get address in ROM area :
@@ -32,6 +30,8 @@ typedef enum {
    0xF0 means RAM16
    any other value (4 high bits shall never be used) is for ROM 
 */
+
+
 struct SlotEntry {
    uint8_t from[NSECTIONS][NPAGES];
    uint8_t to[NSECTIONS][NPAGES];
@@ -42,7 +42,7 @@ struct SlotEntry {
 void printSlot(uint8_t idx, uint8_t page);
 void printFilledSlots(void);
 void cleanSlots(void);
-void addSlot(uint32_t from, uint32_t to, uint16_t target, uint8_t page, mapType type);
+void addSlot(uint32_t from, uint32_t to, uint16_t target, uint8_t page, uint8_t type);
 bool mapAddress(uint16_t addr, uint8_t page, uint32_t *romaddr);
 void getRAMRange(uint16_t *ramfrom, uint16_t *ramto, uint8_t *ramwidth);
 void config_memory(int cfg);

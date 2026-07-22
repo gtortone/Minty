@@ -193,7 +193,7 @@ int load_file(char *filename) {
          // check if memory block has write attribute
          if(attr & 0x02) { 
 
-            mapType type;
+            uint8_t type;
 
             if(attr & 0x04)
                type = RAM8_SLOT;   // narrow flag (8-bit)
