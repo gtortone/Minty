@@ -48,8 +48,7 @@ volatile uint16_t addrInCopy;
 
 volatile uint8_t spyData = 0xFF;
 
-extern struct mapEntry slots[NSLOTS];
-extern struct mapHole holes[NSLOTS];
+extern mm_map_t m;
 
 __attribute__((optimize("O3")))
 void __time_critical_func(core1_main()) {
@@ -61,7 +60,6 @@ void __time_critical_func(core1_main()) {
    volatile uint8_t curPageArr[16];        
    volatile uint8_t seg = 0;
    volatile uint32_t romaddr;
-   volatile uint8_t idx;
 
 #if CONFIG_JLP
    uint16_t crc = 0;
@@ -169,99 +167,18 @@ void __time_critical_func(core1_main()) {
                   }
             } 
 #endif
+            
+            seg = (addrIn >> 12) & 0xF;
+            mm_kind_t kind = mm_lookup(&m, addrIn, curPageArr[seg], (uint32_t *) &romaddr);
 
-            idx = (addrIn >> 8);
-
-            if (slots[idx].usedmask) {
-
-               if (slots[idx].type == ROM_SLOT) {
-
-                  if (addrIn < slots[idx].target) {
-                     dataOut = 0xFFFF;
-                     deviceAddress = true;
-                     continue;
-                  }
-
-                  uint16_t size;
-                  
-                  // handle holes for not-paged ROM slots
-                  if (holes[idx].filled && (holes[idx].page == 0))
-                     size = slots[idx].size[0] + holes[idx].size + 1;
-                  else
-                     size = slots[idx].size[0];
-
-                  if ( (addrIn - slots[idx].target) < size ) { 
-
-                     romaddr = slots[idx].from[0] + (addrIn - slots[idx].target);
-
-                     if (holes[idx].filled && (holes[idx].page == 0)) {
-
-                        if ( (addrIn >= holes[idx].from) && (addrIn <= (holes[idx].from + holes[idx].size)) ) {
-                           dataOut = 0xFFFF;
-                           deviceAddress = true;
-                           continue;
-                        } 
-
-                        if ( addrIn > (holes[idx].from) )
-                           romaddr -= (holes[idx].size + 1);
-                     } 
-
-                     dataOut = cart.ROM[romaddr];
-                     deviceAddress = true;
-                  } 
-
-               } else if (slots[idx].type == ROM_PAGE_SLOT) {
-
-                  seg = addrIn >> 12;
-                  uint8_t page = curPageArr[seg];
-
-                  uint16_t size;
-
-                  // handle holes for paged ROM slots
-                  if (holes[idx].filled && (holes[idx].page == page))
-                     size = slots[idx].size[page] + holes[idx].size + 1;
-                  else
-                     size = slots[idx].size[page];
-
-                  if (slots[idx].usedmask & (1<<page)) {    // page is filled
-
-                     if ( (addrIn - slots[idx].target) < size ) { 
-
-                        romaddr = slots[idx].from[page] + (addrIn - slots[idx].target);
-
-                        if (holes[idx].filled && (holes[idx].page == page)) {
-
-                           if ( (addrIn >= holes[idx].from) && (addrIn <= (holes[idx].from + holes[idx].size)) ) {
-                              dataOut = 0xFFFF;
-                              deviceAddress = true;
-                              continue;
-                           } 
-                           
-                           if ( addrIn > (holes[idx].from) )
-                              romaddr -= (holes[idx].size + 1);
-
-                        }
-
-                        dataOut = cart.ROM[romaddr];
-                        deviceAddress = true;
-                     } 
-
-                  } else {
-                     deviceAddress = true;
-                     dataOut = 0xFFFF;
-                  }
-
-               } else { // RAM8_SLOT or RAM16_SLOT
-               
-                  if ( (addrIn - slots[idx].from[0]) < (slots[idx].size[0]) ) {
-
-                     romaddr = (addrIn - slots[idx].from[0]);
-                     dataOut = cart.RAM[romaddr];
-                     deviceAddress = true;
-                  }
-               } 
-            }
-
+            if (kind == MM_ROM) {
+               dataOut = cart.ROM[romaddr];
+               deviceAddress = true;
+            } else if (MM_IS_RAM(kind)) {
+               dataOut = cart.RAM[romaddr];
+               deviceAddress = true;
+            } 
+            
          } else {
             if (busState == BUS_DWS) {
 
@@ -320,12 +237,15 @@ void __time_critical_func(core1_main()) {
                   } else {
 #endif
 
-                     if ( (addrIn >= cart.ramfrom) && (addrIn <= cart.ramto) ) {
-                        if(cart.ramwidth == 8)
-                           cart.RAM[addrIn - cart.ramfrom] = dataIn & 0xFF;
-                        else  // cart.ramwidth == 16
-                           cart.RAM[addrIn - cart.ramfrom] = dataIn;
-                     }
+                     seg = (addrIn >> 12) & 0xF;
+                     mm_kind_t kind = mm_lookup(&m, addrIn, curPageArr[seg], (uint32_t *) &romaddr);
+
+                     if (kind == MM_RAM8) {
+                        cart.RAM[romaddr] = dataIn & 0xFF;
+                     } else if (kind == MM_RAM16) {
+                        cart.RAM[romaddr] = dataIn;
+                     } 
+                     
 #if CONFIG_JLP
                   }
 #endif

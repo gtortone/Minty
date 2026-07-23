@@ -15,10 +15,6 @@ typedef struct {
    volatile uint16_t RAM[RAMSIZE];
    uint32_t len;
 
-   uint16_t ramfrom;
-   uint16_t ramto;
-   uint8_t ramwidth;
-
    bool pagingSupport;
 #if CONFIG_JLP
    bool JLPSupport;

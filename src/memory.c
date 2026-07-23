@@ -1,344 +1,278 @@
-
-#include <stdio.h>
-#include <stdint.h>
-#include <stdbool.h>
-#include <string.h>
-
-#include "memory.h"
-
 /*
- * each element of slots array is a bucket for MSB of Intellivision
- * bus address
- *
- * e.g.  $5000    ->    bucket 0x50 (80)
+ * intv_memmap_flat.c — Memory map for an Intellivision multicart on MCU
+ *                      (flat per-page-plane variant, see the header)
  */
 
-struct mapEntry slots[NSLOTS];
-struct mapHole holes[NSLOTS];
+#include <string.h>
+#include "memory.h"
 
+mm_map_t m;
 
-void printSlot(uint8_t idx, uint8_t page) {
-
-   // check for hole...
-   //
-   printf("slot #0x%X: type: %d, from: 0x%lX, to: 0x%lX, size: 0x%X, target: 0x%X, page: 0x%X, [%s]\n",
-         idx, 
-         slots[idx].type, 
-         slots[idx].from[page], 
-         slots[idx].from[page]+slots[idx].size[page]-1,
-         slots[idx].size[page], 
-         slots[idx].target, 
-         page, 
-         (slots[idx].usedmask) & (1<<page)?"F":"E");
+/* ------------------------------------------------------------------ */
+/*  Map construction                                                   */
+/* ------------------------------------------------------------------ */
+void mm_init(mm_map_t *m)
+{
+    memset(m, 0, sizeof(*m));
 }
 
-void printFilledSlots(void) {
+/* Adds a ROM entry (equivalent to one [mapping] line).
+   Partial pages, multiple fragments on the same (segment, page) and
+   entries straddling segments are all accepted.
+   Returns the entry index (>= 0) or an MM_ERR_* code. */
+int mm_add(mm_map_t *m, uint32_t rom_start, uint32_t rom_end,
+           uint16_t cpu_start, int8_t page)
+{
+    if (m->count >= MM_MAX_ENTRIES)                    return MM_ERR_FULL;
+    if (rom_end < rom_start)                           return MM_ERR_RANGE;
+    uint32_t len = rom_end - rom_start;                /* len = words-1   */
+    if ((uint32_t)cpu_start + len > 0xFFFF)            return MM_ERR_RANGE;
+    if (page != MM_NO_PAGE && (page < 0 || page > 15)) return MM_ERR_PAGED_ALIGN;
 
-   for(int i=0; i<NSLOTS; i++) 
-      if (slots[i].usedmask) 
-         for(int page=0; page<NPAGES; page++) 
-            if(slots[i].usedmask & (1<<page)) 
-               printSlot(i, page);
+    int i = m->count++;
+    m->entry[i].src_start = rom_start;
+    m->entry[i].src_end   = rom_end;
+    m->entry[i].cpu_start = cpu_start;
+    m->entry[i].page      = page;
+    m->delta[i] = (int32_t)rom_start - (int32_t)cpu_start;
+    m->kind[i]  = MM_ROM;
+    return i;
 }
 
-void cleanSlots(void) {
+/* Adds a RAM area (equivalent to one "RAM 8" / "RAM 16" line in
+   [memattr]). cpu_start/cpu_end are Intellivision bus addresses
+   (inclusive); width is the data width in bits (8 or 16).
+   Areas are appended to the RAM space: the first starts at offset 0,
+   the following ones continue contiguously. RAM is visible on every
+   page plane. Returns the entry index (>= 0) or an MM_ERR_* code. */
+int mm_add_ram(mm_map_t *m, uint16_t cpu_start, uint16_t cpu_end,
+               uint8_t width)
+{
+    if (m->count >= MM_MAX_ENTRIES)                    return MM_ERR_FULL;
+    if (cpu_end < cpu_start)                           return MM_ERR_RANGE;
+    if (width != 8 && width != 16)                     return MM_ERR_RAM_WIDTH;
+    uint32_t len = (uint32_t)cpu_end - cpu_start;      /* words-1         */
 
-   for(int i=0; i<NSLOTS; i++) {
-      for(int j=0;j<NPAGES;j++) {
-         slots[i].from[j] = 0;
-         slots[i].size[j] = 0;
-      }
-      slots[i].target = 0;
-      slots[i].type = 0;
-      slots[i].usedmask = 0;
-   }
+    int i = m->count++;
+    m->entry[i].src_start = m->ram_words;
+    m->entry[i].src_end   = m->ram_words + len;
+    m->entry[i].cpu_start = cpu_start;
+    m->entry[i].page      = MM_NO_PAGE;
+    m->delta[i]    = (int32_t)m->ram_words - (int32_t)cpu_start;
+    m->kind[i]     = (width == 8) ? MM_RAM8 : MM_RAM16;
+    m->ram_words  += len + 1;
+    return i;
 }
 
-void cleanHoles(void) {
-
-   for(int i=0; i<NSLOTS; i++) {
-      holes[i].from = 0;
-      holes[i].size = 0;
-      holes[i].page = 0;
-      holes[i].filled = false;
-   }
+/* Slow resolver (build time only), per page plane: an entry is visible
+   on a plane if it is fixed/RAM or belongs to that page. With
+   overlaps, the last added entry wins, matching jzintv semantics. */
+static uint8_t mm_resolve_slow(const mm_map_t *m, uint8_t plane,
+                               uint16_t addr)
+{
+    uint8_t id = (uint8_t)m->count;             /* ghost "unmapped"       */
+    for (int i = 0; i < m->count; i++) {
+        const mm_entry_t *e = &m->entry[i];
+        if (e->page != MM_NO_PAGE && e->page != (int8_t)plane) continue;
+        if (addr < e->cpu_start) continue;
+        if ((uint32_t)addr - e->cpu_start > e->src_end - e->src_start)
+            continue;
+        id = (uint8_t)i;
+    }
+    return id;
 }
 
-/*
-   * addSlot function fills a slot using nearby slots to fill
-   * whole available range
-   *
-   * e.g.    $8000 - $844D = $4800
-   *
-   * bus address $4800 is mapped from $8000 up to $844D
-   * so this range goes from $4800 to $4800 + ($844D - $8000) = $4C4D
-   *
-   * relevant slots are:   48, 49, 4A, 4B, 4C
-   *
-   * 48) $8000 - $844D = $4800
-   * 49) $8000 - $844D = $4800
-   * 4A) $8000 - $844D = $4800
-   * 4B) $8000 - $844D = $4800
-   * 4C) $8000 - $844D = $4800
-   *
-   */
-
-void addSlot(uint32_t from, uint32_t to, uint16_t target, uint8_t page, mapType type) {
-   
-   uint8_t nslots = 0;
-   bool hole = false;
-   uint8_t baseslot = 0;
-
-   if ( (type == ROM_SLOT) || (type == ROM_PAGE_SLOT) )
-      baseslot = (target >> 8);
-   else
-      baseslot = (from >> 8);
-
-   // detect collision  (only for ROM type for not paged addresses)
-   //if ( (type == ROM_SLOT) && ((slots[baseslot].usedmask) & (1<<page)) && (page == 0)) {
-   if ( (slots[baseslot].usedmask) & (1<<page) ) {
-
-      uint32_t from_in = slots[baseslot].from[page];
-      uint32_t to_in = slots[baseslot].from[page] + slots[baseslot].size[page];
-
-      uint32_t target_from = target;
-      uint32_t target_to = target + (to - from);
-
-      uint32_t target_from_in = slots[baseslot].target;
-      uint32_t target_to_in = slots[baseslot].target + slots[baseslot].size[page];
-
-      // handle map hole
-      if (target_from > target_from_in) {
-         if ( (target_from - target_to_in) > 1 ) {
-            // hole detected
-            hole = true;
-            holes[baseslot].from = target_to_in;
-            holes[baseslot].size = (target_from - target_to_in) - 1;
-            holes[baseslot].page = page;
-            holes[baseslot].filled = true;
-         }
-
-      } else {
-         if ( (target_from_in - target_to) > 1 ) {
-            // hole detected
-            hole = true;
-            holes[baseslot].from = target_to;
-            holes[baseslot].size = (target_from_in - target_to) - 1; 
-            holes[baseslot].page = page;
-            holes[baseslot].filled = true;
-         }
-      }
-     
-      if (from_in < from)
-         from = from_in;
-
-      if (to_in > to)
-         to = to_in;
-
-      if (slots[baseslot].target < target)
-         target = slots[baseslot].target;
-   }
-
-   if(hole) {
-      printf("--- hole 0x%X --- from: 0x%lX, page: 0x%d, size: %d\n",
-         baseslot, holes[baseslot].from, holes[baseslot].page, holes[baseslot].size);
-   }
-
-   if ( (type == ROM_SLOT) || (type == ROM_PAGE_SLOT) )
-      nslots = (( (target + (to - from)) ) >> 8) - (target >> 8);
-   else
-      nslots = (to >> 8) - (from >> 8);
-
-   for(int i=baseslot; i<=(baseslot + nslots); i++) {
-
-      slots[i].from[page] = from;
-      slots[i].size[page] = (to - from) + 1;
-
-      if ( (type == ROM_SLOT) || (type == ROM_PAGE_SLOT) )
-         slots[i].target = target;
-      else
-         slots[i].target = 0;
-      slots[i].type = type;
-      slots[i].usedmask |= (1 << page);
-
-      if (hole) {
-         // extend hole on near segments
-         holes[i].from = holes[baseslot].from;
-         holes[i].size = holes[baseslot].size;
-         holes[i].page = holes[baseslot].page;
-         holes[i].filled = true;
-      }
-
-      //printf("## FILL ## ");
-      //printSlot(i, page);
-   }
+/* Finds an identical split table, or appends a new one.
+   Returns the split index, or MM_ERR_SPLITS_FULL. */
+static int mm_intern_split(mm_map_t *m, int *n_splits, const mm_split_t *s)
+{
+    for (int k = 0; k < *n_splits; k++)
+        if (memcmp(&m->split[k], s, sizeof(*s)) == 0)
+            return k;
+    if (*n_splits >= MM_MAX_SPLITS) return MM_ERR_SPLITS_FULL;
+    m->split[*n_splits] = *s;
+    return (*n_splits)++;
 }
 
-// return slot index if address is mapped and value compatible with slot size
-bool mapSlot(uint16_t addr, uint8_t page, uint8_t *slot) {
+/* Builds the 16 page planes, the deduplicated split tables and the
+   per-block liveness bitmap. Call once, after all the entries have
+   been added. Returns 0, or an MM_ERR_* code. */
+int mm_finalize(mm_map_t *m)
+{
+    uint8_t ghost = (uint8_t)m->count;
+    m->delta[ghost] = 0;                        /* ghost "unmapped" entry */
+    m->kind[ghost]  = MM_NONE;
+    m->none_id      = ghost;
 
-   uint8_t idx = (addr >> 8);
+    int n_splits = 0;
+    int n_blocks = 65536 >> MM_BLOCK_SHIFT;
 
-   if ( (slots[idx].type == ROM_SLOT) || (slots[idx].type == ROM_PAGE_SLOT) ) {
+    memset(m->blk_any, 0, sizeof(m->blk_any));
 
-      if ( (slots[idx].usedmask & (1<<page)) && ((addr - slots[idx].target) <= (slots[idx].size[page] + holes[idx].size)) ) {
-         *slot = idx;
-         return true;
-      }
+    for (int plane = 0; plane < 16; plane++) {
+        for (int blk = 0; blk < n_blocks; blk++) {
+            uint32_t base = (uint32_t)blk << MM_BLOCK_SHIFT;
+            uint32_t top  = base + (1u << MM_BLOCK_SHIFT) - 1;
 
-   } else {    // RAM8 or RAM16
-   
-      if ( (slots[idx].usedmask & (1<<page)) && ((addr - slots[idx].from[0]) <= (slots[idx].size[0] - 1)) ) {
-         *slot = idx;
-         return true;
-      }
-   }
-
-   return false;
-}
-
-// return ROM/cartridge address for Intellivision address
-bool mapAddress(uint16_t addr, uint8_t page, uint32_t *romaddr, mapType *type) {
-
-   uint8_t slot;
-   uint16_t size;
-
-   if ( mapSlot(addr, page, &slot) ) {
-
-      *type = slots[slot].type;
-
-      if ( (*type == ROM_SLOT) || (*type == ROM_PAGE_SLOT) ) {
-
-         if (addr < slots[slot].target)
-            return false;
-
-         if ((holes[slot].page == page) && holes[slot].filled)
-            size = slots[slot].size[page] + holes[slot].size + 1;
-         else
-            size = slots[slot].size[page];
-
-         if ( (addr - slots[slot].target) < size) {    
-
-            *romaddr = slots[slot].from[page] + (addr - slots[slot].target);
-         
-            if ((holes[slot].page == page) && holes[slot].filled) {
-               // check if address is inside hole...
-               if ( (addr >= holes[slot].from) && (addr <= (holes[slot].from + holes[slot].size)) )
-                     return false;
-
-               if ( addr > holes[slot].from )
-                  *romaddr -= (holes[slot].size + 1);
+            /* fast path: if no visible entry has a boundary strictly
+               inside this block, the block is uniform and a single
+               resolve is enough (this covers the vast majority of the
+               16 x 256 blocks and makes the build ~100x faster) */
+            bool has_boundary = false;
+            for (int i = 0; i < m->count && !has_boundary; i++) {
+                const mm_entry_t *e = &m->entry[i];
+                if (e->page != MM_NO_PAGE && e->page != (int8_t)plane)
+                    continue;
+                uint32_t s = e->cpu_start;
+                uint32_t en = s + (e->src_end - e->src_start);
+                if ((s > base && s <= top) || (en >= base && en < top))
+                    has_boundary = true;
+            }
+            if (!has_boundary) {
+                m->map[plane][blk] =
+                    mm_resolve_slow(m, (uint8_t)plane, (uint16_t)base);
+                continue;
             }
 
-            return true;
-         }
+            /* compress the block into uniform contiguous sub-ranges */
+            uint16_t bound[MM_SPLIT_WAYS];
+            uint8_t  id[MM_SPLIT_WAYS];
+            int      runs = 0;
 
-      } else {    // RAM8_SLOT or ROM16_SLOT
+            uint8_t cur = mm_resolve_slow(m, (uint8_t)plane,
+                                          (uint16_t)base);
+            for (uint32_t a = base + 1;
+                 a < base + (1u << MM_BLOCK_SHIFT); a++) {
+                uint8_t v = mm_resolve_slow(m, (uint8_t)plane,
+                                            (uint16_t)a);
+                if (v != cur) {
+                    if (runs >= MM_SPLIT_WAYS - 1) return MM_ERR_FRAGMENTED;
+                    bound[runs] = (uint16_t)(a - 1);
+                    id[runs++]  = cur;
+                    cur = v;
+                }
+            }
+            bound[runs] = (uint16_t)(base + (1u << MM_BLOCK_SHIFT) - 1);
+            id[runs++]  = cur;
 
-         *romaddr = (addr - slots[slot].from[0]);
+            if (runs == 1) {
+                m->map[plane][blk] = id[0];     /* uniform block          */
+            } else {
+                mm_split_t s;
+                for (int k = 0; k < MM_SPLIT_WAYS; k++) {
+                    int j = (k < runs) ? k : runs - 1;
+                    s.id[k] = id[j];
+                    if (k < MM_SPLIT_WAYS - 1)
+                        s.bound[k] = (k < runs - 1) ? bound[k] : 0xFFFF;
+                }
+                int si = mm_intern_split(m, &n_splits, &s);
+                if (si < 0) return si;
+                m->map[plane][blk] = (uint8_t)(MM_SPLIT + si);
+            }
+        }
+    }
 
-         return true;
-      }
-   }
-
-   return false;
+    /* per-block liveness bitmap: bit set if any page maps anything in
+       the block (a split cell always maps at least one word) */
+    for (int blk = 0; blk < n_blocks; blk++) {
+        for (int plane = 0; plane < 16; plane++) {
+            if (m->map[plane][blk] != ghost) {
+                m->blk_any[blk >> 5] |= 1u << (blk & 31);
+                break;
+            }
+        }
+    }
+    return 0;
 }
 
-void getRAMRange(uint16_t *ramfrom, uint16_t *ramto, uint8_t *ramwidth) {
-
-   uint16_t from = 0;
-   uint16_t to = 0;
-
-   for(int slot=0;slot<NSLOTS;slot++) {
-
-      if ( (slots[slot].type == RAM8_SLOT) || (slots[slot].type == RAM16_SLOT) ) {
-
-         uint16_t to_in = slots[slot].from[0] + slots[slot].size[0];
-      
-         if ( (from == 0) && (to == 0) ) {
-            from = slots[slot].from[0];
-            to = to_in;
-            if(slots[slot].type == RAM8_SLOT)
-               *ramwidth = 8;
-            else
-               *ramwidth = 16;
-            continue;
-         }
-
-         if (slots[slot].from[0] < from)
-            from = slots[slot].from[0];
-
-         if (to_in > to)
-            to = to_in;
-      }
-   }
-
-   *ramfrom = from;
-   *ramto = to;
+/* One-call loader: builds a whole map from definition tables. */
+int mm_load(mm_map_t *m,
+            const mm_rom_def_t *rom_defs, unsigned n_rom,
+            const mm_ram_def_t *ram_defs, unsigned n_ram)
+{
+    mm_init(m);
+    for (unsigned i = 0; i < n_rom; i++) {
+        int r = mm_add(m, rom_defs[i].rom_start, rom_defs[i].rom_end,
+                          rom_defs[i].cpu_start, rom_defs[i].page);
+        if (r < 0) return r;
+    }
+    for (unsigned j = 0; j < n_ram; j++) {
+        int r = mm_add_ram(m, ram_defs[j].cpu_start, ram_defs[j].cpu_end,
+                              ram_defs[j].width);
+        if (r < 0) return r;
+    }
+    return mm_finalize(m);
 }
-
-// ---
 
 void config_memory(int cfg) {
 
-   cleanSlots();
-   cleanHoles();
+   mm_init(&m);
 
    switch (cfg) {
 
       case 0:
-         addSlot(0x0000, 0x1FFF, 0x5000, 0, ROM_SLOT);
-         addSlot(0x2000, 0x2FFF, 0xD000, 0, ROM_SLOT);
-         addSlot(0x3000, 0x3FFF, 0xF000, 0, ROM_SLOT);
+         mm_add(&m, 0x0000, 0x1FFF, 0x5000, MM_NO_PAGE);
+         mm_add(&m, 0x2000, 0x2FFF, 0xD000, MM_NO_PAGE);
+         mm_add(&m, 0x3000, 0x3FFF, 0xF000, MM_NO_PAGE);
+         mm_finalize(&m);
          break;
 
       case 1:
-         addSlot(0x0000, 0x1FFF, 0x5000, 0, ROM_SLOT);
-         addSlot(0x2000, 0x4FFF, 0xD000, 0, ROM_SLOT);
+         mm_add(&m, 0x0000, 0x1FFF, 0x5000, MM_NO_PAGE);
+         mm_add(&m, 0x2000, 0x4FFF, 0xD000, MM_NO_PAGE);
+         mm_finalize(&m);
          break;
 
       case 2:
-         addSlot(0x0000, 0x1FFF, 0x5000, 0, ROM_SLOT);
-         addSlot(0x2000, 0x4FFF, 0x9000, 0, ROM_SLOT);
-         addSlot(0x5000, 0x5FFF, 0xD000, 0, ROM_SLOT);
+         mm_add(&m, 0x0000, 0x1FFF, 0x5000, MM_NO_PAGE); 
+         mm_add(&m, 0x2000, 0x4FFF, 0x9000, MM_NO_PAGE);
+         mm_add(&m, 0x5000, 0x5FFF, 0xD000, MM_NO_PAGE);
+         mm_finalize(&m);
          break;
 
       case 3:
-         addSlot(0x0000, 0x1FFF, 0x5000, 0, ROM_SLOT);
-         addSlot(0x2000, 0x3FFF, 0x9000, 0, ROM_SLOT);
-         addSlot(0x4000, 0x4FFF, 0xD000, 0, ROM_SLOT);
-         addSlot(0x5000, 0x5FFF, 0xF000, 0, ROM_SLOT);
+         mm_add(&m, 0x0000, 0x1FFF, 0x5000, MM_NO_PAGE); 
+         mm_add(&m, 0x2000, 0x3FFF, 0x9000, MM_NO_PAGE);
+         mm_add(&m, 0x4000, 0x4FFF, 0xD000, MM_NO_PAGE);
+         mm_add(&m, 0x5000, 0x5FFF, 0xF000, MM_NO_PAGE);
+         mm_finalize(&m);
          break;
 
-      case 4:
-         addSlot(0x0000, 0x1FFF, 0x5000, 0, ROM_SLOT);
-         addSlot(0xD000, 0xD3FF, 0, 0, RAM8_SLOT);
+      case 4: 
+         mm_add(&m, 0x0000, 0x1FFF, 0x5000, MM_NO_PAGE);
+         mm_add_ram(&m, 0xD000, 0xD3FF, 8);
+         mm_finalize(&m);
          break;
 
       case 5:
-         addSlot(0x0000, 0x2FFF, 0x5000, 0, ROM_SLOT);
-         addSlot(0x3000, 0x5FFF, 0x9000, 0, ROM_SLOT);
+         mm_add(&m, 0x0000, 0x2FFF, 0x5000, MM_NO_PAGE);
+         mm_add(&m, 0x3000, 0x5FFF, 0x9000, MM_NO_PAGE);
+         mm_finalize(&m);
          break;
 
       case 6:
-         addSlot(0x0000, 0x1FFF, 0x6000, 0, ROM_SLOT);
+         mm_add(&m, 0x0000, 0x1FFF, 0x6000, MM_NO_PAGE);
+         mm_finalize(&m);
          break;
 
       case 7:
-         addSlot(0x0000, 0x1FFF, 0x4800, 0, ROM_SLOT);
+         mm_add(&m, 0x0000, 0x1FFF, 0x4800, MM_NO_PAGE);
+         mm_finalize(&m);
          break;
 
       case 8:
-         addSlot(0x0000, 0x0FFF, 0x5000, 0, ROM_SLOT);
-         addSlot(0x1000, 0x1FFF, 0x7000, 0, ROM_SLOT);
+         mm_add(&m, 0x0000, 0x0FFF, 0x5000, MM_NO_PAGE);
+         mm_add(&m, 0x1000, 0x1FFF, 0x7000, MM_NO_PAGE);
+         mm_finalize(&m);
          break;
 
       case 9:
-         addSlot(0x0000, 0x1FFF, 0x5000, 0, ROM_SLOT);
-         addSlot(0x2000, 0x3FFF, 0x9000, 0, ROM_SLOT);
-         addSlot(0x4000, 0x4FFF, 0xD000, 0, ROM_SLOT);
-         addSlot(0x5000, 0x5FFF, 0xF000, 0, ROM_SLOT);
-         addSlot(0x8800, 0x8FFF, 0, 0, RAM8_SLOT);
+         mm_add(&m, 0x0000, 0x1FFF, 0x5000, MM_NO_PAGE);
+         mm_add(&m, 0x2000, 0x3FFF, 0x9000, MM_NO_PAGE);
+         mm_add(&m, 0x4000, 0x4FFF, 0xD000, MM_NO_PAGE);
+         mm_add(&m, 0x5000, 0x5FFF, 0xF000, MM_NO_PAGE);
+         mm_add_ram(&m, 0x8800, 0x8FFF, 8);
+         mm_finalize(&m);
          break;
 
       default:

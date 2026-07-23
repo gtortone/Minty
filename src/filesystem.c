@@ -17,7 +17,7 @@
 
 extern Cartridge cart;
 
-extern struct mapEntry slots[NSLOTS];
+extern mm_map_t m;
 
 extern uint8_t tv_mode;      // 0: PAL, 1: NTSC
 extern uint8_t ecs_present;  // 0: ECS absent, 1: ECS present
@@ -143,8 +143,7 @@ int load_file(char *filename) {
       uint16_t prev_size, target;
       char inputBuffer[3];
 
-      cleanSlots();
-      cleanHoles();
+      mm_init(&m);
 
       vfs_read(f, inputBuffer, sizeof(inputBuffer));
       
@@ -167,7 +166,7 @@ int load_file(char *filename) {
          prev_size = (hi - lo) - 1;
          prev_from = from;
 
-         addSlot(from, from + (hi - lo) - 1, target, 0, ROM_SLOT);
+         mm_add(&m, from, from + (hi - lo) - 1, target, MM_NO_PAGE);
          //printf("from: 0x%lX  to: 0x%lX  target: 0x%X\n", from, from + (hi - lo) - 1, target);
 
          for (int j = lo; j < hi; j++) {
@@ -196,18 +195,17 @@ int load_file(char *filename) {
          // check if memory block has write attribute
          if(attr & 0x02) { 
 
-            mapType type;
+            uint8_t w;
 
             if(attr & 0x04)
-               type = RAM8_SLOT;   // narrow flag (8-bit)
-            else
-               type = RAM16_SLOT;
+               w = 8;
+            else w = 16;
 
-            addSlot(i * 0x800, (i * 0x800) + ((hi - lo) * 0x100) - 1, 0, 0, type);
+            mm_add_ram(&m, i * 0x800, (i * 0x800) + ((hi - lo) * 0x100) - 1, w);
          }
       }
 
-      getRAMRange(&cart.ramfrom, &cart.ramto, &cart.ramwidth);
+      mm_finalize(&m);
 
       // check for metadata section 
       if (!vfs_eof(f)) {
