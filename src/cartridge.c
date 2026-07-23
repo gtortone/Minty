@@ -190,19 +190,15 @@ void __time_critical_func(core1_main()) {
                   if ((short_Address >= slots[idx].from[0][page]) && (short_Address <= slots[idx].to[0][page])) {
                      romaddr = (uint32_t)((slots[idx].RomAddr_H[0][page] << 16) + (uint32_t)slots[idx].RomAddr_L[0][page]) + (uint32_t)(short_Address - slots[idx].from[0][page]);
                      dataOut = cart.ROM[romaddr];
+                     deviceAddress = true;
                      //printf("Read 0x%04X => 0x%08lX\n", addrIn, romaddr);
                   }
                   else if ((short_Address >= slots[idx].from[1][page]) && (short_Address <= slots[idx].to[1][page])) {
                      romaddr = (uint32_t)((slots[idx].RomAddr_H[1][page] << 16) + (uint32_t)slots[idx].RomAddr_L[1][page]) + (uint32_t)(short_Address - slots[idx].from[1][page]);
                      dataOut = cart.ROM[romaddr];
+                     deviceAddress = true;
                      //printf("Read 0x%04X => 0x%08lX\n", addrIn, romaddr);
                   }
-                  else {
-                     // out of mapped mem return 0xFFFF
-                     dataOut = 0xFFFF;
-                     //printf("Read 0x%04X => 0xFFFF (out of mapped mem)\n", addrIn);
-                  }
-                  deviceAddress = true;
                   continue;
                }
             }
