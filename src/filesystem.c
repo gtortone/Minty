@@ -205,8 +205,6 @@ int load_file(char *filename) {
          }
       }
 
-      mm_finalize(&m);
-
       // check for metadata section 
       if (!vfs_eof(f)) {
 

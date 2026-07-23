@@ -281,20 +281,17 @@ void config_memory(int cfg) {
          mm_add(&m, 0x0000, 0x1FFF, 0x5000, MM_NO_PAGE);
          mm_add(&m, 0x2000, 0x2FFF, 0xD000, MM_NO_PAGE);
          mm_add(&m, 0x3000, 0x3FFF, 0xF000, MM_NO_PAGE);
-         mm_finalize(&m);
          break;
 
       case 1:
          mm_add(&m, 0x0000, 0x1FFF, 0x5000, MM_NO_PAGE);
          mm_add(&m, 0x2000, 0x4FFF, 0xD000, MM_NO_PAGE);
-         mm_finalize(&m);
          break;
 
       case 2:
          mm_add(&m, 0x0000, 0x1FFF, 0x5000, MM_NO_PAGE); 
          mm_add(&m, 0x2000, 0x4FFF, 0x9000, MM_NO_PAGE);
          mm_add(&m, 0x5000, 0x5FFF, 0xD000, MM_NO_PAGE);
-         mm_finalize(&m);
          break;
 
       case 3:
@@ -302,35 +299,29 @@ void config_memory(int cfg) {
          mm_add(&m, 0x2000, 0x3FFF, 0x9000, MM_NO_PAGE);
          mm_add(&m, 0x4000, 0x4FFF, 0xD000, MM_NO_PAGE);
          mm_add(&m, 0x5000, 0x5FFF, 0xF000, MM_NO_PAGE);
-         mm_finalize(&m);
          break;
 
       case 4: 
          mm_add(&m, 0x0000, 0x1FFF, 0x5000, MM_NO_PAGE);
          mm_add_ram(&m, 0xD000, 0xD3FF, 8);
-         mm_finalize(&m);
          break;
 
       case 5:
          mm_add(&m, 0x0000, 0x2FFF, 0x5000, MM_NO_PAGE);
          mm_add(&m, 0x3000, 0x5FFF, 0x9000, MM_NO_PAGE);
-         mm_finalize(&m);
          break;
 
       case 6:
          mm_add(&m, 0x0000, 0x1FFF, 0x6000, MM_NO_PAGE);
-         mm_finalize(&m);
          break;
 
       case 7:
          mm_add(&m, 0x0000, 0x1FFF, 0x4800, MM_NO_PAGE);
-         mm_finalize(&m);
          break;
 
       case 8:
          mm_add(&m, 0x0000, 0x0FFF, 0x5000, MM_NO_PAGE);
          mm_add(&m, 0x1000, 0x1FFF, 0x7000, MM_NO_PAGE);
-         mm_finalize(&m);
          break;
 
       case 9:
@@ -339,7 +330,6 @@ void config_memory(int cfg) {
          mm_add(&m, 0x4000, 0x4FFF, 0xD000, MM_NO_PAGE);
          mm_add(&m, 0x5000, 0x5FFF, 0xF000, MM_NO_PAGE);
          mm_add_ram(&m, 0x8800, 0x8FFF, 8);
-         mm_finalize(&m);
          break;
 
       default:

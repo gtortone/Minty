@@ -159,8 +159,6 @@ int LoadGame(int entry_num) {
    mm_add(&m, 0x113AC, 0x123A7, 0x6000, MM_NO_PAGE);
    mm_add(&m, 0x123A8, 0x12A57, 0xA000, MM_NO_PAGE);
 
-   mm_finalize(&m);
-
    uint16_t addr = 0x4800;
    uint32_t romaddr;
 
@@ -354,8 +352,6 @@ void RunLauncher() {
       mm_add(&m, 0x1000, (sizeof(mintyfw) / 2)-1, 0x6000, MM_NO_PAGE);
    }
 
-   mm_finalize(&m);
-   
    printf(" DONE\n");
 
    printf("memory map data structure size: %d bytes\n", sizeof(m));

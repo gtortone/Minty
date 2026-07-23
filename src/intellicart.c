@@ -323,8 +323,6 @@ int load_cfg(char *filename) {
    config_jlp(jlp_value, jlpflash_value, filename);
 #endif
 
-   mm_finalize(&m);
-
    printf("load_cfg done\n");
 
    return num_pokes;
