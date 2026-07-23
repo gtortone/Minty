@@ -1,6 +1,15 @@
 /*
  * intv_memmap_flat.c — Memory map for an Intellivision multicart on MCU
- *                      (flat per-page-plane variant, see the header)
+ *                      (flat per-page-plane variant)
+ *
+ * See intv_memmap_flat.h for the architecture overview and the API.
+ *
+ * File layout:
+ *   1. Build API ......... mm_init / mm_add / mm_add_ram
+ *   2. Build helpers ..... entry visibility, resolver, run compression,
+ *                          split-table interning, block encoding
+ *   3. Finalization ...... mm_finalize (planes + splits + liveness)
+ *   4. Convenience ....... mm_load
  */
 
 #include <string.h>
@@ -8,9 +17,10 @@
 
 mm_map_t m;
 
-/* ------------------------------------------------------------------ */
-/*  Map construction                                                   */
-/* ------------------------------------------------------------------ */
+/* ================================================================== */
+/*  1. Build API                                                       */
+/* ================================================================== */
+
 void mm_init(mm_map_t *m)
 {
     memset(m, 0, sizeof(*m));
@@ -30,10 +40,7 @@ int mm_add(mm_map_t *m, uint32_t rom_start, uint32_t rom_end,
     if (page != MM_NO_PAGE && (page < 0 || page > 15)) return MM_ERR_PAGED_ALIGN;
 
     int i = m->count++;
-    m->entry[i].src_start = rom_start;
-    m->entry[i].src_end   = rom_end;
-    m->entry[i].cpu_start = cpu_start;
-    m->entry[i].page      = page;
+    m->entry[i] = (mm_entry_t){ rom_start, rom_end, cpu_start, page };
     m->delta[i] = (int32_t)rom_start - (int32_t)cpu_start;
     m->kind[i]  = MM_ROM;
     return i;
@@ -54,37 +61,96 @@ int mm_add_ram(mm_map_t *m, uint16_t cpu_start, uint16_t cpu_end,
     uint32_t len = (uint32_t)cpu_end - cpu_start;      /* words-1         */
 
     int i = m->count++;
-    m->entry[i].src_start = m->ram_words;
-    m->entry[i].src_end   = m->ram_words + len;
-    m->entry[i].cpu_start = cpu_start;
-    m->entry[i].page      = MM_NO_PAGE;
+    m->entry[i] = (mm_entry_t){ m->ram_words, m->ram_words + len,
+                                cpu_start, MM_NO_PAGE };
     m->delta[i]    = (int32_t)m->ram_words - (int32_t)cpu_start;
     m->kind[i]     = (width == 8) ? MM_RAM8 : MM_RAM16;
     m->ram_words  += len + 1;
     return i;
 }
 
-/* Slow resolver (build time only), per page plane: an entry is visible
-   on a plane if it is fixed/RAM or belongs to that page. With
-   overlaps, the last added entry wins, matching jzintv semantics. */
-static uint8_t mm_resolve_slow(const mm_map_t *m, uint8_t plane,
-                               uint16_t addr)
+/* ================================================================== */
+/*  2. Build helpers (build time only)                                 */
+/* ================================================================== */
+
+/* An entry is visible on a plane if it is fixed/RAM or belongs to
+   that page. This is THE visibility rule: every build step below goes
+   through it. */
+static bool entry_visible(const mm_entry_t *e, uint8_t plane)
 {
-    uint8_t id = (uint8_t)m->count;             /* ghost "unmapped"       */
+    return e->page == MM_NO_PAGE || e->page == (int8_t)plane;
+}
+
+/* Last Intellivision bus address covered by the entry (inclusive). */
+static uint16_t entry_cpu_end(const mm_entry_t *e)
+{
+    return (uint16_t)(e->cpu_start + (e->src_end - e->src_start));
+}
+
+static bool entry_covers(const mm_entry_t *e, uint16_t addr)
+{
+    return addr >= e->cpu_start && addr <= entry_cpu_end(e);
+}
+
+/* Resolves one address on one plane. With overlaps, the last added
+   entry wins, matching jzintv .cfg semantics.
+   Returns an entry index, or m->count (the ghost "unmapped" entry). */
+static uint8_t resolve_addr(const mm_map_t *m, uint8_t plane,
+                            uint16_t addr)
+{
+    uint8_t id = (uint8_t)m->count;
     for (int i = 0; i < m->count; i++) {
         const mm_entry_t *e = &m->entry[i];
-        if (e->page != MM_NO_PAGE && e->page != (int8_t)plane) continue;
-        if (addr < e->cpu_start) continue;
-        if ((uint32_t)addr - e->cpu_start > e->src_end - e->src_start)
-            continue;
-        id = (uint8_t)i;
+        if (entry_visible(e, plane) && entry_covers(e, addr))
+            id = (uint8_t)i;
     }
     return id;
 }
 
+/* True if no visible entry has a boundary strictly inside the block:
+   the block is then uniform and one resolve_addr() is enough. This
+   fast path covers the vast majority of the 16 x 256 blocks and makes
+   the build ~100x faster than resolving every word. */
+static bool block_is_uniform(const mm_map_t *m, uint8_t plane,
+                             uint32_t base, uint32_t top)
+{
+    for (int i = 0; i < m->count; i++) {
+        const mm_entry_t *e = &m->entry[i];
+        if (!entry_visible(e, plane)) continue;
+        uint32_t s = e->cpu_start;
+        uint32_t en = entry_cpu_end(e);
+        if ((s > base && s <= top) || (en >= base && en < top))
+            return false;
+    }
+    return true;
+}
+
+/* Compresses one block into uniform contiguous sub-ranges.
+   Returns the number of runs (1..MM_SPLIT_WAYS), filling bound[]/id[],
+   or MM_ERR_FRAGMENTED if the block has too many zones. */
+static int compress_block(const mm_map_t *m, uint8_t plane, uint32_t base,
+                          uint16_t bound[MM_SPLIT_WAYS],
+                          uint8_t  id[MM_SPLIT_WAYS])
+{
+    int runs = 0;
+    uint8_t cur = resolve_addr(m, plane, (uint16_t)base);
+
+    for (uint32_t a = base + 1; a < base + MM_BLOCK_WORDS; a++) {
+        uint8_t v = resolve_addr(m, plane, (uint16_t)a);
+        if (v == cur) continue;
+        if (runs >= MM_SPLIT_WAYS - 1) return MM_ERR_FRAGMENTED;
+        bound[runs] = (uint16_t)(a - 1);
+        id[runs++]  = cur;
+        cur = v;
+    }
+    bound[runs] = (uint16_t)(base + MM_BLOCK_WORDS - 1);
+    id[runs++]  = cur;
+    return runs;
+}
+
 /* Finds an identical split table, or appends a new one.
    Returns the split index, or MM_ERR_SPLITS_FULL. */
-static int mm_intern_split(mm_map_t *m, int *n_splits, const mm_split_t *s)
+static int intern_split(mm_map_t *m, int *n_splits, const mm_split_t *s)
 {
     for (int k = 0; k < *n_splits; k++)
         if (memcmp(&m->split[k], s, sizeof(*s)) == 0)
@@ -94,96 +160,91 @@ static int mm_intern_split(mm_map_t *m, int *n_splits, const mm_split_t *s)
     return (*n_splits)++;
 }
 
-/* Builds the 16 page planes, the deduplicated split tables and the
-   per-block liveness bitmap. Call once, after all the entries have
-   been added. Returns 0, or an MM_ERR_* code. */
-int mm_finalize(mm_map_t *m)
+/* Normalizes runs into a split table: unused slots repeat the last
+   run, unused bounds are 0xFFFF, so the unrolled lookup compares work
+   for every address. */
+static void runs_to_split(const uint16_t bound[], const uint8_t id[],
+                          int runs, mm_split_t *s)
 {
-    uint8_t ghost = (uint8_t)m->count;
-    m->delta[ghost] = 0;                        /* ghost "unmapped" entry */
-    m->kind[ghost]  = MM_NONE;
-    m->none_id      = ghost;
+    for (int k = 0; k < MM_SPLIT_WAYS; k++) {
+        int j = (k < runs) ? k : runs - 1;
+        s->id[k] = id[j];
+        if (k < MM_SPLIT_WAYS - 1)
+            s->bound[k] = (k < runs - 1) ? bound[k] : 0xFFFF;
+    }
+}
 
-    int n_splits = 0;
-    int n_blocks = 65536 >> MM_BLOCK_SHIFT;
+/* Encodes one (plane, block) cell: uniform id, or split reference.
+   Returns 0, or an MM_ERR_* code. */
+static int encode_block(mm_map_t *m, int *n_splits, uint8_t plane, int blk)
+{
+    uint32_t base = (uint32_t)blk << MM_BLOCK_SHIFT;
+    uint32_t top  = base + MM_BLOCK_WORDS - 1;
 
-    memset(m->blk_any, 0, sizeof(m->blk_any));
-
-    for (int plane = 0; plane < 16; plane++) {
-        for (int blk = 0; blk < n_blocks; blk++) {
-            uint32_t base = (uint32_t)blk << MM_BLOCK_SHIFT;
-            uint32_t top  = base + (1u << MM_BLOCK_SHIFT) - 1;
-
-            /* fast path: if no visible entry has a boundary strictly
-               inside this block, the block is uniform and a single
-               resolve is enough (this covers the vast majority of the
-               16 x 256 blocks and makes the build ~100x faster) */
-            bool has_boundary = false;
-            for (int i = 0; i < m->count && !has_boundary; i++) {
-                const mm_entry_t *e = &m->entry[i];
-                if (e->page != MM_NO_PAGE && e->page != (int8_t)plane)
-                    continue;
-                uint32_t s = e->cpu_start;
-                uint32_t en = s + (e->src_end - e->src_start);
-                if ((s > base && s <= top) || (en >= base && en < top))
-                    has_boundary = true;
-            }
-            if (!has_boundary) {
-                m->map[plane][blk] =
-                    mm_resolve_slow(m, (uint8_t)plane, (uint16_t)base);
-                continue;
-            }
-
-            /* compress the block into uniform contiguous sub-ranges */
-            uint16_t bound[MM_SPLIT_WAYS];
-            uint8_t  id[MM_SPLIT_WAYS];
-            int      runs = 0;
-
-            uint8_t cur = mm_resolve_slow(m, (uint8_t)plane,
-                                          (uint16_t)base);
-            for (uint32_t a = base + 1;
-                 a < base + (1u << MM_BLOCK_SHIFT); a++) {
-                uint8_t v = mm_resolve_slow(m, (uint8_t)plane,
-                                            (uint16_t)a);
-                if (v != cur) {
-                    if (runs >= MM_SPLIT_WAYS - 1) return MM_ERR_FRAGMENTED;
-                    bound[runs] = (uint16_t)(a - 1);
-                    id[runs++]  = cur;
-                    cur = v;
-                }
-            }
-            bound[runs] = (uint16_t)(base + (1u << MM_BLOCK_SHIFT) - 1);
-            id[runs++]  = cur;
-
-            if (runs == 1) {
-                m->map[plane][blk] = id[0];     /* uniform block          */
-            } else {
-                mm_split_t s;
-                for (int k = 0; k < MM_SPLIT_WAYS; k++) {
-                    int j = (k < runs) ? k : runs - 1;
-                    s.id[k] = id[j];
-                    if (k < MM_SPLIT_WAYS - 1)
-                        s.bound[k] = (k < runs - 1) ? bound[k] : 0xFFFF;
-                }
-                int si = mm_intern_split(m, &n_splits, &s);
-                if (si < 0) return si;
-                m->map[plane][blk] = (uint8_t)(MM_SPLIT + si);
-            }
-        }
+    if (block_is_uniform(m, plane, base, top)) {
+        m->map[plane][blk] = resolve_addr(m, plane, (uint16_t)base);
+        return 0;
     }
 
-    /* per-block liveness bitmap: bit set if any page maps anything in
-       the block (a split cell always maps at least one word) */
-    for (int blk = 0; blk < n_blocks; blk++) {
-        for (int plane = 0; plane < 16; plane++) {
-            if (m->map[plane][blk] != ghost) {
+    uint16_t bound[MM_SPLIT_WAYS];
+    uint8_t  id[MM_SPLIT_WAYS];
+    int runs = compress_block(m, plane, base, bound, id);
+    if (runs < 0) return runs;
+
+    if (runs == 1) {
+        m->map[plane][blk] = id[0];
+        return 0;
+    }
+
+    mm_split_t s;
+    runs_to_split(bound, id, runs, &s);
+    int si = intern_split(m, n_splits, &s);
+    if (si < 0) return si;
+    m->map[plane][blk] = (uint8_t)(MM_SPLIT + si);
+    return 0;
+}
+
+/* Per-block liveness bitmap: bit set if any page maps anything in the
+   block (a split cell always maps at least one word). Feeds
+   mm_block_dead(). */
+static void build_liveness(mm_map_t *m)
+{
+    memset(m->blk_any, 0, sizeof(m->blk_any));
+    for (int blk = 0; blk < MM_NUM_BLOCKS; blk++)
+        for (int plane = 0; plane < MM_NUM_PLANES; plane++)
+            if (m->map[plane][blk] != m->none_id) {
                 m->blk_any[blk >> 5] |= 1u << (blk & 31);
                 break;
             }
+}
+
+/* ================================================================== */
+/*  3. Finalization                                                    */
+/* ================================================================== */
+
+/* Builds the 16 page planes, the deduplicated split tables and the
+   liveness bitmap. Call once, after all the entries have been added.
+   Returns 0, or an MM_ERR_* code. */
+int mm_finalize(mm_map_t *m)
+{
+    m->none_id      = (uint8_t)m->count;        /* ghost "unmapped" entry */
+    m->delta[m->none_id] = 0;
+    m->kind[m->none_id]  = MM_NONE;
+
+    int n_splits = 0;
+    for (int plane = 0; plane < MM_NUM_PLANES; plane++)
+        for (int blk = 0; blk < MM_NUM_BLOCKS; blk++) {
+            int r = encode_block(m, &n_splits, (uint8_t)plane, blk);
+            if (r < 0) return r;
         }
-    }
+
+    build_liveness(m);
     return 0;
 }
+
+/* ================================================================== */
+/*  4. Convenience                                                     */
+/* ================================================================== */
 
 /* One-call loader: builds a whole map from definition tables. */
 int mm_load(mm_map_t *m,
@@ -203,6 +264,7 @@ int mm_load(mm_map_t *m,
     }
     return mm_finalize(m);
 }
+
 
 void config_memory(int cfg) {
 

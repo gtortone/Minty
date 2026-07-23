@@ -49,6 +49,9 @@
 #define MM_NO_PAGE      (-1)
 
 #define MM_BLOCK_SHIFT    8     /* 256-word blocks                        */
+#define MM_BLOCK_WORDS    (1u << MM_BLOCK_SHIFT)
+#define MM_NUM_BLOCKS     (65536 >> MM_BLOCK_SHIFT)
+#define MM_NUM_PLANES     16    /* one plane per page number              */
 
 /* map / split.id values: 0..MM_MAX_ENTRIES = entry (the last one is
    the ghost "unmapped" entry), MM_SPLIT.. = split-table reference */
@@ -96,8 +99,8 @@ typedef struct {
                                               ghost entry is MM_NONE     */
     uint32_t   ram_words;               /* total RAM words required       */
     uint8_t    none_id;                 /* id of the ghost entry          */
-    uint8_t    map[16][65536 >> MM_BLOCK_SHIFT];  /* [page][block]        */
-    uint32_t   blk_any[(65536 >> MM_BLOCK_SHIFT) / 32];
+    uint8_t    map[MM_NUM_PLANES][MM_NUM_BLOCKS]; /* [page][block]        */
+    uint32_t   blk_any[MM_NUM_BLOCKS / 32];
                                         /* bit b = 1 if block b maps at
                                            least one word on any page    */
     mm_split_t split[MM_MAX_SPLITS];

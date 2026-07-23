@@ -358,6 +358,8 @@ void RunLauncher() {
    
    printf(" DONE\n");
 
+   printf("memory map data structure size: %d bytes\n", sizeof(m));
+
    // initialise exchange RAM data
    cart.RAM[VERSION_MAJOR_ADDR] = VERSION_MAJOR;
    cart.RAM[VERSION_MINOR_ADDR] = VERSION_MINOR;
