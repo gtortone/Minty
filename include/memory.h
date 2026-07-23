@@ -184,6 +184,19 @@ static inline bool mm_block_unmapped(const mm_map_t *m, uint16_t addr,
     return m->map[page & 0x0F][addr >> MM_BLOCK_SHIFT] == m->none_id;
 }
 
+/* Debug printing, written to the standard printf. Debug use only,
+   not reentrant.
+ 
+   mm_print() is the high-level view: it reconstructs the layout
+   through mm_lookup(), so it shows exactly what the bus will see —
+   ranges identical on every page first, then the page-specific ones.
+ 
+   mm_print_internals() dumps the raw internal state: entries with
+   their delta/kind, the split tables, the per-plane (or block_map)
+   cell runs and the liveness information. */
+void mm_print(const mm_map_t *m);
+void mm_print_internals(const mm_map_t *m);
+
 void config_memory(int cfg);
 
 #endif

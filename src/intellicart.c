@@ -323,13 +323,16 @@ int load_cfg(char *filename) {
    config_jlp(jlp_value, jlpflash_value, filename);
 #endif
 
+   // debug
+   //mm_print_internals(&m);
+
    printf("load_cfg done\n");
 
    return num_pokes;
 }
 
 void apply_pokes(char *filename) {
-#if 0
+
    char tmp_buffer[512] = {0};
    cfgSection cfgsec;
    vfs_file_t *f;
@@ -360,8 +363,6 @@ void apply_pokes(char *filename) {
          continue;
       }
 
-      // FIXME
-      /*
       if (cfgsec == MACRO) {
          // detect end of MACRO section
          if (strstr(tmp_buffer, "[") != NULL) {
@@ -379,9 +380,8 @@ void apply_pokes(char *filename) {
             if (ret == 3 && (strcasecmp(cmd, "p") == 0 || strcasecmp(cmd, "poke") == 0)) {
                // Modify actual value @corresponding address in binary
                uint32_t romaddr;
-               mapType type = ROM_SLOT;
                
-               if (mapAddress(poke_address, 0, &romaddr, &type)) {
+               if(mm_lookup(&m, poke_address, 0, (uint32_t *) &romaddr)) {
                   cart.ROM[romaddr] = poke_value;
                   printf("Apply poke : value %lx @ address %lx (%lx)\n",poke_value, poke_address, romaddr);
                }
@@ -394,9 +394,7 @@ void apply_pokes(char *filename) {
             }
          }
       }
-      */
    }
-#endif
 }
 
 int add_info_page(int cur_page, INFO_ENTRY **info_entries, cfgSection section) {

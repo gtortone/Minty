@@ -18,6 +18,7 @@
  *                                 mm_finalize / mm_load
  */
 
+#include <stdio.h>      // printf
 #include <string.h>
 #include "memory.h"
 
@@ -269,6 +270,74 @@ int mm_load(mm_map_t *m,
         if (r < 0) return r;
     }
     return mm_finalize(m);
+}
+
+/* Raw internal state: entries, split tables, per-plane cell runs and
+   the liveness bitmap. */
+void mm_print_internals(const mm_map_t *m)
+{
+    static const char *kn[] = { "NONE ", "ROM  ", "RAM8 ", "RAM16" };
+ 
+    printf("internal state (flat variant)\n");
+    printf(" count=%d  none_id=%u  n_splits=%u  ram_words=%u  sizeof=%u\n",
+       m->count, m->none_id, m->n_splits, (unsigned)m->ram_words,
+       (unsigned)sizeof(*m));
+ 
+    printf(" entries (id: kind delta):\n");
+    for (int i = 0; i <= m->count; i++)
+        printf("  %2d: %s %+ld%s\n", i, kn[m->kind[i]], (long)m->delta[i],
+           i == m->count ? "  (ghost)" : "");
+ 
+    printf(" split tables:\n");
+    if (m->n_splits == 0) printf("  (none)\n");
+    for (uint8_t k = 0; k < m->n_splits; k++) {
+        const mm_split_t *s = &m->split[k];
+        printf("  S%-2u:", k);
+        for (int w = 0; w < MM_SPLIT_WAYS - 1; w++)
+            if (s->bound[w] != 0xFFFF)
+                printf(" <=$%04X->%u", s->bound[w], s->id[w]);
+        printf(" else->%u\n", s->id[MM_SPLIT_WAYS - 1]);
+    }
+ 
+    printf(" planes (block runs; -- unmapped, Sn split, n entry id):\n");
+    for (int p = 0; p < MM_NUM_PLANES; p++) {
+        int same = -1;
+        for (int q = 0; q < p && same < 0; q++)
+            if (memcmp(m->map[p], m->map[q], MM_NUM_BLOCKS) == 0) same = q;
+        if (same >= 0) { printf("  plane %X: same as plane %X\n", p, same); continue; }
+ 
+        printf("  plane %X:\n   ", p);
+        int col = 0;
+        for (int b = 0; b < MM_NUM_BLOCKS; ) {
+            int b2 = b;
+            while (b2 + 1 < MM_NUM_BLOCKS &&
+                   m->map[p][b2 + 1] == m->map[p][b]) b2++;
+            char cell[8];
+            uint8_t c = m->map[p][b];
+            if (c == m->none_id)      snprintf(cell, sizeof(cell), "--");
+            else if (c >= MM_SPLIT)   snprintf(cell, sizeof(cell), "S%u",
+                                               c - MM_SPLIT);
+            else                      snprintf(cell, sizeof(cell), "%u", c);
+            if (b == b2) printf(" [%02X]=%s", b, cell);
+            else         printf(" [%02X-%02X]=%s", b, b2, cell);
+            if (++col % 5 == 0 && b2 + 1 < MM_NUM_BLOCKS) printf("\n   ");
+            b = b2 + 1;
+        }
+        printf("\n");
+    }
+ 
+    printf(" liveness (address ranges with at least one mapped word):\n ");
+    for (int b = 0; b < MM_NUM_BLOCKS; ) {
+        if (mm_block_dead(m, (uint16_t)(b << MM_BLOCK_SHIFT))) { b++; continue; }
+        int b2 = b;
+        while (b2 + 1 < MM_NUM_BLOCKS &&
+               !mm_block_dead(m, (uint16_t)((b2 + 1) << MM_BLOCK_SHIFT)))
+            b2++;
+        printf(" $%04X-$%04X", b << MM_BLOCK_SHIFT,
+           (b2 << MM_BLOCK_SHIFT) + (int)MM_BLOCK_WORDS - 1);
+        b = b2 + 1;
+    }
+    printf("\n");
 }
 
 void config_memory(int cfg) {
