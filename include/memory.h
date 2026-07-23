@@ -1,5 +1,5 @@
 /*
- * intv_memmap_flat.h — Memory map for an Intellivision multicart on MCU
+ * memory.h — Memory map for an Intellivision multicart on MCU
  *                      (flat per-page-plane variant)
  *
  * Pure address translator, with no internal state:
@@ -15,6 +15,11 @@
  * The build API matches the classic variant: mm_init() + mm_add() /
  * mm_add_ram() + mm_finalize(), or the one-call mm_load() wrapper
  * fed with const definition tables (which can live in flash).
+ * The build is INCREMENTAL: each mm_add()/mm_add_ram() paints its
+ * range onto the page planes immediately, so there is no intermediate
+ * entry storage and mm_finalize() only compacts orphan split tables
+ * (it is kept for API compatibility and may be omitted).
+ * After any MM_ERR_* the map is invalid: restart from mm_init().
  *
  * Internally the map is a single flat table indexed by (page, block):
  * map[16][256]. Fixed areas and RAM are replicated on all 16 page
@@ -76,23 +81,13 @@ typedef enum {
 #define MM_IS_RAM(k)  ((k) >= MM_RAM8)
 
 typedef struct {
-    uint32_t src_start;         /* ROM: first word offset in the file.
-                                   RAM: first offset in the RAM space     */
-    uint32_t src_end;           /* end (inclusive)                        */
-    uint16_t cpu_start;         /* first Intellivision bus address        */
-    int8_t   page;              /* 0..15, or MM_NO_PAGE                   */
-} mm_entry_t;
-
-typedef struct {
     uint16_t bound[MM_SPLIT_WAYS - 1];  /* end (inclusive) of sub-range   */
     uint8_t  id[MM_SPLIT_WAYS];         /* entry of each sub-range        */
 } mm_split_t;
 
 typedef struct {
-    /* --- used only at build time ----------------------------------- */
-    mm_entry_t entry[MM_MAX_ENTRIES];
-    int        count;
-    /* --- used at runtime ------------------------------------------- */
+    int        count;                   /* entries added so far           */
+    uint8_t    n_splits;                /* split tables in use            */
     int32_t    delta[MM_MAX_ENTRIES + 1];  /* src_start - cpu_start;
                                               [+1] is the ghost entry    */
     uint8_t    kind[MM_MAX_ENTRIES + 1];   /* MM_ROM/MM_RAM8/MM_RAM16;
