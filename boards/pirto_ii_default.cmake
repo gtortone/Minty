@@ -10,10 +10,10 @@ set(PICO_FLASH_SIZE_BYTES 16777216)
 set(PICO_FLASH_SPI_CLKDIV 2)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
-   set(MAX_ROM_SIZE 1024*62)  # ~124 kb 
+   set(MAX_ROM_SIZE 1024*74)  # ~144 kb 
 endif()
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-   set(MAX_ROM_SIZE 1024*50)  # ~100 kb
+   set(MAX_ROM_SIZE 1024*64)  # ~128 kb
 endif()
 
