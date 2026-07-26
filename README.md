@@ -45,7 +45,7 @@ Multi-cart based on Raspberry Pi Pico hardware and PiRTOII firmware (https://git
 Note 1
 * route GP28 to EXT-AUDIO cartridge pin and add some passive [components](images/ecs-audio-mod.png)
 * [photo](images/pirto_ii_duo_audio_mod.jpg) of neat wiring
-* enable `CONFIG_ECS_AUDIO` in `boards/pirto_ii_duo.cmake`
+* add option ```-DCONFIG_ECS_AUDIO=ON``` to CMake command
 
 ## Firmware
 
