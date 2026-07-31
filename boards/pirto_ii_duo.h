@@ -33,9 +33,9 @@
 #define MI_SD_SPI_SCK_PIN  18
 #define MI_SD_SPI_TX_PIN   19
 
-#if CONFIG_ECS_AUDIO
+#if (CONFIG_ECS_AUDIO || CONFIG_INTELLIVOICE)
 // ECS AUDIO AY-3-8910
-#define MI_ECS_AUDIO_PIN   28
+#define MI_AUDIO_PIN       28
 #else
 // UART
 #define MI_DBG_UART_ID        0

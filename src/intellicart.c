@@ -10,7 +10,7 @@
 #include "intellicart.h"
 #include "utils.h"
 #include "vfs.h"
-#include "ecs.h"
+#include "audio.h"
 #include "rommeta_parser.h"
 
 typedef enum {
@@ -28,7 +28,8 @@ extern mm_map_t m;
 
 extern uint8_t tv_mode;      // 0: PAL, 1: NTSC
 extern uint8_t ecs_present;  // 0: ECS absent, 1: ECS present
-extern uint8_t ecs_volume;
+extern uint8_t voice_present; // 0: iVoice absent, 1: iVoice Absent
+extern uint8_t audio_volume;
 
 void init_cart(void) {
 
@@ -43,8 +44,9 @@ void init_cart(void) {
    cart.JLPAccel = 0;
    cart.flashfile[0] = '\0';
 #endif
-#if CONFIG_ECS_AUDIO
-   cart.ECSSupport = 0;
+#if CONFIG_ECS_AUDIO || CONFIG_INTELLIVOICE
+   cart.ECSSupport = false;
+   cart.IntellivoiceSupport = false;
 #endif
 }
 
@@ -286,18 +288,28 @@ int load_cfg(char *filename) {
          }
 #endif
 
-#if CONFIG_ECS_AUDIO
+#if CONFIG_ECS_AUDIO || CONFIG_INTELLIVOICE
          if (ecs_present == 0) {
             int ecs_value = 0;
             if ( sscanf(tmp_buffer, "ecs = %d", &ecs_value) == 1 ) {
                if (ecs_value == 1) {
                   cart.ECSSupport = true;
-                  init_ecs(tv_mode, ecs_volume);
                   printf("ECS support found\n");
                }
             }
          }
+         if (voice_present == 0) { 
+            int intellivoice_value = 0;
+            if ( sscanf(tmp_buffer, "voice = %d", &intellivoice_value) == 1 ) {
+               cart.IntellivoiceSupport = true;
+               printf("Intellivoice emulation enabled\n");
+            }
+         }
+         if (cart.ECSSupport || cart.IntellivoiceSupport) {
+            init_audio(tv_mode, audio_volume);
+         }
 #endif
+
 
       } else if (cfgsec == MACRO) {
          // example: 

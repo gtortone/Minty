@@ -36,17 +36,30 @@
     CONST ADDRESS_MINOR     = $80FF
     CONST ADDRESS_TVMODE    = $8100
     CONST ADDRESS_ECS_PRES  = $8101
+    CONST ADDRESS_MaxSize   = $8102 ' Max supported ROM size in kB (16 bits)
+    CONST ADDRESS_AUDIO_VOL = $8104
+    CONST ADDRESS_JLP_EMU   = $8105
+    CONST ADDRESS_ECS_EMU   = $8106
+    CONST ADDRESS_VOICE_PRES= $8107
+    CONST ADDRESS_VOICE_EMU = $8108
     CONST ADDRESS_status    = $8119
-    CONST ADDRESS_cmd       = $8889
-    CONST ADDRESS_has_sd    = $8121
     CONST ADDRESS_dev       = $8120
-    CONST ADDRESS_Select    = $8899
-    CONST ADDRESS_flist     = $817F
-    CONST ADDRESS_ftype     = $9000
-    CONST ADDRESS_ffrom     = $9028 ' First displayed entry
-    CONST ADDRESS_fto       = $9030 ' Last displayed entry
-    CONST ADDRESS_ftotal    = $9032 ' Total number of entries
+    CONST ADDRESS_has_sd    = $8121
     CONST ADDRESS_hw        = $8122
+    CONST ADDRESS_sdpres    = $8123
+    CONST ADDRESS_flist     = $817F ' 10 files * 64 characters per file (640 bytes), end address is $83FF
+    CONST ADDRESS_INFO_NUM  = $8400 ' address to store the total number of info pages
+    CONST ADDRESS_INFO_DISP = $8401 ' address to store the current displayed info page
+    CONST ADDRESS_INFO_PAGE = $8402 ' 10 lines of 19 characters = 190 bytes, end address is $84C0
+    CONST ADDRESS_cmd       = $8889
+    CONST ADDRESS_err       = $888A
+    CONST ADDRESS_Select    = $8899
+    CONST ADDRESS_ftype     = $9000
+    CONST ADDRESS_ffrom     = $9028 ' First displayed entry (16 bits)
+    CONST ADDRESS_fto       = $9030 ' Last displayed entry (16 bits)
+    CONST ADDRESS_ftotal    = $9032 ' Total number of entries (16 bits)
+    CONST ADDRESS_path      = $9100
+    CONST ADDRESS_section   = $9300
     
     ' PI current status
     CONST PI_STAT_BUZZY     = 1
@@ -58,7 +71,22 @@
     CONST CMD_NEXTPAGE      = 3
     CONST CMD_PREVIOUSPAGE  = 4
     CONST CMD_UPDIRECTORY   = 5
-    CONST CMD_SWITCHDEVICE  = 6
+    CONST CMD_READINFO      = 7
+    CONST CMD_NEXTINFO      = 8
+    CONST CMD_PREVINFO      = 9
+
+    ' Interface actions
+    CONST ACTION_NONE          = 0
+    CONST ACTION_SELECT        = 1
+    CONST ACTION_UP            = 2
+    CONST ACTION_DOWN          = 3
+    CONST ACTION_PAGEUP        = 4
+    CONST ACTION_PAGEDOWN      = 5
+    CONST ACTION_EXIT          = 6
+    CONST ACTION_DISPHELP      = 7
+    CONST ACTION_DISPINFO      = 8
+    CONST ACTION_DISPSETTINGS  = 9
+
     ' Type of mass storage devices
     CONST DEV_FLASH         = 0
     CONST DEV_SD            = 1
@@ -72,28 +100,45 @@
     CONST PI_HW_PIRTO2SD    = 3
     CONST PI_HW_PIRTO2DUO   = 4
     CONST PI_HW_PINTY       = 5
+    ' ERROR codes
+    CONST ERR_NO_ERROR            = 0
+    CONST ERR_COULD_NOT_OPEN_FILE = 1
+    CONST ERR_FILE_TO_BIG         = 2
     ' TV MODE
     CONST isPAL          = 0
     CONST isNTSC         = 1
-    ' ECS Presence
-    CONST ECS_Absent     = 0 
-    CONST ECS_Present    = 1
+
+    CONST FNAME_LENGTH   = 64
+    CONST INFO_LENGTH    = 19
 
     DEF FN PI_STATUS = PEEK(ADDRESS_status)
     DEF FN PI_CMD(command) = POKE(ADDRESS_cmd),command
     DEF FN PI_HAS_SD = PEEK(ADDRESS_has_sd)
+    DEF FN PI_SD_PRESENT = PEEK(ADDRESS_sdpres)
     DEF FN PI_SELECTDEVICE(device) = POKE(ADDRESS_dev),device
     DEF FN PI_CURRENTDEVICE = PEEK(ADDRESS_dev)
     DEF FN PI_SELECTENTRY(entry) = POKE(ADDRESS_Select),(entry+1)
+    DEF FN PI_GETENTRY = PEEK(ADDRESS_Select)
     DEF FN PI_GET_FTYPE(file) = PEEK(ADDRESS_ftype+file)
     DEF FN PI_GET_FFROM  = ((PEEK(ADDRESS_ffrom)  * 256) + PEEK(ADDRESS_ffrom+1))
     DEF FN PI_GET_FTO    = ((PEEK(ADDRESS_fto)    * 256) + PEEK(ADDRESS_fto+1))
     DEF FN PI_GET_FTOTAL = ((PEEK(ADDRESS_ftotal) * 256) + PEEK(ADDRESS_ftotal+1))
     DEF FN PI_GET_HW     = PEEK(ADDRESS_hw)
+    DEF FN PI_GET_ERROR  = PEEK(ADDRESS_err)
+    DEF FN PI_GET_INFO_NUM = PEEK(ADDRESS_INFO_NUM)
+    DEF FN PI_GET_INFO_DISP = PEEK(ADDRESS_INFO_DISP)
     DEF FN PI_SET_TVMODE(mode) = POKE(ADDRESS_TVMODE),mode
     DEF FN PI_SET_ECS_PRES(presence) = POKE(ADDRESS_ECS_PRES),presence
+    DEF FN PI_SET_VOICE_PRES(presence) = POKE(ADDRESS_VOICE_PRES),presence
+    DEF FN PI_SET_AUDIO_VOL(v) = POKE(ADDRESS_AUDIO_VOL),v
+    DEF FN PI_GET_AUDIO_VOL = PEEK(ADDRESS_AUDIO_VOL)
+    DEF FN PI_GET_MAXSIZE = ((PEEK(ADDRESS_MaxSize) * 256) + PEEK(ADDRESS_MaxSize+1))
+    DEF FN PI_GET_JLP_EMU = PEEK(ADDRESS_JLP_EMU)
+    DEF FN PI_GET_ECS_EMU = PEEK(ADDRESS_ECS_EMU)
+    DEF FN PI_GET_VOICE_EMU = PEEK(ADDRESS_VOICE_EMU)
     DEF FN PI_GET_MAJOR = PEEK(ADDRESS_MAJOR)
     DEF FN PI_GET_MINOR = PEEK(ADDRESS_MINOR)
+
 
     ' Display splash screen
 	MODE 0,0,2,0,2
@@ -131,8 +176,9 @@
     WEND
 
     ' Send INTY condfiguration to PI
-    IF (NTSC <>0) THEN PI_SET_TVMODE(isNTSC) ELSE PI_SET_TVMODE(isPAL)
-    IF (ECS.AVAILABLE <> 0) THEN PI_SET_ECS_PRES(ECS_Present) ELSE PI_SET_ECS_PRES(ECS_Absent)
+    PI_SET_TVMODE(NTSC)
+    PI_SET_ECS_PRES(ECS.AVAILABLE)
+    PI_SET_VOICE_PRES(VOICE.AVAILABLE)
     
     CLS
     WAIT
