@@ -119,7 +119,7 @@ endif()
 configure_file(${CMAKE_SOURCE_DIR}/include/version.h.in ${CMAKE_SOURCE_DIR}/include/version.h @ONLY)
 
 set_target_properties(Minty PROPERTIES
-    OUTPUT_NAME "Minty_${PICO_BOARD}"
+   OUTPUT_NAME "Minty_${PICO_BOARD}${OUTPUT_SUFFIX}"
 )
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -161,15 +161,17 @@ if(PICO_RP2350)
 
 endif()
 
+set(OUTPUT_SUFFIX "" CACHE STRING "Suffix for output name")
+
 target_compile_definitions(${PROJECT} PRIVATE "PICO_FLASH_SIZE_BYTES=${PICO_FLASH_SIZE_BYTES}")
 target_compile_definitions(${PROJECT} PRIVATE "PICO_FLASH_SPI_CLKDIV=${PICO_FLASH_SPI_CLKDIV}")
-target_compile_definitions(${PROJECT} PRIVATE "CONFIG_USB_DEVICE=${CONFIG_USB_DEVICE}")
-target_compile_definitions(${PROJECT} PRIVATE "CONFIG_SD_STORAGE=${CONFIG_SD_STORAGE}")
-target_compile_definitions(${PROJECT} PRIVATE "CONFIG_FLASH_FAT_STORAGE=${CONFIG_FLASH_FAT_STORAGE}")
-target_compile_definitions(${PROJECT} PRIVATE "CONFIG_FLASH_LFS_STORAGE=${CONFIG_FLASH_LFS_STORAGE}")
-target_compile_definitions(${PROJECT} PRIVATE "CONFIG_JLP=${CONFIG_JLP}")
-target_compile_definitions(${PROJECT} PRIVATE "CONFIG_ECS_AUDIO=${CONFIG_ECS_AUDIO}")
-target_compile_definitions(${PROJECT} PRIVATE "CONFIG_INTELLIVOICE=${CONFIG_INTELLIVOICE}")
+target_compile_definitions(${PROJECT} PRIVATE CONFIG_USB_DEVICE=$<BOOL:${CONFIG_USB_DEVICE}>)
+target_compile_definitions(${PROJECT} PRIVATE CONFIG_SD_STORAGE=$<BOOL:${CONFIG_SD_STORAGE}>)
+target_compile_definitions(${PROJECT} PRIVATE CONFIG_FLASH_FAT_STORAGE=$<BOOL:${CONFIG_FLASH_FAT_STORAGE}>)
+target_compile_definitions(${PROJECT} PRIVATE CONFIG_FLASH_LFS_STORAGE=$<BOOL:${CONFIG_FLASH_LFS_STORAGE}>)
+target_compile_definitions(${PROJECT} PRIVATE CONFIG_JLP=$<BOOL:${CONFIG_JLP}>)
+target_compile_definitions(${PROJECT} PRIVATE CONFIG_ECS_AUDIO=$<BOOL:${CONFIG_ECS_AUDIO}>)
+target_compile_definitions(${PROJECT} PRIVATE CONFIG_INTELLIVOICE=$<BOOL:${CONFIG_INTELLIVOICE}>)
 target_compile_definitions(${PROJECT} PRIVATE "MAX_ROM_SIZE=${MAX_ROM_SIZE}")
 
 if(CONFIG_FLASH_LFS_STORAGE)
