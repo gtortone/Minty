@@ -27,6 +27,6 @@
 #define MI_DBG_UART_TX_PIN    24
 
 // ECS AUDIO AY-3-8910
-#define MI_ECS_AUDIO_PIN      28
+#define MI_AUDIO_PIN          28
 
 #endif

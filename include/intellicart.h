@@ -25,8 +25,9 @@ typedef struct {
    vfs_file_t *filesave;
 #endif
 
-#if CONFIG_ECS_AUDIO
+#if CONFIG_ECS_AUDIO || CONFIG_INTELLIVOICE
    bool ECSSupport;
+   bool IntellivoiceSupport;
 #endif
 } Cartridge;
 

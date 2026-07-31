@@ -169,6 +169,7 @@ target_compile_definitions(${PROJECT} PRIVATE "CONFIG_FLASH_FAT_STORAGE=${CONFIG
 target_compile_definitions(${PROJECT} PRIVATE "CONFIG_FLASH_LFS_STORAGE=${CONFIG_FLASH_LFS_STORAGE}")
 target_compile_definitions(${PROJECT} PRIVATE "CONFIG_JLP=${CONFIG_JLP}")
 target_compile_definitions(${PROJECT} PRIVATE "CONFIG_ECS_AUDIO=${CONFIG_ECS_AUDIO}")
+target_compile_definitions(${PROJECT} PRIVATE "CONFIG_INTELLIVOICE=${CONFIG_INTELLIVOICE}")
 target_compile_definitions(${PROJECT} PRIVATE "MAX_ROM_SIZE=${MAX_ROM_SIZE}")
 
 if(CONFIG_FLASH_LFS_STORAGE)
@@ -203,8 +204,10 @@ target_sources(${PROJECT} PUBLIC
    ${CMAKE_CURRENT_LIST_DIR}/src/littlefs_backend.c
    ${CMAKE_CURRENT_LIST_DIR}/src/launcher.c
    ${CMAKE_CURRENT_LIST_DIR}/src/rommeta_parser.c
-   ${CMAKE_CURRENT_LIST_DIR}/src/ecs.c
+   ${CMAKE_CURRENT_LIST_DIR}/src/audio.c
    ${CMAKE_CURRENT_LIST_DIR}/src/emu2149.c
+   ${CMAKE_CURRENT_LIST_DIR}/src/ivoice.c
+   ${CMAKE_CURRENT_LIST_DIR}/src/intellivoice_minty.c
 )
 
 target_include_directories(${PROJECT} PUBLIC
