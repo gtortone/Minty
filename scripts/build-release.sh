@@ -13,13 +13,13 @@ done
 
 ##
 
-boards_ecs=("pintycard" "pirto_ii_duo")
+boards_ecs_iv=("pintycard" "pirto_ii_duo")
 
-for board in "${boards_ecs[@]}"; do
+for board in "${boards_ecs_iv[@]}"; do
 
-   cmake -B build/$board/release-ecs -DPICO_BOARD=$board -DCMAKE_BUILD_TYPE=Release \
-      -DCONFIG_ECS_AUDIO=ON -DOUTPUT_SUFFIX=_ecs
-   make -j -C build/$board/release-ecs
+   cmake -B build/$board/release-ecs-iv -DPICO_BOARD=$board -DCMAKE_BUILD_TYPE=Release \
+      -DCONFIG_ECS_AUDIO=ON -DCONFIG_INTELLIVOICE=ON -DOUTPUT_SUFFIX=_ecs_iv
+   make -j -C build/$board/release-ecs-iv
 
 done
 
