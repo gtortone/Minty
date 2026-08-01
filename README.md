@@ -21,6 +21,7 @@ Multi-cart based on Raspberry Pi Pico hardware and PiRTOII firmware (https://git
 * 🗂️ VFS (Virtual File System) library included for storage access via FatFs and LittleFS
 * 💡 Full JLP support: hardware acceleration, expanded memory, and flash save/load support (for boards with microSD storage)
 * 🔊 ECS audio emulation with AY-3-8910 soft-core
+* 📢 Intellivoice emulation
 * 🧱 Support for an arbitrary number of patches defined in ROM configuration files
 * 🧭 New launcher firmware featuring icons and custom fonts, automatic saving of the last opened directory, and file information persistence during cfg-based browsing
 * 🕹️ Tons of ROMs tested — Minty can now run the Bad Apple demo (445 KB ROM with 52 memory pages) on RP235x boards
@@ -34,18 +35,19 @@ Multi-cart based on Raspberry Pi Pico hardware and PiRTOII firmware (https://git
 
 ## Table of features
 
-| board  | MCU | RAM | max ROM size  | JLP | ECS audio | ROM storage | build target |
-|--------|-----|-----|---------------| --- | --------- | ------------| ------------ |
-| [Pirto](https://github.com/aotta/PiRTO) | RP2040 | 256 kB | ~212kB      | ✅  | ❌ | microSD     | `pirto` |
-| [Pirto-II](https://github.com/aotta/PiRTOII) | RP2040 | 256 kB | ~144kB   | ❌  | ❌  | flash       | `pirto_ii_default` |
-| [Pirto-II-SD](https://github.com/SukkoPera/PiRTOII) | RP2040 | 256 kB | ~212kB | ✅  | ❌ | microSD     | `pirto_ii_sd` |
-| [Pirto-II-Duo](https://github.com/aotta/PiRTOIIDuo) | RP2350 | 512 kB | ~450 kB | ✅ | (Note 1) | microSD   | `pirto_ii_duo` |
-| [PintyCard](https://oshwlab.com/yannick.erb/intv-pirto-hb) | RP2354A | 512 kB | ~470kB | ✅ | ✅ | flash | `pintycard` |
+| board  | MCU | RAM | max ROM size  | JLP | ECS audio | Intellivoice | ROM storage | build target |
+|--------|-----|-----|---------------| --- | --------- | ------------| ------------ | ------------ |
+| [Pirto](https://github.com/aotta/PiRTO) | RP2040 | 256 kB | ~212kB      | ✅  | ❌ | ❌ |microSD     | `pirto` |
+| [Pirto-II](https://github.com/aotta/PiRTOII) | RP2040 | 256 kB | ~144kB   | ❌  | ❌  | ❌ |flash       | `pirto_ii_default` |
+| [Pirto-II-SD](https://github.com/SukkoPera/PiRTOII) | RP2040 | 256 kB | ~212kB | ✅  | ❌ | ❌ |microSD     | `pirto_ii_sd` |
+| [Pirto-II-Duo](https://github.com/aotta/PiRTOIIDuo) | RP2350 | 512 kB | ~450 kB | ✅ | (Note 1) | (Note 1) |microSD   | `pirto_ii_duo` |
+| [PintyCard](https://oshwlab.com/yannick.erb/intv-pirto-hb) | RP2354A | 512 kB | ~470kB | ✅ | ✅ | ✅ |flash | `pintycard` |
 
 Note 1
 * route GP28 to EXT-AUDIO cartridge pin and add some passive [components](images/ecs-audio-mod.png)
 * [photo](images/pirto_ii_duo_audio_mod.jpg) of neat wiring
-* add option ```-DCONFIG_ECS_AUDIO=ON``` to CMake command
+* to enable ECS audio: add option ```-DCONFIG_ECS_AUDIO=ON``` to CMake command
+* to enable Intellivoice: add option ```-DCONFIG_INTELLIVOICE=ON``` to CMake command
 
 ## Firmware
 
