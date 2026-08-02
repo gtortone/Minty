@@ -36,7 +36,7 @@ void init_intellivoice(uint8_t tv_mode)
     /* Audio callback frequency is the audio callback frequency. */
     callback_rate = 1000000u / AUDIO_PERIOD;
     /* CPU rate is the master clock divided by 4, depending on PAL vs. NTSC. */
-    cpu_rate = tv_mode? 894886u : 1000000u;
+    cpu_rate = pal_mode?1000000u:894886u;
 
     /* Fixed-point cycles per audio callback, Q16.16. */
     voice_cycle_step_fp = (uint32_t)(((uint64_t)cpu_rate << 16) / callback_rate);

@@ -68,16 +68,17 @@ bool audio_callback(repeating_timer_t *rt) {
       printf("audio_callback: ecs=%08lX, ivoice=%08lX\n", ecs_raw,ivoice_raw); 
    }
 #else
-   if (audio_cycle++ >= 1)
+   if (audio_cycle == 1)
    {
       /* apply 8-bit volume control, normalize to 10-bit PWM */
       pwm = (abs(ecs_raw+ivoice_raw) * (int32_t)(AudioVolume + 1) / 3) >> 10;
       // clamp to 10-bit range
       if (pwm > 1023) pwm = 1023;
       pwm_set_gpio_level(AUDIO_PIN, pwm);
-      audio_cycle = 0;
    }
 #endif
+
+   audio_cycle = 1 - audio_cycle; // toggle between ECS and Intellivoice audio processing
    return true;
 }
 
