@@ -252,9 +252,6 @@ int load_file(char *filename) {
                      printf("Intellivoice emulation enabled\n");
                   }
                }
-               if (cart.ECSSupport || cart.IntellivoiceSupport) {
-                  init_audio(tv_mode, audio_volume);
-               }
 #endif
                vfs_read(f, inputBuffer, 2);  // skip 2 bytes to search JLP attributes
             

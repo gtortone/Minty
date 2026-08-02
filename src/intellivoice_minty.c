@@ -14,7 +14,6 @@ extern ivoice_t intellivoice;
 
 static uint32_t voice_cycle_step_fp = 0;
 static uint32_t voice_cycle_frac = 0;
-static int voice_read_pos = 0;
 
 
 void init_intellivoice(uint8_t tv_mode)
@@ -23,7 +22,6 @@ void init_intellivoice(uint8_t tv_mode)
     uint32_t cpu_rate;
     int pal_mode;
 
-    voice_read_pos = 0;
     voice_cycle_frac = 0;
     
     pal_mode = (tv_mode == 0) ? 1 : 0;
@@ -45,7 +43,6 @@ void init_intellivoice(uint8_t tv_mode)
 void intellivoice_reset(void)
 {
     ivoice_reset();
-    voice_read_pos = 0;
     voice_cycle_frac = 0;
 }
 
@@ -62,16 +59,11 @@ int16_t intellivoice_next_sample(void)
         ivoice_tk(cycles);
 
     /*
-     * Consume only newly generated samples.
+     * Consume only last generated sample.
      * ivoice.c increments intellivoice.cur_len when it appends to ivoiceBuffer.
-     * If the low-level buffer wraps, cur_len is reset to 0, so reset our
-     * consumer index as well.
+     * If the low-level buffer wraps, cur_len is reset to 0
      */
-    if (voice_read_pos > intellivoice.cur_len)
-        voice_read_pos = 0;
-
-    if (voice_read_pos < intellivoice.cur_len)
-        sample = ivoiceBuffer[voice_read_pos++];
+    sample = ivoiceBuffer[intellivoice.cur_len];
 
     return sample;
 }

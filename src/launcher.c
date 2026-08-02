@@ -15,6 +15,7 @@
 #include "intellicart.h"
 #include "launcher.h"
 #include "version.h"
+#include "audio.h"
 
 #ifdef PINTYCARD
    #include "pintyrom.h"
@@ -175,7 +176,11 @@ int LoadGame(int entry_num) {
    // test
 
    gpio_put(LED, false);
-
+#if CONFIG_ECS_AUDIO || CONFIG_INTELLIVOICE
+   if (cart.ECSSupport || cart.IntellivoiceSupport) {
+      init_audio(tv_mode, audio_volume);
+   }
+#endif
    sleep_ms(200);
    memset((uint16_t *) cart.RAM, 0, sizeof(cart.RAM));
 
