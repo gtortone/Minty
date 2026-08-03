@@ -6,6 +6,7 @@
 #include "pico/stdlib.h"
 #include "hardware/timer.h"
 #include "hardware/pwm.h"
+#include "hardware/structs/pwm.h"
 
 #include "board.h"
 #include "audio.h"
@@ -38,7 +39,7 @@ const uint8_t ECS_LUT[16] = {
    0x0F
 };
 
-
+#define GPIO_TO_SLICE(g) ((g) < 32 ? (((g) >> 1) & 7) : (8 + (((g) >> 1) & 3)))
 
 bool audio_callback(repeating_timer_t *rt) {   
    static int32_t ecs_raw = 0;
@@ -58,7 +59,6 @@ bool audio_callback(repeating_timer_t *rt) {
       ivoice_raw = ((ivoice_raw + 32768) >> 2);
    }
 
-
 #ifndef NDEBUG
    // debug output for audio callback every 0.2 seconds (8000 callbacks at 40kHz)
    static uint16_t cnt = 0;
@@ -73,7 +73,7 @@ bool audio_callback(repeating_timer_t *rt) {
       uint16_t pwm = (uint16_t)((((uint32_t)(ecs_raw+ivoice_raw) * (uint32_t)(AudioVolume + 1) / 3) >> 10));
       // clamp to 10-bit range
       if (pwm > 1023) pwm = 1023;
-      pwm_set_gpio_level(AUDIO_PIN, pwm);
+      pwm_hw->slice[GPIO_TO_SLICE(AUDIO_PIN)].cc = pwm;
    }
 #endif
 

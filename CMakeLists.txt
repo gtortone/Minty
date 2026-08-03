@@ -152,7 +152,7 @@ elseif(CONFIG_FLASH_LFS_STORAGE)
    )
 endif()
 
-if(CONFIG_ECS_AUDIO)
+if(CONFIG_ECS_AUDIO OR CONFIG_INTELLIVOICE)
    target_link_libraries(${PROJECT} hardware_pwm)
 endif()
 
