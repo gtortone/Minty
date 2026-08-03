@@ -305,9 +305,6 @@ int load_cfg(char *filename) {
                printf("Intellivoice emulation enabled\n");
             }
          }
-         if (cart.ECSSupport || cart.IntellivoiceSupport) {
-            init_audio(tv_mode, audio_volume);
-         }
 #endif
 
 

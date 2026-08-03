@@ -48,7 +48,7 @@
    #include "intellivoice_minty.h"
    #define IVOICE_BUF_SIZE    32
    extern ivoice_t intellivoice;
-   uint8_t ivoiceRead = 0;
+   volatile uint8_t ivoiceRead = 0;
    volatile uint8_t ivoiceWrite = 0;
    volatile uint8_t ivoiceRegister[IVOICE_BUF_SIZE] = {0};
    volatile uint16_t ivoiceValue[IVOICE_BUF_SIZE] = {0};
@@ -169,7 +169,13 @@ void __time_critical_func(core1_main()) {
                   continue;
                }
                if (addrIn == IVOICE_ADDR_FIFO) {
-                  dataOut = (intellivoice.fifo_head - intellivoice.fifo_tail) >= 64 ? 0x8000 : 0;
+                  uint32_t fifo_count = (intellivoice.fifo_head - intellivoice.fifo_tail);
+                  if (ivoiceWrite < ivoiceRead) {
+                     fifo_count += (ivoiceWrite + IVOICE_BUF_SIZE) - ivoiceRead;
+                  } else {
+                     fifo_count += ivoiceWrite - ivoiceRead;
+                  }
+                  dataOut = fifo_count >= 64 ? 0x8000 : 0;
                   deviceAddress = true;
                   continue;
                }
