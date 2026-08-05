@@ -31,6 +31,15 @@
 
 #if CONFIG_JLP
    #include "jlpflash.h"
+   uint16_t randarr[4];
+   uint8_t randidx = 0;
+   bool randrefill = false;
+   uint16_t crc = 0;
+   void doorbell_jlp_handler(void);
+
+   #if PICO_RP2350
+      #define JLP_IRQ   SIO_IRQ_BELL
+   #endif
 #endif
 
 #if CONFIG_ECS_AUDIO
@@ -73,10 +82,6 @@ void __time_critical_func(core1_main()) {
    volatile uint8_t seg = 0;
    volatile uint32_t romaddr;
 
-#if CONFIG_JLP
-   uint16_t crc = 0;
-#endif
-
    multicore_lockout_victim_init();
 
    sleep_ms(480);
@@ -94,6 +99,7 @@ void __time_critical_func(core1_main()) {
 
    seg = 0;
    memset((uint8_t *) curPageArr, 0, sizeof(curPageArr));
+   
 
    while (1) {
 
@@ -183,11 +189,16 @@ void __time_critical_func(core1_main()) {
 #endif
 
 #if CONFIG_JLP
-            // addrInCopy is to pass address to other core for JLP functions processing
-            addrInCopy = addrIn;
             
             // check for JLP support and accelerators/RAM enabled 
             if ( cart.JLPSupport ) {
+              
+                  // addrInCopy is to pass address to other core for JLP functions processing
+                  addrInCopy = addrIn;
+#if PICO_RP2350
+                  multicore_doorbell_set_other_core(0);
+#endif
+
                   if ( (cart.JLPAccel || cart.JLPFlash) && ((addrIn >= 0x8000) && (addrIn <= 0x9FFF)) ) {
                      if ((cart.JLPFlash) && (addrIn == 0x8023)) {
                         dataOut = 0;
@@ -202,6 +213,7 @@ void __time_critical_func(core1_main()) {
                      continue;
                   }
             } 
+
 #endif
             
             seg = (addrIn >> 12) & 0xF;
@@ -265,6 +277,10 @@ void __time_critical_func(core1_main()) {
                   if ( cart.JLPSupport ) { 
 
                      if ( (cart.JLPAccel || cart.JLPFlash) && ((addrIn >= 0x8000) && (addrIn <= 0x9FFF)) ) {
+
+#if PICO_RP2350
+                        multicore_doorbell_set_other_core(0);
+#endif
 
                         // JLP CRC-16 accelerator function
                         if (addrIn == 0x9FFC) { 
@@ -333,23 +349,9 @@ static void generate_random(uint16_t *arr, int n) {
       }
    }
 }
-#endif
 
-void RunGame() {
+void __time_critical_func(handle_jlp_request)(void) {
 
-#if CONFIG_JLP  
-   // initialize random seed and preallocate an array of random numbers
-   uint16_t randarr[4];
-   uint8_t randidx = 0;
-   bool randrefill = false;
-
-   generate_random(randarr, sizeof(randarr)/sizeof(uint16_t));
-#endif
-   uint64_t resetTimeout = 0;
-
-   resetCart();              // start game !
-
-#if CONFIG_JLP
    volatile uint16_t pbc; 
 
    int16_t s16_op1, s16_op2;
@@ -357,7 +359,191 @@ void RunGame() {
 
    s16_op1 = s16_op2 = 0;
    u16_op1 = u16_op2 = 0;
+
+   if (cart.JLPSupport) {
+
+      pbc = addrInCopy;
+
+      switch(pbc) {
+
+         // switch off JLP RAM and accelerators
+         case 0x8034: {
+            if (cart.RAM[0x34] == 0x6A7A)
+               cart.JLPAccel = false;
+         }
+         break;
+
+         // switch on JLP RAM and accelerators
+         case 0x8033: {
+            if (cart.RAM[0x33] == 0x4A5A)
+               cart.JLPAccel = true;
+         break;
+         }
+      }
+
+      // handle JLP accelerator feature
+      if ( (cart.JLPAccel) && (pbc >= 0x9F80) && (pbc <= 0x9FFF) ) {
+
+         switch(pbc) {
+
+            // MPYSS: signed 16bit by signed 16bit multiply into 32bit result
+            case 0x9F80:
+            case 0x9F81: {
+               s16_op1 = cart.RAM[0x1F80];
+               s16_op2 = cart.RAM[0x1F81];
+               int32_t res = s16_op1 * s16_op2;
+               cart.RAM[0x1F8F] = (res) >> 16;
+               cart.RAM[0x1F8E] = (res & 0xffff);
+            }
+            break;
+            
+            // MPYSU: signed 16bit by unsigned 16bit multiply into 32bit result
+            case 0x9F82:
+            case 0x9F83: {
+               s16_op1 = cart.RAM[0x1F82];
+               u16_op2 = cart.RAM[0x1F83];
+               int32_t res = s16_op1 * u16_op2;
+               cart.RAM[0x1F8F] = (res) >> 16;
+               cart.RAM[0x1F8E] = (res & 0xffff);
+            }
+            break;
+
+            // MPYUS: unsigned 16bit by signed 16bit multiply into 32bit result
+            case 0x9F84:
+            case 0x9F85: {
+               u16_op1 = cart.RAM[0x1F84];
+               s16_op2 = cart.RAM[0x1F85];
+               int32_t res = u16_op1 * s16_op2;
+               cart.RAM[0x1F8F] = (res) >> 16;
+               cart.RAM[0x1F8E] = (res & 0xffff);
+            }
+            break;
+            
+            // MPYUU: unsigned 16bit by unsigned 16bit multiply into 32bit result
+            case 0x9F86:
+            case 0x9F87: {
+               u16_op1 = cart.RAM[0x1F86];
+               u16_op2 = cart.RAM[0x1F87];
+               uint32_t res = u16_op1 * u16_op2;
+               cart.RAM[0x1F8F] = (res) >> 16;
+               cart.RAM[0x1F8E] = (res & 0xffff);
+            }
+            break;
+            
+            // DIVSS: signed 16bit by signed 16bit divide with remainder
+            case 0x9F88:
+            case 0x9F89: {
+               s16_op1 = cart.RAM[0x1F88];
+               s16_op2 = cart.RAM[0x1F89];
+               int16_t res = s16_op1 % s16_op2;
+               cart.RAM[0x1F8F] = res;
+               res = s16_op1 / s16_op2;
+               cart.RAM[0x1F8E] = res;
+            }
+            break;
+            
+            // DIVUU: unsigned 16bit by unsigned 16bit divide with remainder
+            case 0x9F8A:
+            case 0x9F8B: {
+               u16_op1 = cart.RAM[0x1F8A];
+               u16_op2 = cart.RAM[0x1F8B];
+               int16_t res = u16_op1 % u16_op2;
+               cart.RAM[0x1F8F] = res;
+               res = u16_op1 / u16_op2;
+               cart.RAM[0x1F8E] = res;
+            }
+            break;
+
+            //case 0x9FFC: {
+            //   crc = cart.RAM[0x1FFD];
+            //   crc ^= data;
+            //   for (int i=0; i<16; i++)
+            //      crc = (crc >> 1) ^ (crc & 1 ? 0xAD52 : 0);
+            //   cart.RAM[0x1FFD] = crc;
+            //}
+            //break;
+
+            // nondeterministic hardware random number generator
+            case 0x9FFE: {
+               cart.RAM[0x1FFE] = randarr[randidx++];
+               if (randidx == 4) {
+                  randidx = 0;
+                  randrefill = true;
+               }
+            }
+            break;
+
+            default:
+               break;
+         }
+      }
+      
+      // handle JLP flash feature
+      if ( (cart.JLPFlash) && (pbc >= 0x802D) && (pbc <= 0x802F) ) {
+
+         switch (pbc) {
+
+            // JF.wrcmd: copy JLP RAM to flash. Must write the value $C0DE.
+            case 0x802D: {
+               if (cart.RAM[0x2D] == 0xC0DE) {
+                  cart.RAM[0x2D] = 0xFFFF;
+                  writeFlash(JLP_ROW_NUMBER, JLP_RAM_ADDRESS);
+                  cart.RAM[0x2D] = 0x0000;
+               }
+            }
+            break;
+
+            // JF.rdcmd: copy flash to JLP RAM. Must write the value $DEC0.
+            case 0x802E: {
+               if (cart.RAM[0x2E] == 0xDEC0) {
+                  cart.RAM[0x2E] = 0xFFFF;
+                  readFlash(JLP_ROW_NUMBER, JLP_RAM_ADDRESS);
+                  cart.RAM[0x2E] = 0x0000;
+               }
+            }
+            break;
+
+            // JF.ercmd: erase flash sector. Must write the value $BEEF.
+            case 0x802F: {
+               if (cart.RAM[0x2F] == 0xBEEF) {
+                  cart.RAM[0x2F] = 0xFFFF;
+                  eraseFlash(JLP_ROW_NUMBER);
+                  cart.RAM[0x2F] = 0x0000;
+               }
+            break;
+            }
+
+            default:
+               break;
+         }
+      }
+   }  // if cart.JLPsupport
+}
 #endif
+
+#if CONFIG_JLP && PICO_RP2350
+void doorbell_jlp_handler(void) {
+
+   if (multicore_doorbell_is_set_current_core(0)) {
+      
+      // ack doorbell
+      multicore_doorbell_clear_current_core(0);
+
+      handle_jlp_request();
+   }
+}
+#endif
+
+void __time_critical_func(RunGame)() {
+
+#if CONFIG_JLP  
+   // initialize random seed and preallocate an array of random numbers
+   generate_random(randarr, sizeof(randarr)/sizeof(uint16_t));
+#endif
+
+   uint64_t resetTimeout = 0;
+
+   resetCart();              // start game !
 
    while (1) {
 
@@ -385,164 +571,18 @@ void RunGame() {
       }
 #endif
 
+#if CONFIG_JLP && PICO_RP2040
+      handle_jlp_request();
+#endif
+      
 #if CONFIG_JLP
-
-      if (cart.JLPSupport) {
-
-         pbc = addrInCopy;
-
-         switch(pbc) {
-
-            // switch off JLP RAM and accelerators
-            case 0x8034: {
-               if (cart.RAM[0x34] == 0x6A7A)
-                  cart.JLPAccel = false;
-            }
-            break;
-
-            // switch on JLP RAM and accelerators
-            case 0x8033: {
-               if (cart.RAM[0x33] == 0x4A5A)
-                  cart.JLPAccel = true;
-            break;
-            }
-         }
-
-         // handle JLP accelerator feature
-         if ( (cart.JLPAccel) && (pbc >= 0x9F80) && (pbc <= 0x9FFF) ) {
-
-            switch(pbc) {
-   
-               // MPYSS: signed 16bit by signed 16bit multiply into 32bit result
-               case 0x9F80:
-               case 0x9F81: {
-                  s16_op1 = cart.RAM[0x1F80];
-                  s16_op2 = cart.RAM[0x1F81];
-                  int32_t res = s16_op1 * s16_op2;
-                  cart.RAM[0x1F8F] = (res) >> 16;
-                  cart.RAM[0x1F8E] = (res & 0xffff);
-               }
-               break;
-               
-               // MPYSU: signed 16bit by unsigned 16bit multiply into 32bit result
-               case 0x9F82:
-               case 0x9F83: {
-                  s16_op1 = cart.RAM[0x1F82];
-                  u16_op2 = cart.RAM[0x1F83];
-                  int32_t res = s16_op1 * u16_op2;
-                  cart.RAM[0x1F8F] = (res) >> 16;
-                  cart.RAM[0x1F8E] = (res & 0xffff);
-               }
-               break;
-
-               // MPYUS: unsigned 16bit by signed 16bit multiply into 32bit result
-               case 0x9F84:
-               case 0x9F85: {
-                  u16_op1 = cart.RAM[0x1F84];
-                  s16_op2 = cart.RAM[0x1F85];
-                  int32_t res = u16_op1 * s16_op2;
-                  cart.RAM[0x1F8F] = (res) >> 16;
-                  cart.RAM[0x1F8E] = (res & 0xffff);
-               }
-               break;
-               
-               // MPYUU: unsigned 16bit by unsigned 16bit multiply into 32bit result
-               case 0x9F86:
-               case 0x9F87: {
-                  u16_op1 = cart.RAM[0x1F86];
-                  u16_op2 = cart.RAM[0x1F87];
-                  uint32_t res = u16_op1 * u16_op2;
-                  cart.RAM[0x1F8F] = (res) >> 16;
-                  cart.RAM[0x1F8E] = (res & 0xffff);
-               }
-               break;
-               
-               // DIVSS: signed 16bit by signed 16bit divide with remainder
-               case 0x9F88:
-               case 0x9F89: {
-                  s16_op1 = cart.RAM[0x1F88];
-                  s16_op2 = cart.RAM[0x1F89];
-                  int16_t res = s16_op1 % s16_op2;
-                  cart.RAM[0x1F8F] = res;
-                  res = s16_op1 / s16_op2;
-                  cart.RAM[0x1F8E] = res;
-               }
-               break;
-               
-               // DIVUU: unsigned 16bit by unsigned 16bit divide with remainder
-               case 0x9F8A:
-               case 0x9F8B: {
-                  u16_op1 = cart.RAM[0x1F8A];
-                  u16_op2 = cart.RAM[0x1F8B];
-                  int16_t res = u16_op1 % u16_op2;
-                  cart.RAM[0x1F8F] = res;
-                  res = u16_op1 / u16_op2;
-                  cart.RAM[0x1F8E] = res;
-               }
-               break;
-
-               // nondeterministic hardware random number generator
-               case 0x9FFE: {
-                  cart.RAM[0x1FFE] = randarr[randidx++];
-                  if (randidx == 4) {
-                     randidx = 0;
-                     randrefill = true;
-                  }
-               }
-               break;
-
-               default:
-                  break;
-            }
-         }
-         
-         // handle JLP flash feature
-         if ( (cart.JLPFlash) && (pbc >= 0x802D) && (pbc <= 0x802F) ) {
-
-            switch (pbc) {
-
-               // JF.wrcmd: copy JLP RAM to flash. Must write the value $C0DE.
-               case 0x802D: {
-                  if (cart.RAM[0x2D] == 0xC0DE) {
-                     cart.RAM[0x2D] = 0xFFFF;
-                     writeFlash(JLP_ROW_NUMBER, JLP_RAM_ADDRESS);
-                     cart.RAM[0x2D] = 0x0000;
-                  }
-               }
-               break;
-
-               // JF.rdcmd: copy flash to JLP RAM. Must write the value $DEC0.
-               case 0x802E: {
-                  if (cart.RAM[0x2E] == 0xDEC0) {
-                     cart.RAM[0x2E] = 0xFFFF;
-                     readFlash(JLP_ROW_NUMBER, JLP_RAM_ADDRESS);
-                     cart.RAM[0x2E] = 0x0000;
-                  }
-               }
-               break;
-
-               // JF.ercmd: erase flash sector. Must write the value $BEEF.
-               case 0x802F: {
-                  if (cart.RAM[0x2F] == 0xBEEF) {
-                     cart.RAM[0x2F] = 0xFFFF;
-                     eraseFlash(JLP_ROW_NUMBER);
-                     cart.RAM[0x2F] = 0x0000;
-                  }
-               break;
-               }
-
-               default:
-                  break;
-            }
-         }
-
-         // refill random numbers
-         if (randrefill) {
-            generate_random(randarr, sizeof(randarr)/sizeof(uint16_t));
-            randrefill = false;
-         }
+      // refill random numbers
+      if (randrefill) {
+         generate_random(randarr, sizeof(randarr)/sizeof(uint16_t));
+         randrefill = false;
       }
 #endif
+
    }  // end while
 }
 
@@ -595,6 +635,14 @@ void Inty_cart_main() {
       printf(" OK\n");
    else
       printf(" FAIL\n");
+#endif
+
+#if CONFIG_JLP && PICO_RP2350
+   multicore_doorbell_claim(0, 1u << 0);
+   // setup doorbell
+   irq_set_exclusive_handler(JLP_IRQ, doorbell_jlp_handler);
+   irq_set_priority(JLP_IRQ, 0x00);
+   irq_set_enabled(JLP_IRQ, true);
 #endif
 
    // init cartridge
