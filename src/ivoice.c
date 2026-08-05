@@ -37,18 +37,18 @@
 
 /*#define SINGLE_STEP*/
 
-#undef DEBUG_FIFO
-#ifdef DEBUG_FIFO
-#define dfprintf(x) printf(x)
-#else
-#define dfprintf(x) 
-#endif
+//#undef DEBUG_FIFO
+//#ifdef DEBUG_FIFO
+//#define dfprintf(x) printf(x)
+//#else
+//#define dfprintf(x) 
+//#endif
 
-#ifdef DEBUG
-#define jzdprintf(x) printf(x)
-#else
-#define jzdprintf(x)
-#endif
+//#ifdef DEBUG
+//#define jzdprintf(x) printf(x)
+//#else
+//#define jzdprintf(x)
+//#endif
 
 #undef HIGH_QUALITY
 #define PER_PAUSE    (64)               /* Equiv timing period for pauses.  */
@@ -61,13 +61,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "pico/bit_ops.h"
 /*
  * Minty port:
  * - remove FreeIntv/libretro dependencies
  */
 #include "audio.h"
 #include "ivoice.h"
-
 
 ivoice_t intellivoice;
 
@@ -93,7 +93,6 @@ void ivoiceUnserialize(const struct ivoiceSerialized *data)
 /*  Internal function prototypes.                                           */
 /* ======================================================================== */
 static INLINE int16_t  limit (int16_t s);
-static INLINE uint32_t bitrev(uint32_t val);
 static int             lpc12_update(lpc12_t *f, int, int16_t *, uint32_t *);
 static void            lpc12_regdec(lpc12_t *f);
 static uint32_t        sp0256_getb(ivoice_t *ivoice, int len);
@@ -860,20 +859,6 @@ static const int16_t sp0256_df_idx[16 * 8] =
 };
 
 /* ======================================================================== */
-/*  BITREV       -- Bit-reverse a 32-bit number.                            */
-/* ======================================================================== */
-static INLINE uint32_t bitrev(uint32_t val)
-{
-    val = ((val & 0xFFFF0000) >> 16) | ((val & 0x0000FFFF) << 16);
-    val = ((val & 0xFF00FF00) >>  8) | ((val & 0x00FF00FF) <<  8);
-    val = ((val & 0xF0F0F0F0) >>  4) | ((val & 0x0F0F0F0F) <<  4);
-    val = ((val & 0xCCCCCCCC) >>  2) | ((val & 0x33333333) <<  2);
-    val = ((val & 0xAAAAAAAA) >>  1) | ((val & 0x55555555) <<  1);
-
-    return val;
-}
-
-/* ======================================================================== */
 /*  SP0256_GETB  -- Get up to 8 bits at the current PC.                     */
 /* ======================================================================== */
 static uint32_t sp0256_getb(ivoice_t *ivoice, int len)
@@ -892,8 +877,8 @@ static uint32_t sp0256_getb(ivoice_t *ivoice, int len)
         data = ((d1 << 10) | d0) >> ivoice->fifo_bitp;
 
 #ifdef DEBUG_FIFO
-        dfprintf(("IV: RD_FIFO %.3X %d.%d %d\n", data & ((1u << len) - 1),
-                ivoice->fifo_tail, ivoice->fifo_bitp, ivoice->fifo_head));
+        //dfprintf(("IV: RD_FIFO %.3X %d.%d %d\n", data & ((1u << len) - 1),
+        //        ivoice->fifo_tail, ivoice->fifo_bitp, ivoice->fifo_head));
 #endif
 
         /* ---------------------------------------------------------------- */
@@ -995,11 +980,11 @@ static void sp0256_micro(ivoice_t *iv)
         repeat = 0;
         ctrl_xfer = 0;
 
-        jzdprintf(("$%.4X.%.1X: OPCODE %d%d%d%d.%d%d\n",
-                (iv->pc >> 3) - 1, iv->pc & 7,
-                !!(opcode & 1), !!(opcode & 2),
-                !!(opcode & 4), !!(opcode & 8),
-                !!(iv->mode&4), !!(iv->mode&2)));
+        //jzdprintf(("$%.4X.%.1X: OPCODE %d%d%d%d.%d%d\n",
+        //        (iv->pc >> 3) - 1, iv->pc & 7,
+        //        !!(opcode & 1), !!(opcode & 2),
+        //        !!(opcode & 4), !!(opcode & 8),
+        //        !!(iv->mode&4), !!(iv->mode&2)));
 
         /* ---------------------------------------------------------------- */
         /*  Handle the special cases for specific opcodes.                  */
@@ -1016,7 +1001,7 @@ static void sp0256_micro(ivoice_t *iv)
                 /* -------------------------------------------------------- */
                 if (immed4)     /* SETPAGE */
                 {
-                    iv->page = bitrev(immed4) >> 13;
+                    iv->page = __rev(immed4) >> 13;
                 } else
                 /* -------------------------------------------------------- */
                 /*  Otherwise, this is an RTS / HLT.                        */
@@ -1063,8 +1048,8 @@ static void sp0256_micro(ivoice_t *iv)
                 /*  Figure out our branch target.                           */
                 /* -------------------------------------------------------- */
                 btrg = iv->page                           |
-                       (bitrev(immed4)             >> 17) |
-                       (bitrev(sp0256_getb(iv, 8)) >> 21);
+                       (__rev(immed4)             >> 17) |
+                       (__rev(sp0256_getb(iv, 8)) >> 21);
                 ctrl_xfer = 1;
 
                 /* -------------------------------------------------------- */
@@ -1119,7 +1104,7 @@ static void sp0256_micro(ivoice_t *iv)
         /* ---------------------------------------------------------------- */
         if (ctrl_xfer)
         {
-            jzdprintf(("jumping to $%.4X.%.1X: ", iv->pc >> 3, iv->pc & 7));
+            //jzdprintf(("jumping to $%.4X.%.1X: ", iv->pc >> 3, iv->pc & 7));
 
             /* ------------------------------------------------------------ */
             /*  Set our "FIFO Selected" flag based on whether we're going   */
@@ -1127,7 +1112,7 @@ static void sp0256_micro(ivoice_t *iv)
             /* ------------------------------------------------------------ */
             iv->fifo_sel = iv->pc == FIFO_ADDR;
 
-            jzdprintf(("%s ", iv->fifo_sel ? "FIFO" : "ROM"));
+            //jzdprintf(("%s ", iv->fifo_sel ? "FIFO" : "ROM"));
 
             /* ------------------------------------------------------------ */
             /*  Control transfers to the FIFO cause it to discard the       */
@@ -1135,14 +1120,14 @@ static void sp0256_micro(ivoice_t *iv)
             /* ------------------------------------------------------------ */
             if (iv->fifo_sel && iv->fifo_bitp)
             {
-                jzdprintf(("bitp = %d -> Flush", iv->fifo_bitp));
+                //jzdprintf(("bitp = %d -> Flush", iv->fifo_bitp));
 
                 /* Discard partially-read decle. */
                 if (iv->fifo_tail < iv->fifo_head) iv->fifo_tail++;
                 iv->fifo_bitp = 0;
             }
 
-            jzdprintf(("\n"));
+            //jzdprintf(("\n"));
 
             continue;
         }
@@ -1163,7 +1148,7 @@ static void sp0256_micro(ivoice_t *iv)
         #endif
 
         iv->filt.rpt = repeat;
-        jzdprintf(("repeat = %d\n", repeat));
+        //jzdprintf(("repeat = %d\n", repeat));
 
         /* clear delay line on new opcode */
         for (i = 0; i < 6; i++)
@@ -1203,8 +1188,8 @@ static void sp0256_micro(ivoice_t *iv)
             field = cr & CR_FIELD;
             value = 0;
 
-            jzdprintf(("$%.4X.%.1X: len=%2d shf=%2d prm=%2d d=%d f=%d ",
-                     iv->pc >> 3, iv->pc & 7, len, shf, prm, !!delta, !!field));
+            //jzdprintf(("$%.4X.%.1X: len=%2d shf=%2d prm=%2d d=%d f=%d ",
+            //         iv->pc >> 3, iv->pc & 7, len, shf, prm, !!delta, !!field));
             /* ------------------------------------------------------------ */
             /*  Clear any registers that were requested to be cleared.      */
             /* ------------------------------------------------------------ */
@@ -1224,7 +1209,7 @@ static void sp0256_micro(ivoice_t *iv)
             }
             else
             {
-                jzdprintf((" (no update)\n"));
+                //jzdprintf((" (no update)\n"));
                 continue;
             }
 
@@ -1242,9 +1227,9 @@ static void sp0256_micro(ivoice_t *iv)
             if (shf)
                 value = value < 0 ? -(-value << shf) : (value << shf);
 
-            jzdprintf(("v=%.2X (%c%.2X)  ", value & 0xFF,
-                     value & 0x80 ? '-' : '+',
-                     0xFF & (value & 0x80 ? -value : value)));
+            //jzdprintf(("v=%.2X (%c%.2X)  ", value & 0xFF,
+            //         value & 0x80 ? '-' : '+',
+            //         0xFF & (value & 0x80 ? -value : value)));
 
             iv->silent = 0;
 
@@ -1253,12 +1238,12 @@ static void sp0256_micro(ivoice_t *iv)
             /* ------------------------------------------------------------ */
             if (field)
             {
-                jzdprintf(("--field-> r[%2d] = %.2X -> ", prm, iv->filt.r[prm]));
+                //jzdprintf(("--field-> r[%2d] = %.2X -> ", prm, iv->filt.r[prm]));
 
                 iv->filt.r[prm] &= ~(~0u << shf); /* Clear the old bits.    */
                 iv->filt.r[prm] |= value;         /* Merge in the new bits. */
 
-                jzdprintf(("%.2X\n", iv->filt.r[prm]));
+                //jzdprintf(("%.2X\n", iv->filt.r[prm]));
 
                 continue;
             }
@@ -1268,11 +1253,11 @@ static void sp0256_micro(ivoice_t *iv)
             /* ------------------------------------------------------------ */
             if (delta)
             {
-                jzdprintf(("--delta-> r[%2d] = %.2X -> ", prm, iv->filt.r[prm]));
+                //jzdprintf(("--delta-> r[%2d] = %.2X -> ", prm, iv->filt.r[prm]));
 
                 iv->filt.r[prm] += value;
 
-                jzdprintf(("%.2X\n", iv->filt.r[prm]));
+                //jzdprintf(("%.2X\n", iv->filt.r[prm]));
 
                 continue;
             }
@@ -1281,7 +1266,7 @@ static void sp0256_micro(ivoice_t *iv)
             /*  Otherwise, just write the new value.                        */
             /* ------------------------------------------------------------ */
             iv->filt.r[prm] = value;
-            jzdprintf(("--value-> r[%2d] = %.2X\n", prm, iv->filt.r[prm]));
+            //jzdprintf(("--value-> r[%2d] = %.2X\n", prm, iv->filt.r[prm]));
         }
 
         /* ---------------------------------------------------------------- */
@@ -1579,7 +1564,7 @@ void ivoice_wr(uint32_t addr, uint32_t data)
         /* ---------------------------------------------------------------- */
         if ((ivoice->fifo_head - ivoice->fifo_tail) >= 64)
         {
-            jzdprintf(("IV: Dropped FIFO write\n"));
+            //jzdprintf(("IV: Dropped FIFO write\n"));
             return;
         }
 
@@ -1587,8 +1572,8 @@ void ivoice_wr(uint32_t addr, uint32_t data)
         /*  FIFO up the lower 10 bits of the data.                          */
         /* ---------------------------------------------------------------- */
 #ifdef DEBUG_FIFO
-        dfprintf(("IV: WR_FIFO %.3X %d.%d %d\n", data & 0x3FF,
-                ivoice->fifo_tail, ivoice->fifo_bitp, ivoice->fifo_head));
+        //dfprintf(("IV: WR_FIFO %.3X %d.%d %d\n", data & 0x3FF,
+        //        ivoice->fifo_tail, ivoice->fifo_bitp, ivoice->fifo_head));
 #endif
         ivoice->fifo[ivoice->fifo_head++ & 63] = data & 0x3FF;
 
