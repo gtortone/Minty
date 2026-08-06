@@ -55,6 +55,15 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(pico_fatfs)
 
+add_subdirectory(
+   ${PICO_FATFS_DIR}/src
+   ${PICO_FATFS_DIR}/build
+)
+
+target_sources(no-OS-FatFS-SD-SDIO-SPI-RPi-Pico PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/diskio.c
+)
+
 #
 # overwrite sd_card_spi.c to support SD <=2GB
 #
@@ -84,17 +93,6 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(littlefs)
 
-# disable warning on lfs.c
-set_source_files_properties(
-   ${LITTLEFS_DIR}/lfs.c
-   PROPERTIES COMPILE_OPTIONS "-Wno-unused-function"
-)
-###
-
-add_subdirectory(
-   ${PICO_FATFS_DIR}/src
-   ${LITTLEFS_DIR}
-)
 
 add_executable(${PROJECT})
 
@@ -146,9 +144,30 @@ if(CONFIG_FLASH_FAT_STORAGE)
    )
 elseif(CONFIG_FLASH_LFS_STORAGE)
    target_sources(${PROJECT} PUBLIC
-      ${CMAKE_CURRENT_LIST_DIR}/lib/littlefs/lfs.c
-      ${CMAKE_CURRENT_LIST_DIR}/lib/littlefs/lfs_util.c
       ${CMAKE_CURRENT_LIST_DIR}/src/pico_lfs.c
+      ${CMAKE_CURRENT_LIST_DIR}/src/littlefs_backend.c
+   )
+
+   # disable warning on lfs.c
+   set_source_files_properties(
+      ${LITTLEFS_DIR}/lfs.c
+      PROPERTIES COMPILE_OPTIONS "-Wno-unused-function"
+   )
+
+   target_compile_definitions(${PROJECT} PRIVATE "LFS_NO_DEBUG=1")
+   target_compile_definitions(${PROJECT} PRIVATE "LFS_THREADSAFE=1")
+
+   add_library(littlefs STATIC
+       ${LITTLEFS_DIR}/lfs.c
+       ${LITTLEFS_DIR}/lfs_util.c
+   )
+
+   target_include_directories(littlefs PUBLIC
+       ${LITTLEFS_DIR}
+   )
+
+   target_link_libraries(${PROJECT}
+      littlefs
    )
 endif()
 
@@ -174,12 +193,6 @@ target_compile_definitions(${PROJECT} PRIVATE CONFIG_ECS_AUDIO=$<BOOL:${CONFIG_E
 target_compile_definitions(${PROJECT} PRIVATE CONFIG_INTELLIVOICE=$<BOOL:${CONFIG_INTELLIVOICE}>)
 target_compile_definitions(${PROJECT} PRIVATE "MAX_ROM_SIZE=${MAX_ROM_SIZE}")
 
-if(CONFIG_FLASH_LFS_STORAGE)
-   #target_compile_definitions(${PROJECT} PRIVATE "LFS_THREADSAFE=1")
-   target_compile_definitions(${PROJECT} PRIVATE "LFS_NO_DEBUG=1")
-   target_compile_definitions(${PROJECT} PRIVATE "LFS_THREADSAFE=1")
-endif()
-
 # options to enable FatFS SD debug
 #target_compile_definitions(${PROJECT} PRIVATE "USE_PRINTF=1")
 #target_compile_definitions(${PROJECT} PRIVATE "USE_DBG_PRINTF=1")
@@ -203,7 +216,6 @@ target_sources(${PROJECT} PUBLIC
    ${CMAKE_CURRENT_LIST_DIR}/src/utils.c
    ${CMAKE_CURRENT_LIST_DIR}/src/vfs.c
    ${CMAKE_CURRENT_LIST_DIR}/src/fatfs_backend.c
-   ${CMAKE_CURRENT_LIST_DIR}/src/littlefs_backend.c
    ${CMAKE_CURRENT_LIST_DIR}/src/launcher.c
    ${CMAKE_CURRENT_LIST_DIR}/src/rommeta_parser.c
    ${CMAKE_CURRENT_LIST_DIR}/src/audio.c
@@ -216,22 +228,12 @@ target_include_directories(${PROJECT} PUBLIC
    ${CMAKE_CURRENT_LIST_DIR}/include
 )
 
-#
-# overwrite ffconf.h and use custom flash/SD driver
-#
-add_custom_target(glue.c
-   COMMAND ${CMAKE_COMMAND} -E copy
-            ${CMAKE_SOURCE_DIR}/src/diskio.c
-            ${PICO_FATFS_DIR}/src/src/glue.c
-)
-
 add_custom_target(ffconf.h
    COMMAND ${CMAKE_COMMAND} -E rm -f
    ${PICO_FATFS_DIR}/src/include/ffconf.h
 )
 
-
-add_dependencies(${PROJECT} ffconf.h glue.c)
+add_dependencies(${PROJECT} ffconf.h)
 
 target_link_libraries(${PROJECT}
    pico_stdlib
