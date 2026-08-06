@@ -41,6 +41,8 @@ pico_sdk_init()
 
 include(FetchContent)
 
+add_executable(${PROJECT})
+
 #
 # fetch no-OS-FatFS-SD-SDIO-SPI-RPi-Pico library
 #
@@ -60,10 +62,6 @@ add_subdirectory(
    ${PICO_FATFS_DIR}/build
 )
 
-target_sources(no-OS-FatFS-SD-SDIO-SPI-RPi-Pico PRIVATE
-    ${CMAKE_SOURCE_DIR}/src/diskio.c
-)
-
 #
 # overwrite sd_card_spi.c to support SD <=2GB
 #
@@ -77,6 +75,20 @@ set_source_files_properties(
    ${PICO_FATFS_DIR}/src/src/f_util.c
    PROPERTIES COMPILE_OPTIONS "-Wno-format"
 )
+
+# exclude glue.c (-> diskio.c)
+set_source_files_properties(
+    ${PICO_FATFS_DIR}/src/src/glue.c
+    PROPERTIES HEADER_FILE_ONLY TRUE
+)
+
+# replace ffconf.h 
+add_custom_target(ffconf.h
+   COMMAND ${CMAKE_COMMAND} -E rm -f
+   ${PICO_FATFS_DIR}/src/include/ffconf.h
+)
+
+add_dependencies(${PROJECT} ffconf.h)
 ###
 
 #
@@ -92,9 +104,7 @@ FetchContent_Declare(
 )
 
 FetchContent_MakeAvailable(littlefs)
-
-
-add_executable(${PROJECT})
+###
 
 # set version header file
 execute_process(
@@ -177,7 +187,6 @@ endif()
 
 if(PICO_RP2350)
    target_link_libraries(${PROJECT} pico_sha256)
-
 endif()
 
 set(OUTPUT_SUFFIX "" CACHE STRING "Suffix for output name")
@@ -211,6 +220,7 @@ target_sources(${PROJECT} PUBLIC
    ${CMAKE_CURRENT_LIST_DIR}/src/jlpflash.c
    ${CMAKE_CURRENT_LIST_DIR}/src/memory.c
    ${CMAKE_CURRENT_LIST_DIR}/src/fatfs_disk.c
+   ${CMAKE_CURRENT_LIST_DIR}/src/diskio.c
    ${CMAKE_CURRENT_LIST_DIR}/src/flash_fs.c
    ${CMAKE_CURRENT_LIST_DIR}/src/hw_config.c
    ${CMAKE_CURRENT_LIST_DIR}/src/utils.c
@@ -228,12 +238,7 @@ target_include_directories(${PROJECT} PUBLIC
    ${CMAKE_CURRENT_LIST_DIR}/include
 )
 
-add_custom_target(ffconf.h
-   COMMAND ${CMAKE_COMMAND} -E rm -f
-   ${PICO_FATFS_DIR}/src/include/ffconf.h
-)
-
-add_dependencies(${PROJECT} ffconf.h)
+###
 
 target_link_libraries(${PROJECT}
    pico_stdlib
