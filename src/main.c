@@ -30,9 +30,10 @@ int main(void) {
    //set_sys_clock_khz(250000, true);
    set_sys_clock_khz(200000, true);
 #elif PICO_RP2350
-   vreg_set_voltage(VREG_VOLTAGE_1_15);
+   //vreg_set_voltage(VREG_VOLTAGE_1_15);
    sleep_ms(200);
-   set_sys_clock_khz(250000, true);
+   //set_sys_clock_khz(250000, true);
+   set_sys_clock_khz(200000, true);
 #endif
 
    gpio_init(MSYNC);
