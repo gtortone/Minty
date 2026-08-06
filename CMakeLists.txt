@@ -47,6 +47,7 @@ add_executable(${PROJECT})
 # fetch no-OS-FatFS-SD-SDIO-SPI-RPi-Pico library
 #
 set(PICO_FATFS_DIR ${CMAKE_SOURCE_DIR}/lib/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico)
+set(FATFS_CONFIG ${CMAKE_SOURCE_DIR}/include/ffconf.h)
 
 FetchContent_Declare(
     pico_fatfs
@@ -81,14 +82,6 @@ set_source_files_properties(
     ${PICO_FATFS_DIR}/src/src/glue.c
     PROPERTIES HEADER_FILE_ONLY TRUE
 )
-
-# replace ffconf.h 
-add_custom_target(ffconf.h
-   COMMAND ${CMAKE_COMMAND} -E rm -f
-   ${PICO_FATFS_DIR}/src/include/ffconf.h
-)
-
-add_dependencies(${PROJECT} ffconf.h)
 ###
 
 #
