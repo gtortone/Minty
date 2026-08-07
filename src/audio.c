@@ -1,5 +1,3 @@
-#if CONFIG_ECS_AUDIO || CONFIG_INTELLIVOICE
-
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -116,5 +114,3 @@ void init_audio(uint8_t tv_mode, uint8_t volume) {
    add_repeating_timer_us(-(AUDIO_PERIOD/2), audio_callback, NULL, &timer);
 
 }
-
-#endif

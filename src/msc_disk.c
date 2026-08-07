@@ -5,8 +5,6 @@
 //   parts of code are directly from the A8PicoCart project by Robin Edwards 2023
 */
 
-#if CONFIG_USB_DEVICE && CONFIG_FLASH_FAT_STORAGE
-
 #include "fatfs_disk.h"
 #include "flash_fs.h"
 #include "tusb.h"
@@ -156,5 +154,3 @@ int32_t tud_msc_scsi_cb(uint8_t lun, uint8_t const scsi_cmd[16], void *buffer, u
 
    return (int32_t) resplen;
 }
-
-#endif

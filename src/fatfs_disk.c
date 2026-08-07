@@ -5,8 +5,6 @@
 //   parts of code are directly from the A8PicoCart project by Robin Edwards 2023
 */
 
-#if CONFIG_FLASH_FAT_STORAGE
-
 #include "ff.h"
 #include "diskio.h"
 #include "fatfs_disk.h"
@@ -89,5 +87,3 @@ uint32_t fatfs_disk_write(const uint8_t *buff, uint32_t sector, uint32_t count) 
 int64_t fatfs_disk_sync() {
    return flash_fs_sync();
 }
-
-#endif

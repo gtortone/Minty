@@ -1,5 +1,3 @@
-#if CONFIG_JLP
-
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -84,5 +82,3 @@ void eraseFlash(int row) {
 
    vfs_close(cart.filesave);
 }
-#endif
-

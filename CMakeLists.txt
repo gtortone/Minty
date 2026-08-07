@@ -175,7 +175,19 @@ elseif(CONFIG_FLASH_LFS_STORAGE)
 endif()
 
 if(CONFIG_ECS_AUDIO OR CONFIG_INTELLIVOICE)
+   target_sources(${PROJECT} PUBLIC
+      ${CMAKE_CURRENT_LIST_DIR}/src/audio.c
+      ${CMAKE_CURRENT_LIST_DIR}/src/emu2149.c
+      ${CMAKE_CURRENT_LIST_DIR}/src/ivoice.c
+      ${CMAKE_CURRENT_LIST_DIR}/src/intellivoice_minty.c
+   )
    target_link_libraries(${PROJECT} hardware_pwm)
+endif()
+
+if(CONFIG_JLP)
+   target_sources(${PROJECT} PUBLIC
+      ${CMAKE_CURRENT_LIST_DIR}/src/jlpflash.c
+   )
 endif()
 
 if(PICO_RP2350)
@@ -210,21 +222,14 @@ target_sources(${PROJECT} PUBLIC
    ${CMAKE_CURRENT_LIST_DIR}/src/interface.c
    ${CMAKE_CURRENT_LIST_DIR}/src/filesystem.c
    ${CMAKE_CURRENT_LIST_DIR}/src/intellicart.c
-   ${CMAKE_CURRENT_LIST_DIR}/src/jlpflash.c
    ${CMAKE_CURRENT_LIST_DIR}/src/memory.c
-   ${CMAKE_CURRENT_LIST_DIR}/src/fatfs_disk.c
    ${CMAKE_CURRENT_LIST_DIR}/src/diskio.c
-   ${CMAKE_CURRENT_LIST_DIR}/src/flash_fs.c
    ${CMAKE_CURRENT_LIST_DIR}/src/hw_config.c
    ${CMAKE_CURRENT_LIST_DIR}/src/utils.c
    ${CMAKE_CURRENT_LIST_DIR}/src/vfs.c
    ${CMAKE_CURRENT_LIST_DIR}/src/fatfs_backend.c
    ${CMAKE_CURRENT_LIST_DIR}/src/launcher.c
    ${CMAKE_CURRENT_LIST_DIR}/src/rommeta_parser.c
-   ${CMAKE_CURRENT_LIST_DIR}/src/audio.c
-   ${CMAKE_CURRENT_LIST_DIR}/src/emu2149.c
-   ${CMAKE_CURRENT_LIST_DIR}/src/ivoice.c
-   ${CMAKE_CURRENT_LIST_DIR}/src/intellivoice_minty.c
 )
 
 target_include_directories(${PROJECT} PUBLIC
