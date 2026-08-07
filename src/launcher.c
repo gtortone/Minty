@@ -14,6 +14,7 @@
 #include "filesystem.h"
 #include "intellicart.h"
 #include "launcher.h"
+#include "config.h"
 #include "version.h"
 #include "audio.h"
 
@@ -23,15 +24,10 @@
    #include "mintyrom.h"
 #endif
 
-#if CONFIG_SD_STORAGE
-   #include "config.h"
-#endif
-
 #if CONFIG_USB_DEVICE
    #include "usb_tasks.h"
 #endif
 
-#if CONFIG_SD_STORAGE
 // config file
 vfs_file_t *cfgfile;
 vfs_stat_t st;
@@ -40,7 +36,6 @@ struct boardConfig cfg = {
    .version = CONFIG_VERSION,
    .magicNumber = CONFIG_MAGIC_NUMBER 
 }; 
-#endif
 
 extern Cartridge cart;     // main data structure for cart emulation
 
@@ -119,29 +114,23 @@ int LoadGame(int entry_num) {
       return result;
    }
 
-#if CONFIG_SD_STORAGE
-   // save config file only on SD 
-   if (volumeId == 1) {
+   // save last loaded game to config file
+   strcpy(cfg.lastPath, curPath);
 
-      // save last loaded game to config file
-      strcpy(cfg.lastPath, curPath);
-
-      // save ECS audio volume level
+   // save ECS audio volume level
 #if CONFIG_ECS_AUDIO
-      cfg.audio_volume = 255 - audio_volume;
+   cfg.audio_volume = 255 - audio_volume;
 #else
-      cfg.audio_volume = 255;
+   cfg.audio_volume = 255;
 #endif
-      printf("save cfg file: %s\n", CONFIG_FILENAME);
+   printf("save cfg file: %s\n", CONFIG_FILENAME);
 
-      if ( (cfgfile = vfs_open(CONFIG_FILENAME, "w")) != NULL) {
-         vfs_write(cfgfile, &cfg, sizeof(struct boardConfig));
-         vfs_close(cfgfile);
-      } else {
-         printf("E: config file %s not written\n", CONFIG_FILENAME);
-      }
+   if ( (cfgfile = vfs_open(CONFIG_FILENAME, "w")) != NULL) {
+      vfs_write(cfgfile, &cfg, sizeof(struct boardConfig));
+      vfs_close(cfgfile);
+   } else {
+      printf("E: config file %s not written\n", CONFIG_FILENAME);
    }
-#endif
 
    // ROM file has internal cfg info
    if(!is_rom_file(curPath)) {
@@ -395,55 +384,53 @@ void RunLauncher() {
    cart.RAM[DEV_ADDR] = volumeId;
    cart.RAM[SDPRES_ADDR] = 1;
 
-#if CONFIG_SD_STORAGE
-   if (volumeId == 1) {
+   // try to read configuration file    
+   if ( (cfgfile = vfs_open(CONFIG_FILENAME, "r")) != NULL) {
 
-      // try to read configuration file    
-      if ( (cfgfile = vfs_open(CONFIG_FILENAME, "r")) != NULL) {
+      vfs_read(cfgfile, &cfg, sizeof(struct boardConfig));
 
-         vfs_read(cfgfile, &cfg, sizeof(struct boardConfig));
+      printf("cfg.lastpath: %s\n", cfg.lastPath);
 
-         printf("cfg.lastpath: %s\n", cfg.lastPath);
+      if (cfg.magicNumber == CONFIG_MAGIC_NUMBER) {
 
-         if (cfg.magicNumber == CONFIG_MAGIC_NUMBER) {
-
-            vfs_stat(cfg.lastPath, &st);
-            if (st.type & VFS_TYPE_DIR) {
+         vfs_stat(cfg.lastPath, &st);
+         if (st.type & VFS_TYPE_DIR) {
+            strcpy(curPath, cfg.lastPath);
+         } else {
+            char* curFile = strrchr(cfg.lastPath+1,'/');
+            if (curFile) {
+               int n;
+               *curFile = 0; // curPath ends at last slash
+               curFile++;    // curFile contains last launched file
                strcpy(curPath, cfg.lastPath);
-            } else {
-               char* curFile = strrchr(cfg.lastPath+1,'/');
-               if (curFile) {
-                  int n;
-                  *curFile = 0; // curPath ends at last slash
-                  curFile++;    // curFile contains last launched file
-                  strcpy(curPath, cfg.lastPath);
 
-                  // read  directory
-                  num_dir_entries = read_directory(curPath, screen_entries);
-                  if (num_dir_entries < 0) {
-                        // could not read directory, show empty list and send info to INTY launcher
-                        num_dir_entries = 0;
-                        cart.RAM[SDPRES_ADDR] = 0;
-                  }
-                  // search for previously launched file
-                  for (n = num_dir_entries; n > 0; n--) {
-                     if (strcmp(curFile, screen_entries[n-1].filename) == 0) break;
-                  }
-                  filefrom = (int)((n-1) / 10) * 10;
-                  fileto = filefrom + 10;
-                  if (fileto > num_dir_entries)
-                     fileto = num_dir_entries;
-                  cart.RAM[SELECTION_ADDR] = n - filefrom - 1;
+               // read  directory
+               num_dir_entries = read_directory(curPath, screen_entries);
+               if (num_dir_entries < 0) {
+                     // could not read directory, show empty list and send info to INTY launcher
+                     num_dir_entries = 0;
+                     cart.RAM[SDPRES_ADDR] = 0;
                }
+               // search for previously launched file
+               for (n = num_dir_entries; n > 0; n--) {
+                  if (strcmp(curFile, screen_entries[n-1].filename) == 0) break;
+               }
+               filefrom = (int)((n-1) / 10) * 10;
+               fileto = filefrom + 10;
+               if (fileto > num_dir_entries)
+                  fileto = num_dir_entries;
+               cart.RAM[SELECTION_ADDR] = n - filefrom - 1;
             }
-
-            audio_volume = 255 - cfg.audio_volume; 
-            cart.RAM[EMU_VOL_ADDR] = audio_volume;
          }
 
-         vfs_close(cfgfile);
+         audio_volume = 255 - cfg.audio_volume; 
+         cart.RAM[EMU_VOL_ADDR] = audio_volume;
       }
+
+      vfs_close(cfgfile);
    }
+
+#if CONFIG_SD_STORAGE
    cart.RAM[HAS_SD_ADDR] = 1;
 #else
    cart.RAM[HAS_SD_ADDR] = 0;

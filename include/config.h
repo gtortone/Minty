@@ -6,7 +6,12 @@
 
 #define CONFIG_VERSION        2
 #define CONFIG_MAGIC_NUMBER   (uint16_t) 0xCAFE
-#define CONFIG_FILENAME       "/sd/.Minty.cfg"
+
+#if defined(PIRTO_II_DEFAULT)
+   #define CONFIG_FILENAME       "/fl/.Minty.cfg"
+#else
+   #define CONFIG_FILENAME       "/sd/.Minty.cfg"
+#endif
 
 struct boardConfig {
    uint8_t version;
