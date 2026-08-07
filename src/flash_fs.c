@@ -108,6 +108,23 @@ static uint8_t log_page_buf[FLASH_PAGE_SIZE];
 static uint16_t log_page_used = 0;
 static uint16_t log_next_page = 0;
 
+// nesting depth of a filesystem mutation; the autosync timer skips its tick
+// while this is non zero. Only ever touched from thread context, so a plain
+// counter is enough: the timer callback runs while that code is suspended and
+// therefore observes either 0 (not yet inside) or non zero (inside).
+static volatile uint8_t fs_busy = 0;
+
+static repeating_timer_t sync_timer;
+static bool sync_timer_running = false;
+
+static inline void fs_enter(void) {
+   fs_busy++;
+}
+
+static inline void fs_exit(void) {
+   fs_busy--;
+}
+
 static uint16_t shadow_slot_next = 0;
 
 // shared 4K scratch buffer, used by the checkpoint and by
@@ -115,7 +132,8 @@ static uint16_t shadow_slot_next = 0;
 // buffer is enough and keeps it off the stack
 static uint8_t sector_buf[FLASH_SECTOR_SIZE];
 
-uint8_t used_bitmap[NUM_FLASH_SECTORS]; // we will use 256 flash sectors for 2048 fat sectors
+// one bit per 512 byte slot, one byte per 4096 byte flash sector
+uint8_t used_bitmap[NUM_FLASH_SECTORS];
 
 uint16_t write_sector = 0;      // which flash sector we are writing to
 uint8_t write_sector_bitmap = 0;        // 1 for each free 512 byte page on the sector
@@ -420,16 +438,15 @@ static void log_replay(void) {
       uint16_t sector = (uint16_t) (FS_LOG_FIRST_SECTOR + p / FS_LOG_PAGES_PER_SECTOR);
       uint32_t offset = (uint32_t) (p % FS_LOG_PAGES_PER_SECTOR) * FLASH_PAGE_SIZE;
       const log_record *recs = (const log_record *) fs_xip_ptr(sector, offset);
+      uint16_t valid = 0;
 
       for (i = 0; i < FS_LOG_RECS_PER_PAGE; i++) {
          uint16_t old_entry;
 
-         if (!log_record_valid(&recs[i])) {
-            // a partially filled page cannot be programmed again
-            log_next_page = (uint16_t) (i == 0 ? p : p + 1);
-            log_page_reset();
-            return;
-         }
+         // a sync flushes a partially filled page, so a hole ends this page
+         // but not the log
+         if (!log_record_valid(&recs[i]))
+            break;
 
          old_entry = map_get_entry(recs[i].fat_sector);
          if (old_entry)
@@ -437,7 +454,16 @@ static void log_replay(void) {
 
          map_journal_set(recs[i].fat_sector, recs[i].map_entry);
          used_bitmap[getMapSector(recs[i].map_entry)] |= (1 << getMapOffset(recs[i].map_entry));
+         valid++;
       }
+
+      if (valid == 0) {         // blank page: this is the end of the log
+         log_next_page = p;
+         log_page_reset();
+         return;
+      }
+      // pages are filled in order and cannot be programmed twice, so a
+      // partially used page simply pushes the next write to the following one
    }
 
    log_next_page = FS_LOG_PAGES;
@@ -465,8 +491,14 @@ int64_t write_fs_map() {
    uint64_t nb = 0;
    uint16_t i = 0;
 
-   if (map_journal_count == 0)
-      return log_flush_page();
+   fs_enter();
+
+   if (map_journal_count == 0) {
+      int64_t r = log_flush_page();
+
+      fs_exit();
+      return r;
+   }
 
    while (i < map_journal_count) {
       uint16_t page = map_entry_page(map_journal[i].fat_sector);
@@ -493,6 +525,7 @@ int64_t write_fs_map() {
    log_erase();
    map_journal_count = 0;
 
+   fs_exit();
    return (int64_t) nb;
 }
 
@@ -514,6 +547,10 @@ uint16_t getNextWriteSector() {
             if (used_bitmap[(i + search_start_pos) % NUM_FLASH_SECTORS] != 0xFF)
                break;
          }
+         if (i == NUM_FLASH_SECTORS) {  // every slot is taken
+            printf("getNextWriteSector() - storage area is full\n");
+            return 0;
+         }
          write_sector = (i + search_start_pos) % NUM_FLASH_SECTORS;
          write_sector_bitmap = ~used_bitmap[write_sector];
          flash_erase_with_copy_sector(write_sector, used_bitmap[write_sector]);
@@ -524,6 +561,10 @@ uint16_t getNextWriteSector() {
    for (i = 0; i < 8; i++) {
       if (write_sector_bitmap & (1 << i))
          break;
+   }
+   if (i == 8) {                // should be unreachable: FS_SPARE_SECTORS keeps
+      printf("getNextWriteSector() - no free slot\n");   // slots in reserve
+      return 0;
    }
    // mark the offset used
    write_sector_bitmap &= ~(1 << i);
@@ -564,6 +605,8 @@ int flash_fs_mount() {
    init_used_bitmap();
    log_replay();
    //debug_print_in_use();
+
+   flash_fs_autosync_start();
    return 0;
 }
 
@@ -587,13 +630,66 @@ void flash_fs_create() {
    log_erase();
 
    init_used_bitmap();
+
+   flash_fs_autosync_start();
 }
 
 // make everything written so far durable. The map sectors are untouched: the
 // log already holds the pending updates, so this costs a single 256 byte page
 // program.
 int64_t flash_fs_sync() {
-   return log_flush_page();
+   int64_t nb;
+
+   fs_enter();
+   nb = log_flush_page();
+   fs_exit();
+   return nb;
+}
+
+// Fires every FS_SYNC_INTERVAL_MS from the default alarm pool, so a staged log
+// page never sits in RAM longer than that. Runs in interrupt context, which is
+// safe for two reasons: the flash program itself executes from RAM with
+// interrupts disabled, and the tick is skipped whenever thread context is in
+// the middle of a filesystem mutation.
+//
+// This assumes core1 never fetches code or data from flash. Everything it runs
+// must be __not_in_flash_func, and every table it touches must live in RAM:
+// a const array left in .rodata is an XIP read and would stall core1 for the
+// duration of the program cycle.
+static bool sync_timer_cb(repeating_timer_t *t) {
+   (void) t;
+
+   if (fs_busy || log_page_used == 0)
+      return true;              // try again on the next tick
+
+   log_flush_page();
+   return true;
+}
+
+// Started automatically by flash_fs_mount() and flash_fs_create(); calling it
+// again is harmless.
+bool flash_fs_autosync_start(void) {
+   if (sync_timer_running)
+      return true;
+
+   // negative period: the interval is measured from the start of the callback
+   sync_timer_running = add_repeating_timer_ms(-(int32_t) FS_SYNC_INTERVAL_MS,
+                                               sync_timer_cb, NULL, &sync_timer);
+   if (!sync_timer_running)
+      printf("flash_fs_autosync_start() - no alarm slot available\n");
+
+   return sync_timer_running;
+}
+
+// Only needed to release the alarm slot, or to leave the log clean before a
+// deliberate shutdown; the final flush is done here.
+void flash_fs_autosync_stop(void) {
+   if (!sync_timer_running)
+      return;
+
+   cancel_repeating_timer(&sync_timer);
+   sync_timer_running = false;
+   flash_fs_sync();
 }
 
 void flash_fs_read_FAT_sector(uint16_t fat_sector, void *buffer) {
@@ -609,12 +705,18 @@ void flash_fs_read_FAT_sector(uint16_t fat_sector, void *buffer) {
 void flash_fs_write_FAT_sector(uint16_t fat_sector, const void *buffer) {
    uint16_t old_entry, new_entry;
 
+   fs_enter();
+
    // make room before touching anything; a checkpoint here is a safe point
    if (map_journal_count >= FS_MAP_JOURNAL_SIZE || log_is_full())
       write_fs_map();
 
    old_entry = map_get_entry(fat_sector);
    new_entry = getNextWriteSector();
+   if (new_entry == 0) {        // out of space: leave the previous copy in place
+      fs_exit();
+      return;
+   }
 
    // data goes down first: until the log record is committed the map still
    // points at the previous copy, which is still marked allocated and has
@@ -627,6 +729,8 @@ void flash_fs_write_FAT_sector(uint16_t fat_sector, const void *buffer) {
    if (old_entry)
       used_bitmap[getMapSector(old_entry)] &= ~(1 << getMapOffset(old_entry));
    used_bitmap[getMapSector(new_entry)] |= (1 << getMapOffset(new_entry));
+
+   fs_exit();
 }
 
 bool flash_fs_verify_FAT_sector(uint16_t fat_sector, const void *buffer) {

@@ -89,6 +89,20 @@ void flash_fs_create();
 // loss, costs one 256 byte page program
 int64_t flash_fs_sync();
 
+// period of the autosync alarm; this is the worst case amount of work an
+// unexpected reset can lose
+#ifndef FS_SYNC_INTERVAL_MS
+#define FS_SYNC_INTERVAL_MS 250
+#endif
+
+// The autosync alarm flushes the staged log page in the background and is
+// started automatically by flash_fs_mount() and flash_fs_create(), so normally
+// neither of these needs to be called. The callback programs a flash page from
+// interrupt context on core0, which is only safe as long as core1 runs
+// entirely from RAM (code and .rodata alike).
+bool flash_fs_autosync_start(void);
+void flash_fs_autosync_stop(void);
+
 // fold the pending log into the sector map and restart the log; happens
 // automatically when the log fills up, exposed for an explicit unmount
 int64_t write_fs_map(void);
