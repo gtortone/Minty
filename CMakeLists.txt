@@ -149,6 +149,8 @@ elseif(CONFIG_FLASH_LFS_STORAGE)
    target_sources(${PROJECT} PUBLIC
       ${CMAKE_CURRENT_LIST_DIR}/src/pico_lfs.c
       ${CMAKE_CURRENT_LIST_DIR}/src/littlefs_backend.c
+      ${LITTLEFS_DIR}/lfs.c
+      ${LITTLEFS_DIR}/lfs_util.c
    )
 
    # disable warning on lfs.c
@@ -160,17 +162,8 @@ elseif(CONFIG_FLASH_LFS_STORAGE)
    target_compile_definitions(${PROJECT} PRIVATE "LFS_NO_DEBUG=1")
    target_compile_definitions(${PROJECT} PRIVATE "LFS_THREADSAFE=1")
 
-   add_library(littlefs STATIC
-       ${LITTLEFS_DIR}/lfs.c
-       ${LITTLEFS_DIR}/lfs_util.c
-   )
-
-   target_include_directories(littlefs PUBLIC
+   target_include_directories(${PROJECT} PUBLIC
        ${LITTLEFS_DIR}
-   )
-
-   target_link_libraries(${PROJECT}
-      littlefs
    )
 endif()
 
