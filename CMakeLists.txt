@@ -130,12 +130,17 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif()
 
 if(CONFIG_USB_DEVICE)
-   target_link_libraries(${PROJECT} tinyusb_device)
    target_compile_options(${PROJECT} PRIVATE "-DCFG_TUSB_RHPORT0_MODE")
+   target_link_libraries(${PROJECT} tinyusb_device)
    target_sources(${PROJECT} PUBLIC
-      ${CMAKE_CURRENT_LIST_DIR}/src/msc_disk.c
       ${CMAKE_CURRENT_LIST_DIR}/src/usb_tasks.c
       ${CMAKE_CURRENT_LIST_DIR}/src/usb_descriptors.c
+   )
+endif()
+
+if(CONFIG_USB_DEVICE AND CONFIG_FLASH_FAT_STORAGE)
+   target_sources(${PROJECT} PUBLIC
+      ${CMAKE_CURRENT_LIST_DIR}/src/msc_disk.c
    )
 endif()
 
@@ -143,7 +148,6 @@ if(CONFIG_FLASH_FAT_STORAGE)
    target_sources(${PROJECT} PUBLIC
       ${CMAKE_CURRENT_LIST_DIR}/src/fatfs_disk.c
       ${CMAKE_CURRENT_LIST_DIR}/src/flash_fs.c
-      ${CMAKE_CURRENT_LIST_DIR}/src/msc_disk.c
    )
 elseif(CONFIG_FLASH_LFS_STORAGE)
    target_sources(${PROJECT} PUBLIC
