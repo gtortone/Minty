@@ -7,9 +7,7 @@
 #include "pico/rand.h"
 
 #include "board.h"
-
 #include "memory.h"
-
 #include "interface.h"
 #include "filesystem.h"
 #include "intellicart.h"
@@ -394,7 +392,6 @@ void RunLauncher() {
       if (cfg.magicNumber == CONFIG_MAGIC_NUMBER) {
 
          vfs_stat(cfg.lastPath, &st);
-         printf("st.type: %d\n", st.type);
          if (st.type & VFS_TYPE_DIR) {
             strcpy(curPath, cfg.lastPath);
          } else if (st.type == 0) {    // check for a valid/existing file
