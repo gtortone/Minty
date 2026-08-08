@@ -162,8 +162,8 @@ int load_cfg(char *filename) {
 
       printf("filename: %s, fp: %d\n", filename, fp);
 
-      for (int i=0; i<sizeof(fingerprints)/sizeof(int); i += 2) {
-         if (fp == fingerprints[i]) {
+      for (int i=0; i<sizeof(romcoll)/sizeof(struct romConfig); i++) {
+         if (fp == romcoll[i].fingerprint) {
             if (fp == 11349) {
                // Baseball or MTE Test Cart?
                if (cart.len > 8192)
@@ -174,7 +174,19 @@ int load_cfg(char *filename) {
                return num_pokes;
             }
 
-            config_memory(fingerprints[i+1]);
+            config_memory(romcoll[i].mem_id);
+
+#if CONFIG_ECS_AUDIO || CONFIG_INTELLIVOICE
+            if (romcoll[i].flags & VAR_VOICE) {
+               cart.IntellivoiceSupport = true;
+               printf("Intellivoice emulation enabled\n");
+            }
+
+            if (romcoll[i].flags & VAR_ECS) {
+               cart.ECSSupport = true;
+               printf("ECS support found\n");
+            }
+#endif
 
             return num_pokes;
          }
