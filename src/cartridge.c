@@ -454,15 +454,6 @@ void __time_critical_func(handle_jlp_request)(void) {
             }
             break;
 
-            //case 0x9FFC: {
-            //   crc = cart.RAM[0x1FFD];
-            //   crc ^= data;
-            //   for (int i=0; i<16; i++)
-            //      crc = (crc >> 1) ^ (crc & 1 ? 0xAD52 : 0);
-            //   cart.RAM[0x1FFD] = crc;
-            //}
-            //break;
-
             // nondeterministic hardware random number generator
             case 0x9FFE: {
                cart.RAM[0x1FFE] = randarr[randidx++];
