@@ -138,7 +138,7 @@ static int littlefs_lseek(vfs_file_t *vf, size_t offset) {
 
    lfs_file_t *fil = (lfs_file_t *)vf->backend;
 
-   if (lfs_file_seek(&lfs, fil, offset, LFS_SEEK_CUR) < 0)
+   if (lfs_file_seek(&lfs, fil, offset, LFS_SEEK_SET) < 0)
       return -1;
 
    if (lfs_eof(&lfs, fil))
@@ -226,8 +226,8 @@ static int littlefs_stat(const char *path, vfs_stat_t *st, const vfs_mount_t *mn
    if (lfs_stat(&lfs, path, &info) < 0)
       return -1;
 
-   memcpy(st->name, info.name, strlen(st->name));
-   st->name[strlen(st->name)] = 0;
+   strncpy(st->name, info.name, sizeof(st->name) - 1);
+   st->name[sizeof(st->name) - 1] = '\0';
 
    st->size = info.size;
 

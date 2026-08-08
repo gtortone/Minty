@@ -181,9 +181,8 @@ static int fat_stat(const char *path, vfs_stat_t *st, const vfs_mount_t *mnt) {
    if (f_stat(full, &info) != FR_OK)
       return -1;
 
-   memcpy(st->name, info.fname, strlen(st->name));
-   st->name[strlen(st->name)] = 0;
-   //strncpy(st->name, info.fname, sizeof(st->name));
+   strncpy(st->name, info.fname, sizeof(st->name) - 1);
+   st->name[sizeof(st->name) - 1] = '\0';
 
    st->size = info.fsize;
 
