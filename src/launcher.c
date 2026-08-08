@@ -394,9 +394,10 @@ void RunLauncher() {
       if (cfg.magicNumber == CONFIG_MAGIC_NUMBER) {
 
          vfs_stat(cfg.lastPath, &st);
+         printf("st.type: %d\n", st.type);
          if (st.type & VFS_TYPE_DIR) {
             strcpy(curPath, cfg.lastPath);
-         } else {
+         } else if (st.type == 0) {    // check for a valid/existing file
             char* curFile = strrchr(cfg.lastPath+1,'/');
             if (curFile) {
                int n;
@@ -412,14 +413,20 @@ void RunLauncher() {
                      cart.RAM[SDPRES_ADDR] = 0;
                }
                // search for previously launched file
+               bool found = false;
                for (n = num_dir_entries; n > 0; n--) {
-                  if (strcmp(curFile, screen_entries[n-1].filename) == 0) break;
+                  if (strcmp(curFile, screen_entries[n-1].filename) == 0) {
+                     found = true;
+                     break;
+                  }
                }
-               filefrom = (int)((n-1) / 10) * 10;
-               fileto = filefrom + 10;
-               if (fileto > num_dir_entries)
-                  fileto = num_dir_entries;
-               cart.RAM[SELECTION_ADDR] = n - filefrom - 1;
+               if (found) {
+                  filefrom = (int)((n-1) / 10) * 10;
+                  fileto = filefrom + 10;
+                  if (fileto > num_dir_entries)
+                     fileto = num_dir_entries;
+                  cart.RAM[SELECTION_ADDR] = n - filefrom - 1;
+               }
             }
          }
 
