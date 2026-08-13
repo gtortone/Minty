@@ -10,6 +10,9 @@
 
 #define RAMSIZE   0x2800 // biggest contigus memory block useable for RAM is from 0x8000 to 0x9BFF (10kW = 20kB) based on memory map
 
+#define JLP_ADDR_LO     0x8000
+#define JLP_ADDR_HI     0x9FFF
+
 typedef struct {
    volatile uint16_t ROM[MAX_ROM_SIZE];
    volatile uint16_t RAM[RAMSIZE];
@@ -23,6 +26,10 @@ typedef struct {
    bool JLPAccel;
    char flashfile[512];
    vfs_file_t *filesave;
+#endif
+
+#if CONFIG_FUJINET
+   bool FujiSupport;   // this board serves the FujiNet mailbox
 #endif
 
 #if CONFIG_ECS_AUDIO || CONFIG_INTELLIVOICE

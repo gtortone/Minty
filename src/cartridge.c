@@ -27,6 +27,7 @@
 #include "fatfs_backend.h"
 #include "littlefs_backend.h"
 #include "audio.h"
+#include "usb_tasks.h"
 
 
 #if CONFIG_JLP
@@ -61,6 +62,14 @@
    volatile uint8_t ivoiceWrite = 0;
    volatile uint8_t ivoiceRegister[IVOICE_BUF_SIZE] = {0};
    volatile uint16_t ivoiceValue[IVOICE_BUF_SIZE] = {0};
+#endif
+
+#if CONFIG_FUJINET
+   #include "tusb.h"
+   #include "fujinet.h"
+   #include "fujiboot.h"
+   #include "fujibus_usb.h"
+   #include "fuji_mailbox.h"
 #endif
 
 extern Cartridge cart;     // main data structure for cart emulation
@@ -188,6 +197,19 @@ void __time_critical_func(core1_main()) {
             }
 #endif
 
+#if CONFIG_FUJINET
+
+            if ( cart.FujiSupport) {
+
+               if ( (addrIn >= FUJI_MB_ADDR_LO) && (addrIn <= FUJI_MB_ADDR_HI) ) {
+
+                  dataOut = cart.RAM[addrIn - 0x8000];
+                  deviceAddress = true;
+                  continue;
+               }
+            }
+#endif
+
 #if CONFIG_JLP
             
             // check for JLP support and accelerators/RAM enabled 
@@ -199,7 +221,7 @@ void __time_critical_func(core1_main()) {
                   multicore_doorbell_set_other_core(0);
 #endif
 
-                  if ( (cart.JLPAccel || cart.JLPFlash) && ((addrIn >= 0x8000) && (addrIn <= 0x9FFF)) ) {
+                  if ( (cart.JLPAccel || cart.JLPFlash) && ((addrIn >= JLP_ADDR_LO) && (addrIn <= JLP_ADDR_HI)) ) {
                      if ((cart.JLPFlash) && (addrIn == 0x8023)) {
                         dataOut = 0;
                         deviceAddress = true;
@@ -272,11 +294,24 @@ void __time_critical_func(core1_main()) {
 
                if (deviceAddress) {
 
+#if CONFIG_FUJINET
+
+            if ( cart.FujiSupport) {
+
+               if ( (addrIn >= FUJI_MB_ADDR_LO) && (addrIn <= FUJI_MB_ADDR_HI) ) {
+
+                  cart.RAM[addrIn - 0x8000] = dataIn;
+                  continue;
+               }
+            }
+
+#endif
+
 #if CONFIG_JLP
                   // check for JLP support and accelerators/RAM enabled 
                   if ( cart.JLPSupport ) { 
 
-                     if ( (cart.JLPAccel || cart.JLPFlash) && ((addrIn >= 0x8000) && (addrIn <= 0x9FFF)) ) {
+                     if ( (cart.JLPAccel || cart.JLPFlash) && ((addrIn >= JLP_ADDR_LO) && (addrIn <= JLP_ADDR_HI)) ) {
 
 #if PICO_RP2350
                         multicore_doorbell_set_other_core(0);
@@ -574,12 +609,27 @@ void __time_critical_func(RunGame)() {
       }
 #endif
 
+#if CONFIG_FUJINET
+      tud_task();
+      fuji_mailbox_service();
+#endif
+
    }  // end while
 }
 
+static void fuji_wait_ms_pumped(uint32_t ms)
+{
+    absolute_time_t deadline = make_timeout_time_ms(ms);
+    while (!time_reached(deadline))
+        tud_task();
+}
 
 void Inty_cart_main() {
    printf("Inty_cart_main\n");
+
+#if CONFIG_FUJINET
+   fujibus_set_inbound_handler(dbc_inbound_handler);
+#endif
 
    multicore_launch_core1(core1_main);
 
@@ -595,7 +645,8 @@ void Inty_cart_main() {
    gpio_set_dir(MSYNC, GPIO_IN);
    gpio_pull_down(MSYNC);
 
-   sleep_ms(800);
+   fuji_wait_ms_pumped(800);
+   //sleep_ms(800);
 
    printf("Inty Pow-ON\n");
 
@@ -639,8 +690,14 @@ void Inty_cart_main() {
    // init cartridge
    init_cart();
 
-   //  Run Minty game selection interface
+
+#if CONFIG_FUJINET_LAUNCHER
+   // Run FujiNet launcher
+   RunFujiConfig();
+#else
+   // Run Minty game selection interface
    RunLauncher();
+#endif
 
    // Game selected and loaded => Run emulation
    RunGame();

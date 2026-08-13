@@ -17,7 +17,7 @@ static bool ejected = false;
 void tud_msc_inquiry_cb(uint8_t lun, uint8_t vendor_id[8], uint8_t product_id[16], uint8_t product_rev[4]) {
    (void) lun;
 
-   const char vid[] = "PicoCart";
+   const char vid[] = "Minty";
    const char pid[] = "Mass Storage";
    const char rev[] = "1.0";
 
@@ -29,6 +29,7 @@ void tud_msc_inquiry_cb(uint8_t lun, uint8_t vendor_id[8], uint8_t product_id[16
 // Invoked when received Test Unit Ready command.
 // return true allowing host to read/write this LUN e.g SD card inserted
 bool tud_msc_test_unit_ready_cb(uint8_t lun) {
+   /*
    (void) lun;
 
    // RAM disk is ready until ejected
@@ -37,6 +38,7 @@ bool tud_msc_test_unit_ready_cb(uint8_t lun) {
       tud_msc_set_sense(lun, SCSI_SENSE_NOT_READY, 0x3a, 0x00);
       return false;
    }
+   */
 
    return true;
 }

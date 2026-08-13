@@ -126,11 +126,10 @@ set_target_properties(Minty PROPERTIES
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
    target_link_libraries(${PROJECT} pico_stdio_uart)
    pico_enable_stdio_uart(${PROJECT} 1)
-   pico_enable_stdio_usb(${PROJECT} 1)
+   #pico_enable_stdio_usb(${PROJECT} 1)
 endif()
 
 if(CONFIG_USB_DEVICE)
-   target_compile_options(${PROJECT} PRIVATE "-DCFG_TUSB_RHPORT0_MODE")
    target_link_libraries(${PROJECT} tinyusb_device)
    target_sources(${PROJECT} PUBLIC
       ${CMAKE_CURRENT_LIST_DIR}/src/usb_tasks.c
@@ -187,6 +186,15 @@ if(CONFIG_JLP)
    )
 endif()
 
+if(CONFIG_FUJINET)
+   target_sources(${PROJECT} PUBLIC
+      ${CMAKE_CURRENT_LIST_DIR}/src/fujibus.c
+      ${CMAKE_CURRENT_LIST_DIR}/src/fujibus_usb.c
+      ${CMAKE_CURRENT_LIST_DIR}/src/fujinet.c
+      ${CMAKE_CURRENT_LIST_DIR}/src/fujiboot.c
+   )
+endif()
+
 if(PICO_RP2350)
    target_link_libraries(${PROJECT} pico_sha256)
 endif()
@@ -202,6 +210,8 @@ target_compile_definitions(${PROJECT} PRIVATE CONFIG_FLASH_LFS_STORAGE=$<BOOL:${
 target_compile_definitions(${PROJECT} PRIVATE CONFIG_JLP=$<BOOL:${CONFIG_JLP}>)
 target_compile_definitions(${PROJECT} PRIVATE CONFIG_ECS_AUDIO=$<BOOL:${CONFIG_ECS_AUDIO}>)
 target_compile_definitions(${PROJECT} PRIVATE CONFIG_INTELLIVOICE=$<BOOL:${CONFIG_INTELLIVOICE}>)
+target_compile_definitions(${PROJECT} PRIVATE CONFIG_FUJINET=$<BOOL:${CONFIG_FUJINET}>)
+target_compile_definitions(${PROJECT} PRIVATE CONFIG_FUJINET_LAUNCHER=$<BOOL:${CONFIG_FUJINET_LAUNCHER}>)
 target_compile_definitions(${PROJECT} PRIVATE "MAX_ROM_SIZE=${MAX_ROM_SIZE}")
 
 # options to enable FatFS SD debug
