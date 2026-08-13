@@ -54,7 +54,9 @@
 #endif
 
 #if CONFIG_INTELLIVOICE
-   #include "intellivoice_minty.h"
+   #include "ivoice.h"
+   #define IVOICE_ADDR_ALD   0x0080u
+   #define IVOICE_ADDR_FIFO  0x0081u
    #define IVOICE_BUF_SIZE    32
    extern ivoice_t intellivoice;
    volatile uint8_t ivoiceRead = 0;

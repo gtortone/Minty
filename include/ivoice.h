@@ -6,12 +6,15 @@
  * ============================================================================
  *  This header is adapted for integration in the Minty firmware project.
  *
+ *  Definitions provided by audio.h:
+ *    - INTELLIVOICE_FREQ
  * ============================================================================
  */
 #ifndef IVOICE_H_
 #define IVOICE_H_
 
 #include <stdint.h>
+#include "audio.h"
 
 #ifndef INLINE
 #define INLINE inline
@@ -36,9 +39,10 @@ typedef struct lpc12_t
 
 typedef struct ivoice_t
 {
-    uint64_t    now;
-
     int         silent;       /* Flag: Intellivoice is silent.              */
+
+#ifndef MINTY_FW
+    uint64_t    now;
 
     int16_t     scratch[SCBUF_SIZE];    /* Scratch buffer for audio.        */
     uint32_t    sc_head;      /* Scratch circular buffer head.              */
@@ -56,6 +60,8 @@ typedef struct ivoice_t
     double      time_scale;   /* Time scaling, normally 1.0 in Minty.       */
     double      skipping;     /* Time-scale helper.                         */
 
+#endif /* !MINTY_FW */
+
     lpc12_t     filt;         /* 12-pole LPC filter.                        */
     int         lrq;          /* Load ReQuest, bit 15 exposed on $0080.     */
     int         ald;          /* Address LoaD command.                      */
@@ -71,23 +77,26 @@ typedef struct ivoice_t
     uint32_t    fifo_bitp;    /* FIFO bit pointer for partial decles.       */
     uint16_t    fifo[64];     /* 64-decle SPB-640 FIFO.                     */
 
+#ifndef MINTY_FW
     int         cur_len;      /* Number of valid samples in cur_buf.        */
     int16_t    *cur_buf;      /* Current sound buffer.                      */
+#endif /* !MINTY_FW */
     const uint8_t *rom[16];   /* 4K ROM pages.                              */
 } ivoice_t;
 
+extern ivoice_t intellivoice;
+
+#ifndef MINTY_FW
 /*
  * Save-state support kept for source compatibility with FreeIntv.
  * Minty does not need to use this unless save-state support is later added.
  */
-
 typedef struct ivoiceSerialized
 {
     ivoice_t main;
     int      ivoiceBufferSize;
-    int16_t  ivoiceBuffer[AUDIO_FREQ / 60 * 2];
+    int16_t  ivoiceBuffer[INTELLIVOICE_FREQ / 60 * 2];
 } ivoiceSerialized;
-
 
 extern int      ivoiceBufferSize;
 extern int16_t  ivoiceBuffer[];
@@ -95,13 +104,18 @@ extern int16_t  ivoiceBuffer[];
 void ivoiceSerialize(struct ivoiceSerialized *data);
 void ivoiceUnserialize(const struct ivoiceSerialized *data);
 
-extern ivoice_t intellivoice;
+#endif /* !MINTY_FW */
 
 /*
  * Advance Intellivoice time.
  * len uses the same CPU-side cycle/time base as the original FreeIntv port.
  */
+#ifdef MINTY_FW
+/* Generate exactly one native-rate SP0256 sample directly. */
+int16_t ivoice_minty_next_sample(void);
+#else
 uint32_t ivoice_tk(uint32_t len);
+#endif
 
 /*
  * Bus accessors.
@@ -114,7 +128,9 @@ void     ivoice_wr(uint32_t addr, uint32_t data);
 
 void ivoice_reset(void);
 void ivoice_dtor(void);
+#ifndef MINTY_FW
 void ivoice_frame(void);
+#endif
 
 /*
  * pal_mode: 1 = PAL, 0 = NTSC.
