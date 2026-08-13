@@ -156,8 +156,6 @@ static unsigned rh_crclen;
 // function's small send loop rather than calling it.
 static void dbc_send_frame(uint8_t command)
 {
-    printf("ACK preparing to command: 0x%X\n", command);
-    
     uint8_t buf[16];
     size_t len = fujibus_build_request(FUJI_DEVICEID_DBC, command, NULL, 0, NULL, 0,
                                         buf, sizeof(buf));
@@ -171,8 +169,6 @@ static void dbc_send_frame(uint8_t command)
         tud_task();
     }
     tud_cdc_write_flush();
-
-    printf("ACK sent to command: 0x%X\n", command);
 }
 
 // mailbox_overlap: true if [from, to] (inclusive, bus addresses) overlaps
@@ -483,6 +479,11 @@ static bool apply_boot_mapping(void)
         cart.JLPSupport = false;
         cart.JLPAccel = false;
         cart.JLPFlash = false;
+        // No update_ram_window() here (unlike the mm_map_t reference port
+        // this file was adapted from): this tree's cartridge.c reads
+        // cart.JLPAccel/JLPFlash/FujiSupport directly on every bus access
+        // rather than caching a ramLo/ramHi window, so clearing the flags
+        // above is already enough.
     }
 #endif
 
@@ -599,7 +600,7 @@ bool dbc_inbound_handler(const fb_reply_t *req)
 // full interlock rationale.
 void fuji_mailbox_service(void)
 {
-    static uint8_t rxbuf[FUJI_MB_RX_MAX];
+    static uint8_t rxbuf[FUJIBUS_RAW_RX_MAX];
     static uint8_t txbuf[FUJI_MB_TX_MAX];
 
     // BOOTSEL doorbell -- see fuji_mailbox.h. Checked every call, independent
@@ -627,9 +628,9 @@ void fuji_mailbox_service(void)
     // would have been ready moments later -- and fuji_mailbox_service()
     // only runs once per SEQ bump, there's no retry above this.
     {
-        //absolute_time_t link_deadline = make_timeout_time_ms(3000);
-        //while (!tud_cdc_connected() && !time_reached(link_deadline))
-        //    tud_task();
+        absolute_time_t link_deadline = make_timeout_time_ms(3000);
+        while (!tud_cdc_connected() && !time_reached(link_deadline))
+            tud_task();
         cart.RAM[FUJI_MB_LINK] = tud_cdc_connected() ? 1 : 0;
     }
 
@@ -678,7 +679,14 @@ void fuji_mailbox_service(void)
 
     cart.RAM[FUJI_MB_ERR] = (uint16_t)st;
     if (st == FB_OK) {
-        uint16_t rxlen = reply.data_len; // already bounded by rx_cap == sizeof(rxbuf)
+        // reply.data_len is bounded by sizeof(rxbuf) (FUJIBUS_RAW_RX_MAX),
+        // which is now larger than the mailbox's own RX window -- clamp
+        // before copying into cart.RAM so an oversized reply can't overrun
+        // FUJI_MB_RX_MAX. Real mailbox replies never exceed FUJI_MB_RX_MAX
+        // today; this only guards the address space.
+        uint16_t rxlen = reply.data_len;
+        if (rxlen > FUJI_MB_RX_MAX)
+            rxlen = FUJI_MB_RX_MAX;
         for (uint16_t i = 0; i < rxlen; i++)
             cart.RAM[FUJI_MB_RX + i] = reply.data[i];
         cart.RAM[FUJI_MB_RXLEN_LO] = rxlen & 0xFF;
