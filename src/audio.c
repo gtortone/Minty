@@ -44,13 +44,15 @@ bool audio_callback(repeating_timer_t *rt) {
    static int32_t ivoice_raw = 0;
    static uint8_t audio_cycle = 0;
 
-   if (cart.ECSSupport && audio_cycle == 0) {
+   gpio_put(LED, false);
+
+   if (cart.ECSSupport) {
       PSG_calc(psg0);
       // ecs audio output is ranging from 0 to 4095 per channel, the mixed output ranges from 0 to 12285
       ecs_raw = (int32_t)psg0->out;
    }
 
-   if (cart.IntellivoiceSupport && audio_cycle == 1) {
+   if (cart.IntellivoiceSupport && audio_cycle == 3) {
       // Intellivoice output is signed, ranging from -32768 to 32767.
       ivoice_raw = (int32_t)intellivoice_next_sample();
       // scale to match ECS output level
@@ -65,17 +67,17 @@ bool audio_callback(repeating_timer_t *rt) {
       printf("audio_callback: ecs=%08lX, ivoice=%08lX\n", ecs_raw,ivoice_raw); 
    }
 #else
-   if (audio_cycle == 1)
-   {
-      /* apply 8-bit volume control, normalize to 10-bit PWM */
-      uint16_t pwm = (uint16_t)((((uint32_t)(ecs_raw+ivoice_raw) * (uint32_t)(AudioVolume + 1) / 3) >> 10));
-      // clamp to 10-bit range
-      if (pwm > 1023) pwm = 1023;
-      pwm_hw->slice[GPIO_TO_SLICE(AUDIO_PIN)].cc = pwm;
-   }
+   /* apply 8-bit volume control, normalize to 10-bit PWM */
+   uint16_t pwm = (uint16_t)((((uint32_t)(ecs_raw+ivoice_raw) * (uint32_t)(AudioVolume + 1) / 3) >> 10));
+   // clamp to 10-bit range
+   if (pwm > 1023) pwm = 1023;
+   pwm_hw->slice[GPIO_TO_SLICE(AUDIO_PIN)].cc = pwm;
 #endif
 
-   audio_cycle = 1 - audio_cycle; // toggle between ECS and Intellivoice audio processing
+   audio_cycle++;
+   if (audio_cycle > 3) audio_cycle = 0;
+   
+   gpio_put(LED, true);
    return true;
 }
 
@@ -111,6 +113,6 @@ void init_audio(uint8_t tv_mode, uint8_t volume) {
       init_intellivoice(tv_mode);
    }
 
-   add_repeating_timer_us(-(AUDIO_PERIOD/2), audio_callback, NULL, &timer);
+   add_repeating_timer_us(-(AUDIO_PERIOD), audio_callback, NULL, &timer);
 
 }

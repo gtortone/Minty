@@ -1609,9 +1609,9 @@ void ivoice_frame(void)
     ivoice_t *ivoice = &intellivoice;
     int c;
     
-    c = ivoice->cur_len - AUDIO_FREQ / 60;
+    c = ivoice->cur_len - INTELLIVOICE_FREQ / 60;
     if (c > 0)
-        memmove(ivoiceBuffer, ivoiceBuffer + AUDIO_FREQ / 60, c * sizeof(int16_t));
+        memmove(ivoiceBuffer, ivoiceBuffer + INTELLIVOICE_FREQ / 60, c * sizeof(int16_t));
     else
         c = 0;
     ivoice->cur_len = c;
@@ -1630,8 +1630,8 @@ int ivoice_init
     int rate;
     int wind;
     
-    ivoiceBufferSize = AUDIO_FREQ / 60 * 2;
-    rate = AUDIO_FREQ;   /* Sampling rate */
+    ivoiceBufferSize = INTELLIVOICE_FREQ / 60 * 2;
+    rate = INTELLIVOICE_FREQ;   /* Sampling rate */
     wind = -1;  /* Sliding window size */
     
     /* -------------------------------------------------------------------- */
