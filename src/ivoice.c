@@ -62,6 +62,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include "pico/bit_ops.h"
+#ifdef MINTY_FW
+#include "pico/platform.h"
+#endif
 /*
  * Minty port:
  * - remove FreeIntv/libretro dependencies
@@ -69,10 +72,17 @@
 #include "audio.h"
 #include "ivoice.h"
 
+#ifdef MINTY_FW
+#define IVOICE_HOT(name) __not_in_flash_func(name)
+#else
+#define IVOICE_HOT(name) name
+#endif
+
 ivoice_t intellivoice;
 
+#ifndef MINTY_FW
 int ivoiceBufferSize;
-int16_t ivoiceBuffer[AUDIO_FREQ / 60 * 2];
+int16_t ivoiceBuffer[INTELLIVOICE_FREQ / 60 * 2];
 
 void ivoiceSerialize(struct ivoiceSerialized *data)
 {
@@ -89,14 +99,16 @@ void ivoiceUnserialize(const struct ivoiceSerialized *data)
     memcpy(ivoiceBuffer, data->ivoiceBuffer, sizeof(ivoiceBuffer));
 }
 
+#endif /* !MINTY_FW */
+
 /* ======================================================================== */
 /*  Internal function prototypes.                                           */
 /* ======================================================================== */
 static INLINE int16_t  limit (int16_t s);
-static int             lpc12_update(lpc12_t *f, int, int16_t *, uint32_t *);
-static void            lpc12_regdec(lpc12_t *f);
-static uint32_t        sp0256_getb(ivoice_t *ivoice, int len);
-static void            sp0256_micro(ivoice_t *iv);
+static int             IVOICE_HOT(lpc12_update)(lpc12_t *f, int, int16_t *, uint32_t *);
+static void            IVOICE_HOT(lpc12_regdec)(lpc12_t *f);
+static uint32_t        IVOICE_HOT(sp0256_getb)(ivoice_t *ivoice, int len);
+static void            IVOICE_HOT(sp0256_micro)(ivoice_t *iv);
 
 /* ======================================================================== */
 /*  IVOICE_QTBL  -- Coefficient Quantization Table.  This comes from a      */
@@ -177,7 +189,7 @@ static int amp_decode(uint8_t a)
 /* ======================================================================== */
 /*  LPC12_UPDATE     -- Update the 12-pole filter, outputting samples.      */
 /* ======================================================================== */
-static int lpc12_update(lpc12_t *f, int num_samp, int16_t *out, uint32_t *optr)
+static int IVOICE_HOT(lpc12_update)(lpc12_t *f, int num_samp, int16_t *out, uint32_t *optr)
 {
     int i, j;
     int16_t samp;
@@ -301,7 +313,7 @@ static const int stage_map[6] = { 0, 1, 2, 3, 4, 5 };
 /* ======================================================================== */
 /*  LPC12_REGDEC -- Decode the register set in the filter bank.             */
 /* ======================================================================== */
-static void lpc12_regdec(lpc12_t *f)
+static void IVOICE_HOT(lpc12_regdec)(lpc12_t *f)
 {
     int i;
 
@@ -861,7 +873,7 @@ static const int16_t sp0256_df_idx[16 * 8] =
 /* ======================================================================== */
 /*  SP0256_GETB  -- Get up to 8 bits at the current PC.                     */
 /* ======================================================================== */
-static uint32_t sp0256_getb(ivoice_t *ivoice, int len)
+static uint32_t IVOICE_HOT(sp0256_getb)(ivoice_t *ivoice, int len)
 {
     uint32_t data = 0;
     uint32_t d0, d1;
@@ -928,7 +940,7 @@ static uint32_t sp0256_getb(ivoice_t *ivoice, int len)
 /*                  instructions either until the repeat count != 0 or      */
 /*                  the sequencer gets halted by a RTS to 0.                */
 /* ======================================================================== */
-static void sp0256_micro(ivoice_t *iv)
+static void IVOICE_HOT(sp0256_micro)(ivoice_t *iv)
 {
     uint8_t  immed4;
     uint8_t  opcode;
@@ -1301,6 +1313,34 @@ static void sp0256_micro(ivoice_t *iv)
 }
 
 /* ======================================================================== */
+/*  IVOICE_MINTY_NEXT_SAMPLE -- Generate one native SP0256 sample directly. */
+/* ======================================================================== */
+int16_t IVOICE_HOT(ivoice_minty_next_sample)(void)
+{
+    ivoice_t *iv = &intellivoice;
+    int16_t sample = 0;
+    uint32_t output_index = 0;
+
+    /*
+     * sp0256_micro() contains its own loop and returns only after loading a
+     * frame repeat count or reaching the halted state. A second outer retry
+     * loop is therefore unnecessary for the direct Minty sample path.
+     */
+    if (iv->filt.rpt <= 0 && iv->filt.cnt <= 0)
+        sp0256_micro(iv);
+
+    if (iv->silent && iv->filt.rpt <= 0 && iv->filt.cnt <= 0)
+        return 0;
+
+    if (lpc12_update(&iv->filt, 1, &sample, &output_index) == 1)
+        return sample;
+
+    /* Defensive fallback for malformed or unexpected zero-length frames. */
+    return 0;
+}
+
+#ifndef MINTY_FW
+/* ======================================================================== */
 /*  IVOICE_TK    -- Where the magic happens.  Generate voice data for       */
 /*                  our good friend, the Intellivoice.                      */
 /* ======================================================================== */
@@ -1466,6 +1506,7 @@ uint32_t ivoice_tk(uint32_t len)
     return (ivoice->sound_current >> 2) - (ivoice->now - len);
 }
 
+#endif /* !MINTY_FW */
 
 /* ======================================================================== */
 /*  IVOICE_RD    -- Handle reads from the Intellivoice.                     */
@@ -1604,6 +1645,7 @@ void ivoice_dtor(void)
      */
 }
 
+#ifndef MINTY_FW
 void ivoice_frame(void)
 {
     ivoice_t *ivoice = &intellivoice;
@@ -1616,17 +1658,31 @@ void ivoice_frame(void)
         c = 0;
     ivoice->cur_len = c;
 }
+#endif /* !MINTY_FW */
 
 /* ======================================================================== */
 /*  IVOICE_INIT  -- Makes a new Intellivoice                                */
 /* ======================================================================== */
 int ivoice_init
 (
-    int             pal_mode,   /*  PAL vs. NTSC                            */
-    double          time_scale  /*  For --macho                             */
+    int             pal_mode,
+    double          time_scale
 )
 {
     ivoice_t *ivoice = &intellivoice;
+
+#ifdef MINTY_FW
+    /* Direct native-rate Minty path has no resampler or output buffer. */
+    (void)pal_mode;
+    (void)time_scale;
+
+    memset(ivoice, 0, sizeof(*ivoice));
+    ivoice->rom[1]   = mask;
+    ivoice->filt.rng = 1;
+    ivoice_reset();
+    return 0;
+#else
+
     int rate;
     int wind;
     
@@ -1702,7 +1758,10 @@ int ivoice_init
     ivoice->silent   = 1;
 
     return 0;
+
+#endif /* MINTY_FW */
 }
+
 
 
 /* ======================================================================== */
