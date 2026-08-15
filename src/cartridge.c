@@ -568,7 +568,7 @@ void __time_critical_func(RunGame)() {
 #endif
 
 #if CONFIG_JLP && PICO_RP2040
-      if (cart.JLPsupport) {
+      if (cart.JLPSupport) {
          handle_jlp_request();
       }
 #endif
