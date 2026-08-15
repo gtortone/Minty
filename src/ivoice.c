@@ -104,11 +104,11 @@ void ivoiceUnserialize(const struct ivoiceSerialized *data)
 /* ======================================================================== */
 /*  Internal function prototypes.                                           */
 /* ======================================================================== */
-static INLINE int16_t  limit (int16_t s);
-static int             IVOICE_HOT(lpc12_update)(lpc12_t *f, int, int16_t *, uint32_t *);
-static void            IVOICE_HOT(lpc12_regdec)(lpc12_t *f);
-static uint32_t        IVOICE_HOT(sp0256_getb)(ivoice_t *ivoice, int len);
-static void            IVOICE_HOT(sp0256_micro)(ivoice_t *iv);
+static INLINE int16_t  IVOICE_HOT(limit) (int16_t s);
+static INLINE uint32_t IVOICE_HOT(sp0256_getb)(ivoice_t *ivoice, int len);
+static INLINE int      IVOICE_HOT(lpc12_update)(lpc12_t *f, int, int16_t *, uint32_t *);
+static INLINE void     IVOICE_HOT(lpc12_regdec)(lpc12_t *f);
+static INLINE void     IVOICE_HOT(sp0256_micro)(ivoice_t *iv);
 
 /* ======================================================================== */
 /*  IVOICE_QTBL  -- Coefficient Quantization Table.  This comes from a      */
@@ -137,7 +137,7 @@ static const int16_t qtbl[128] =
 /* ======================================================================== */
 /*  LIMIT            -- Limiter function for digital sample output.         */
 /* ======================================================================== */
-static INLINE int16_t limit(int16_t s)
+static INLINE int16_t IVOICE_HOT(limit) (int16_t s)
 {
 #ifdef HIGH_QUALITY /* Higher quality than the original, but who cares? */
     if (s >  8191) return  8191;
@@ -162,7 +162,7 @@ static int samp_mpy(int coef, int samp)
 /* ======================================================================== */
 /*  AMP_DECODE       -- Decode amplitude register                           */
 /* ======================================================================== */
-static int amp_decode(uint8_t a)
+static INLINE int IVOICE_HOT(amp_decode)(uint8_t a)
 {
     /* -------------------------------------------------------------------- */
     /*  Amplitude has 3 bits of exponent and 5 bits of mantissa.  This      */
@@ -189,7 +189,7 @@ static int amp_decode(uint8_t a)
 /* ======================================================================== */
 /*  LPC12_UPDATE     -- Update the 12-pole filter, outputting samples.      */
 /* ======================================================================== */
-static int IVOICE_HOT(lpc12_update)(lpc12_t *f, int num_samp, int16_t *out, uint32_t *optr)
+static INLINE int IVOICE_HOT(lpc12_update)(lpc12_t *f, int num_samp, int16_t *out, uint32_t *optr)
 {
     int i, j;
     int16_t samp;
@@ -313,7 +313,7 @@ static const int stage_map[6] = { 0, 1, 2, 3, 4, 5 };
 /* ======================================================================== */
 /*  LPC12_REGDEC -- Decode the register set in the filter bank.             */
 /* ======================================================================== */
-static void IVOICE_HOT(lpc12_regdec)(lpc12_t *f)
+static INLINE void IVOICE_HOT(lpc12_regdec)(lpc12_t *f)
 {
     int i;
 
@@ -873,7 +873,7 @@ static const int16_t sp0256_df_idx[16 * 8] =
 /* ======================================================================== */
 /*  SP0256_GETB  -- Get up to 8 bits at the current PC.                     */
 /* ======================================================================== */
-static uint32_t IVOICE_HOT(sp0256_getb)(ivoice_t *ivoice, int len)
+static INLINE uint32_t IVOICE_HOT(sp0256_getb)(ivoice_t *ivoice, int len)
 {
     uint32_t data = 0;
     uint32_t d0, d1;
@@ -935,12 +935,376 @@ static uint32_t IVOICE_HOT(sp0256_getb)(ivoice_t *ivoice, int len)
     return data;
 }
 
+
+#ifdef MINTY_FW
+static INLINE void IVOICE_HOT(sp0256_decode_loadall)(ivoice_t *iv, int has_b5_f5)
+{
+    uint8_t *r = iv->filt.r;
+
+    r[AM] = (uint8_t)sp0256_getb(iv, 8);
+    r[PR] = (uint8_t)sp0256_getb(iv, 8);
+    r[B0] = (uint8_t)sp0256_getb(iv, 8);
+    r[F0] = (uint8_t)sp0256_getb(iv, 8);
+    r[B1] = (uint8_t)sp0256_getb(iv, 8);
+    r[F1] = (uint8_t)sp0256_getb(iv, 8);
+    r[B2] = (uint8_t)sp0256_getb(iv, 8);
+    r[F2] = (uint8_t)sp0256_getb(iv, 8);
+    r[B3] = (uint8_t)sp0256_getb(iv, 8);
+    r[F3] = (uint8_t)sp0256_getb(iv, 8);
+    r[B4] = (uint8_t)sp0256_getb(iv, 8);
+    r[F4] = (uint8_t)sp0256_getb(iv, 8);
+
+    if (has_b5_f5)
+    {
+        r[B5] = (uint8_t)sp0256_getb(iv, 8);
+        r[F5] = (uint8_t)sp0256_getb(iv, 8);
+    }
+    else
+    {
+        r[B5] = 0;
+        r[F5] = 0;
+    }
+
+    r[IA] = (uint8_t)sp0256_getb(iv, 8);
+    r[IP] = (uint8_t)sp0256_getb(iv, 8);
+    iv->silent = 0;
+}
+
+
+static INLINE int8_t sp0256_delta_value(ivoice_t *iv, unsigned len, unsigned shift)
+{
+    uint32_t raw = sp0256_getb(iv, (int)len);
+    int32_t value = (int32_t)(raw << (32u - len)) >> (32u - len);
+    return (int8_t)(value * (int32_t)(1u << shift));
+}
+
+static INLINE int IVOICE_HOT(sp0256_decode_load2)(ivoice_t *iv, int idx0, int idx1)
+{
+    uint8_t *r = iv->filt.r;
+    const unsigned key = ((unsigned)idx0 << 8) | (unsigned)idx1;
+
+    switch (key)
+    {
+        case (83u << 8) | 96u:
+        {
+            r[AM] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 2);
+            r[PR] = (uint8_t)sp0256_getb(iv, 8);
+            r[B0] = (uint8_t)((uint8_t)sp0256_getb(iv, 3) << 4);
+            r[F0] = (uint8_t)((uint8_t)sp0256_getb(iv, 5) << 3);
+            r[B1] = (uint8_t)((uint8_t)sp0256_getb(iv, 3) << 4);
+            r[F1] = (uint8_t)((uint8_t)sp0256_getb(iv, 5) << 3);
+            r[B2] = (uint8_t)((uint8_t)sp0256_getb(iv, 3) << 4);
+            r[F2] = (uint8_t)((uint8_t)sp0256_getb(iv, 5) << 3);
+            r[B3] = (uint8_t)((uint8_t)sp0256_getb(iv, 4) << 3);
+            r[F3] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 2);
+            r[B4] = (uint8_t)((uint8_t)sp0256_getb(iv, 7) << 1);
+            r[F4] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 2);
+            r[IA] = (uint8_t)sp0256_getb(iv, 5);
+            r[IP] = (uint8_t)sp0256_getb(iv, 5);
+            iv->silent = 0;
+            return 1;
+        }
+        case (129u << 8) | 144u:
+        {
+            r[AM] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 2);
+            r[PR] = (uint8_t)sp0256_getb(iv, 8);
+            r[B0] = (uint8_t)((uint8_t)sp0256_getb(iv, 3) << 4);
+            r[F0] = (uint8_t)((uint8_t)sp0256_getb(iv, 5) << 3);
+            r[B1] = (uint8_t)((uint8_t)sp0256_getb(iv, 3) << 4);
+            r[F1] = (uint8_t)((uint8_t)sp0256_getb(iv, 5) << 3);
+            r[B2] = (uint8_t)((uint8_t)sp0256_getb(iv, 3) << 4);
+            r[F2] = (uint8_t)((uint8_t)sp0256_getb(iv, 5) << 3);
+            r[B3] = (uint8_t)((uint8_t)sp0256_getb(iv, 4) << 3);
+            r[F3] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 2);
+            r[B4] = (uint8_t)((uint8_t)sp0256_getb(iv, 7) << 1);
+            r[F4] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 2);
+            r[B5] = (uint8_t)sp0256_getb(iv, 8);
+            r[F5] = (uint8_t)sp0256_getb(iv, 8);
+            r[IA] = (uint8_t)sp0256_getb(iv, 5);
+            r[IP] = (uint8_t)sp0256_getb(iv, 5);
+            iv->silent = 0;
+            return 1;
+        }
+        case (97u << 8) | 110u:
+        {
+            r[AM] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 2);
+            r[PR] = (uint8_t)sp0256_getb(iv, 8);
+            r[B0] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 1);
+            r[F0] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 2);
+            r[B1] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 1);
+            r[F1] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 2);
+            r[B2] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 1);
+            r[F2] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 2);
+            r[B3] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 1);
+            r[F3] = (uint8_t)((uint8_t)sp0256_getb(iv, 7) << 1);
+            r[B4] = (uint8_t)sp0256_getb(iv, 8);
+            r[F4] = (uint8_t)sp0256_getb(iv, 8);
+            r[IA] = (uint8_t)sp0256_getb(iv, 5);
+            r[IP] = (uint8_t)sp0256_getb(iv, 5);
+            iv->silent = 0;
+            return 1;
+        }
+        case (145u << 8) | 160u:
+        {
+            r[AM] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 2);
+            r[PR] = (uint8_t)sp0256_getb(iv, 8);
+            r[B0] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 1);
+            r[F0] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 2);
+            r[B1] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 1);
+            r[F1] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 2);
+            r[B2] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 1);
+            r[F2] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 2);
+            r[B3] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 1);
+            r[F3] = (uint8_t)((uint8_t)sp0256_getb(iv, 7) << 1);
+            r[B4] = (uint8_t)sp0256_getb(iv, 8);
+            r[F4] = (uint8_t)sp0256_getb(iv, 8);
+            r[B5] = (uint8_t)sp0256_getb(iv, 8);
+            r[F5] = (uint8_t)sp0256_getb(iv, 8);
+            r[IA] = (uint8_t)sp0256_getb(iv, 5);
+            r[IP] = (uint8_t)sp0256_getb(iv, 5);
+            iv->silent = 0;
+            return 1;
+        }
+        default:
+            return 0;
+    }
+}
+static INLINE int IVOICE_HOT(sp0256_decode_loadc)(ivoice_t *iv, int idx0, int idx1)
+{
+    uint8_t *r = iv->filt.r;
+    const unsigned key = ((unsigned)idx0 << 8) | (unsigned)idx1;
+
+    switch (key)
+    {
+        case (83u << 8) | 94u:
+        {
+            r[AM] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 2);
+            r[PR] = (uint8_t)sp0256_getb(iv, 8);
+            r[B0] = (uint8_t)((uint8_t)sp0256_getb(iv, 3) << 4);
+            r[F0] = (uint8_t)((uint8_t)sp0256_getb(iv, 5) << 3);
+            r[B1] = (uint8_t)((uint8_t)sp0256_getb(iv, 3) << 4);
+            r[F1] = (uint8_t)((uint8_t)sp0256_getb(iv, 5) << 3);
+            r[B2] = (uint8_t)((uint8_t)sp0256_getb(iv, 3) << 4);
+            r[F2] = (uint8_t)((uint8_t)sp0256_getb(iv, 5) << 3);
+            r[B3] = (uint8_t)((uint8_t)sp0256_getb(iv, 4) << 3);
+            r[F3] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 2);
+            r[B4] = (uint8_t)((uint8_t)sp0256_getb(iv, 7) << 1);
+            r[F4] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 2);
+            iv->silent = 0;
+            return 1;
+        }
+        case (129u << 8) | 142u:
+        {
+            r[AM] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 2);
+            r[PR] = (uint8_t)sp0256_getb(iv, 8);
+            r[B0] = (uint8_t)((uint8_t)sp0256_getb(iv, 3) << 4);
+            r[F0] = (uint8_t)((uint8_t)sp0256_getb(iv, 5) << 3);
+            r[B1] = (uint8_t)((uint8_t)sp0256_getb(iv, 3) << 4);
+            r[F1] = (uint8_t)((uint8_t)sp0256_getb(iv, 5) << 3);
+            r[B2] = (uint8_t)((uint8_t)sp0256_getb(iv, 3) << 4);
+            r[F2] = (uint8_t)((uint8_t)sp0256_getb(iv, 5) << 3);
+            r[B3] = (uint8_t)((uint8_t)sp0256_getb(iv, 4) << 3);
+            r[F3] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 2);
+            r[B4] = (uint8_t)((uint8_t)sp0256_getb(iv, 7) << 1);
+            r[F4] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 2);
+            r[B5] = (uint8_t)sp0256_getb(iv, 8);
+            r[F5] = (uint8_t)sp0256_getb(iv, 8);
+            iv->silent = 0;
+            return 1;
+        }
+        case (97u << 8) | 108u:
+        {
+            r[AM] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 2);
+            r[PR] = (uint8_t)sp0256_getb(iv, 8);
+            r[B0] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 1);
+            r[F0] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 2);
+            r[B1] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 1);
+            r[F1] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 2);
+            r[B2] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 1);
+            r[F2] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 2);
+            r[B3] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 1);
+            r[F3] = (uint8_t)((uint8_t)sp0256_getb(iv, 7) << 1);
+            r[B4] = (uint8_t)sp0256_getb(iv, 8);
+            r[F4] = (uint8_t)sp0256_getb(iv, 8);
+            iv->silent = 0;
+            return 1;
+        }
+        case (145u << 8) | 158u:
+        {
+            r[AM] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 2);
+            r[PR] = (uint8_t)sp0256_getb(iv, 8);
+            r[B0] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 1);
+            r[F0] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 2);
+            r[B1] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 1);
+            r[F1] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 2);
+            r[B2] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 1);
+            r[F2] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 2);
+            r[B3] = (uint8_t)((uint8_t)sp0256_getb(iv, 6) << 1);
+            r[F3] = (uint8_t)((uint8_t)sp0256_getb(iv, 7) << 1);
+            r[B4] = (uint8_t)sp0256_getb(iv, 8);
+            r[F4] = (uint8_t)sp0256_getb(iv, 8);
+            r[B5] = (uint8_t)sp0256_getb(iv, 8);
+            r[F5] = (uint8_t)sp0256_getb(iv, 8);
+            iv->silent = 0;
+            return 1;
+        }
+        default:
+            return 0;
+    }
+}
+static INLINE int IVOICE_HOT(sp0256_decode_delta9)(ivoice_t *iv, int idx0, int idx1)
+{
+    uint8_t *r = iv->filt.r;
+    const unsigned key = ((unsigned)idx0 << 8) | (unsigned)idx1;
+
+    switch (key)
+    {
+        case (45u << 8) | 56u:
+        {
+            r[AM] = (uint8_t)(r[AM] + sp0256_delta_value(iv, 4u, 2u));
+            r[PR] = (uint8_t)(r[PR] + sp0256_delta_value(iv, 5u, 0u));
+            r[B0] = (uint8_t)(r[B0] + sp0256_delta_value(iv, 3u, 4u));
+            r[F0] = (uint8_t)(r[F0] + sp0256_delta_value(iv, 3u, 3u));
+            r[B1] = (uint8_t)(r[B1] + sp0256_delta_value(iv, 3u, 4u));
+            r[F1] = (uint8_t)(r[F1] + sp0256_delta_value(iv, 3u, 3u));
+            r[B2] = (uint8_t)(r[B2] + sp0256_delta_value(iv, 3u, 4u));
+            r[F2] = (uint8_t)(r[F2] + sp0256_delta_value(iv, 3u, 3u));
+            r[B3] = (uint8_t)(r[B3] + sp0256_delta_value(iv, 3u, 3u));
+            r[F3] = (uint8_t)(r[F3] + sp0256_delta_value(iv, 4u, 2u));
+            r[B4] = (uint8_t)(r[B4] + sp0256_delta_value(iv, 4u, 1u));
+            r[F4] = (uint8_t)(r[F4] + sp0256_delta_value(iv, 4u, 2u));
+            iv->silent = 0;
+            return 1;
+        }
+        case (45u << 8) | 58u:
+        {
+            r[AM] = (uint8_t)(r[AM] + sp0256_delta_value(iv, 4u, 2u));
+            r[PR] = (uint8_t)(r[PR] + sp0256_delta_value(iv, 5u, 0u));
+            r[B0] = (uint8_t)(r[B0] + sp0256_delta_value(iv, 3u, 4u));
+            r[F0] = (uint8_t)(r[F0] + sp0256_delta_value(iv, 3u, 3u));
+            r[B1] = (uint8_t)(r[B1] + sp0256_delta_value(iv, 3u, 4u));
+            r[F1] = (uint8_t)(r[F1] + sp0256_delta_value(iv, 3u, 3u));
+            r[B2] = (uint8_t)(r[B2] + sp0256_delta_value(iv, 3u, 4u));
+            r[F2] = (uint8_t)(r[F2] + sp0256_delta_value(iv, 3u, 3u));
+            r[B3] = (uint8_t)(r[B3] + sp0256_delta_value(iv, 3u, 3u));
+            r[F3] = (uint8_t)(r[F3] + sp0256_delta_value(iv, 4u, 2u));
+            r[B4] = (uint8_t)(r[B4] + sp0256_delta_value(iv, 4u, 1u));
+            r[F4] = (uint8_t)(r[F4] + sp0256_delta_value(iv, 4u, 2u));
+            r[B5] = (uint8_t)(r[B5] + sp0256_delta_value(iv, 5u, 0u));
+            r[F5] = (uint8_t)(r[F5] + sp0256_delta_value(iv, 5u, 0u));
+            iv->silent = 0;
+            return 1;
+        }
+        case (59u << 8) | 70u:
+        {
+            r[AM] = (uint8_t)(r[AM] + sp0256_delta_value(iv, 4u, 2u));
+            r[PR] = (uint8_t)(r[PR] + sp0256_delta_value(iv, 5u, 0u));
+            r[B0] = (uint8_t)(r[B0] + sp0256_delta_value(iv, 4u, 1u));
+            r[F0] = (uint8_t)(r[F0] + sp0256_delta_value(iv, 4u, 2u));
+            r[B1] = (uint8_t)(r[B1] + sp0256_delta_value(iv, 4u, 1u));
+            r[F1] = (uint8_t)(r[F1] + sp0256_delta_value(iv, 4u, 2u));
+            r[B2] = (uint8_t)(r[B2] + sp0256_delta_value(iv, 4u, 1u));
+            r[F2] = (uint8_t)(r[F2] + sp0256_delta_value(iv, 4u, 2u));
+            r[B3] = (uint8_t)(r[B3] + sp0256_delta_value(iv, 4u, 1u));
+            r[F3] = (uint8_t)(r[F3] + sp0256_delta_value(iv, 5u, 1u));
+            r[B4] = (uint8_t)(r[B4] + sp0256_delta_value(iv, 5u, 0u));
+            r[F4] = (uint8_t)(r[F4] + sp0256_delta_value(iv, 5u, 0u));
+            iv->silent = 0;
+            return 1;
+        }
+        case (59u << 8) | 72u:
+        {
+            r[AM] = (uint8_t)(r[AM] + sp0256_delta_value(iv, 4u, 2u));
+            r[PR] = (uint8_t)(r[PR] + sp0256_delta_value(iv, 5u, 0u));
+            r[B0] = (uint8_t)(r[B0] + sp0256_delta_value(iv, 4u, 1u));
+            r[F0] = (uint8_t)(r[F0] + sp0256_delta_value(iv, 4u, 2u));
+            r[B1] = (uint8_t)(r[B1] + sp0256_delta_value(iv, 4u, 1u));
+            r[F1] = (uint8_t)(r[F1] + sp0256_delta_value(iv, 4u, 2u));
+            r[B2] = (uint8_t)(r[B2] + sp0256_delta_value(iv, 4u, 1u));
+            r[F2] = (uint8_t)(r[F2] + sp0256_delta_value(iv, 4u, 2u));
+            r[B3] = (uint8_t)(r[B3] + sp0256_delta_value(iv, 4u, 1u));
+            r[F3] = (uint8_t)(r[F3] + sp0256_delta_value(iv, 5u, 1u));
+            r[B4] = (uint8_t)(r[B4] + sp0256_delta_value(iv, 5u, 0u));
+            r[F4] = (uint8_t)(r[F4] + sp0256_delta_value(iv, 5u, 0u));
+            r[B5] = (uint8_t)(r[B5] + sp0256_delta_value(iv, 5u, 0u));
+            r[F5] = (uint8_t)(r[F5] + sp0256_delta_value(iv, 5u, 0u));
+            iv->silent = 0;
+            return 1;
+        }
+        default:
+            return 0;
+    }
+}
+static INLINE int IVOICE_HOT(sp0256_decode_deltad)(ivoice_t *iv, int idx0, int idx1)
+{
+    uint8_t *r = iv->filt.r;
+    const unsigned key = ((unsigned)idx0 << 8) | (unsigned)idx1;
+
+    switch (key)
+    {
+        case (111u << 8) | 116u:
+        {
+            memset(&r[B0], 0, 6);
+            r[AM] = (uint8_t)(r[AM] + sp0256_delta_value(iv, 4u, 2u));
+            r[PR] = (uint8_t)(r[PR] + sp0256_delta_value(iv, 5u, 0u));
+            r[B3] = (uint8_t)(r[B3] + sp0256_delta_value(iv, 3u, 3u));
+            r[F3] = (uint8_t)(r[F3] + sp0256_delta_value(iv, 4u, 2u));
+            r[B4] = (uint8_t)(r[B4] + sp0256_delta_value(iv, 4u, 1u));
+            r[F4] = (uint8_t)(r[F4] + sp0256_delta_value(iv, 4u, 2u));
+            iv->silent = 0;
+            return 1;
+        }
+        case (111u << 8) | 118u:
+        {
+            memset(&r[B0], 0, 6);
+            r[AM] = (uint8_t)(r[AM] + sp0256_delta_value(iv, 4u, 2u));
+            r[PR] = (uint8_t)(r[PR] + sp0256_delta_value(iv, 5u, 0u));
+            r[B3] = (uint8_t)(r[B3] + sp0256_delta_value(iv, 3u, 3u));
+            r[F3] = (uint8_t)(r[F3] + sp0256_delta_value(iv, 4u, 2u));
+            r[B4] = (uint8_t)(r[B4] + sp0256_delta_value(iv, 4u, 1u));
+            r[F4] = (uint8_t)(r[F4] + sp0256_delta_value(iv, 4u, 2u));
+            r[B5] = (uint8_t)(r[B5] + sp0256_delta_value(iv, 5u, 0u));
+            r[F5] = (uint8_t)(r[F5] + sp0256_delta_value(iv, 5u, 0u));
+            iv->silent = 0;
+            return 1;
+        }
+        case (119u << 8) | 124u:
+        {
+            r[AM] = (uint8_t)(r[AM] + sp0256_delta_value(iv, 4u, 2u));
+            r[PR] = (uint8_t)(r[PR] + sp0256_delta_value(iv, 5u, 0u));
+            r[B3] = (uint8_t)(r[B3] + sp0256_delta_value(iv, 4u, 1u));
+            r[F3] = (uint8_t)(r[F3] + sp0256_delta_value(iv, 5u, 1u));
+            r[B4] = (uint8_t)(r[B4] + sp0256_delta_value(iv, 5u, 0u));
+            r[F4] = (uint8_t)(r[F4] + sp0256_delta_value(iv, 5u, 0u));
+            iv->silent = 0;
+            return 1;
+        }
+        case (119u << 8) | 126u:
+        {
+            r[AM] = (uint8_t)(r[AM] + sp0256_delta_value(iv, 4u, 2u));
+            r[PR] = (uint8_t)(r[PR] + sp0256_delta_value(iv, 5u, 0u));
+            r[B3] = (uint8_t)(r[B3] + sp0256_delta_value(iv, 4u, 1u));
+            r[F3] = (uint8_t)(r[F3] + sp0256_delta_value(iv, 5u, 1u));
+            r[B4] = (uint8_t)(r[B4] + sp0256_delta_value(iv, 5u, 0u));
+            r[F4] = (uint8_t)(r[F4] + sp0256_delta_value(iv, 5u, 0u));
+            r[B5] = (uint8_t)(r[B5] + sp0256_delta_value(iv, 5u, 0u));
+            r[F5] = (uint8_t)(r[F5] + sp0256_delta_value(iv, 5u, 0u));
+            iv->silent = 0;
+            return 1;
+        }
+        default:
+            return 0;
+    }
+}
+#endif /* MINTY_FW */
+
+
 /* ======================================================================== */
 /*  SP0256_MICRO -- Emulate the microsequencer in the SP0256.  Executes     */
 /*                  instructions either until the repeat count != 0 or      */
 /*                  the sequencer gets halted by a RTS to 0.                */
 /* ======================================================================== */
-static void IVOICE_HOT(sp0256_micro)(ivoice_t *iv)
+static INLINE void IVOICE_HOT(sp0256_micro)(ivoice_t *iv)
 {
     uint8_t  immed4;
     uint8_t  opcode;
@@ -1182,104 +1546,145 @@ static void IVOICE_HOT(sp0256_micro)(ivoice_t *iv)
         /* ---------------------------------------------------------------- */
         /*  Step through control words in the description for data block.   */
         /* ---------------------------------------------------------------- */
-        for (i = idx0; i <= idx1; i++)
+#ifdef MINTY_FW
         {
-            int len, shf, delta, field, prm, clrL;
-            int8_t value;
+            int specialized = 0;
 
-            /* ------------------------------------------------------------ */
-            /*  Get the control word and pull out some important fields.    */
-            /* ------------------------------------------------------------ */
-            cr = sp0256_datafmt[i];
-
-            len   = CR_LEN(cr);
-            shf   = CR_SHF(cr);
-            prm   = CR_PRM(cr);
-            clrL  = cr & CR_CLRL;
-            delta = cr & CR_DELTA;
-            field = cr & CR_FIELD;
-            value = 0;
-
-            //jzdprintf(("$%.4X.%.1X: len=%2d shf=%2d prm=%2d d=%d f=%d ",
-            //         iv->pc >> 3, iv->pc & 7, len, shf, prm, !!delta, !!field));
-            /* ------------------------------------------------------------ */
-            /*  Clear any registers that were requested to be cleared.      */
-            /* ------------------------------------------------------------ */
-            if (clrL)
+            switch (opcode)
             {
-                iv->filt.r[F0] = iv->filt.r[B0] = 0;
-                iv->filt.r[F1] = iv->filt.r[B1] = 0;
-                iv->filt.r[F2] = iv->filt.r[B2] = 0;
+                case 0x08u: /* Documented opcode 0001: LOADALL */
+                    sp0256_decode_loadall(iv, idx0 == 1 && idx1 == 16);
+                    specialized = 1;
+                    break;
+
+                case 0x04u: /* Documented opcode 0010: LOAD_2 */
+                    specialized = sp0256_decode_load2(iv, idx0, idx1);
+                    break;
+
+                case 0x03u: /* Documented opcode 1100: LOAD_C */
+                    specialized = sp0256_decode_loadc(iv, idx0, idx1);
+                    break;
+
+                case 0x09u: /* Documented opcode 1001: DELTA_9 */
+                    specialized = sp0256_decode_delta9(iv, idx0, idx1);
+                    break;
+
+                case 0x0Bu: /* Documented opcode 1101: DELTA_D */
+                    specialized = sp0256_decode_deltad(iv, idx0, idx1);
+                    break;
+
+                default:
+                    break;
             }
 
-            /* ------------------------------------------------------------ */
-            /*  If this entry has a bitfield with it, grab the bitfield.    */
-            /* ------------------------------------------------------------ */
-            if (len)
+            if (!specialized)
             {
-                value = sp0256_getb(iv, len);
-            }
-            else
+                for (i = idx0; i <= idx1; i++)
+                {
+#else
+        {
+            for (i = idx0; i <= idx1; i++)
             {
-                //jzdprintf((" (no update)\n"));
-                continue;
+#endif
+                int len, shf, delta, field, prm, clrL;
+                int8_t value;
+
+                /* ------------------------------------------------------------ */
+                /*  Get the control word and pull out some important fields.    */
+                /* ------------------------------------------------------------ */
+                cr = sp0256_datafmt[i];
+
+                len   = CR_LEN(cr);
+                shf   = CR_SHF(cr);
+                prm   = CR_PRM(cr);
+                clrL  = cr & CR_CLRL;
+                delta = cr & CR_DELTA;
+                field = cr & CR_FIELD;
+                value = 0;
+
+                //jzdprintf(("$%.4X.%.1X: len=%2d shf=%2d prm=%2d d=%d f=%d ",
+                //         iv->pc >> 3, iv->pc & 7, len, shf, prm, !!delta, !!field));
+                /* ------------------------------------------------------------ */
+                /*  Clear any registers that were requested to be cleared.      */
+                /* ------------------------------------------------------------ */
+                if (clrL)
+                {
+                    memset(&iv->filt.r[B0], 0, 6);
+                    //iv->filt.r[B0] = iv->filt.r[F0] = 0;
+                    //iv->filt.r[B1] = iv->filt.r[F1] = 0;
+                    //iv->filt.r[B2] = iv->filt.r[F2] = 0;
+                }
+
+                /* ------------------------------------------------------------ */
+                /*  If this entry has a bitfield with it, grab the bitfield.    */
+                /* ------------------------------------------------------------ */
+                if (len)
+                {
+                    value = sp0256_getb(iv, len);
+                }
+                else
+                {
+                    //jzdprintf((" (no update)\n"));
+                    continue;
+                }
+
+                /* ------------------------------------------------------------ */
+                /*  Sign extend if this is a delta update.                      */
+                /* ------------------------------------------------------------ */
+                if (delta)  /* Sign extend */
+                {
+                    if (value & (1u << (len - 1))) value |= -(1u << len);
+                }
+
+                /* ------------------------------------------------------------ */
+                /*  Shift the value to the appropriate precision.               */
+                /* ------------------------------------------------------------ */
+                if (shf)
+                    value = value < 0 ? -(-value << shf) : (value << shf);
+
+                //jzdprintf(("v=%.2X (%c%.2X)  ", value & 0xFF,
+                //         value & 0x80 ? '-' : '+',
+                //         0xFF & (value & 0x80 ? -value : value)));
+
+                iv->silent = 0;
+
+                /* ------------------------------------------------------------ */
+                /*  If this is a field-replace, insert the field.               */
+                /* ------------------------------------------------------------ */
+                if (field)
+                {
+                    //jzdprintf(("--field-> r[%2d] = %.2X -> ", prm, iv->filt.r[prm]));
+
+                    iv->filt.r[prm] &= ~(~0u << shf); /* Clear the old bits.    */
+                    iv->filt.r[prm] |= value;         /* Merge in the new bits. */
+
+                    //jzdprintf(("%.2X\n", iv->filt.r[prm]));
+                    continue;
+                }
+
+                /* ------------------------------------------------------------ */
+                /*  If this is a delta update, add to the appropriate field.    */
+                /* ------------------------------------------------------------ */
+                if (delta)
+                {
+                    //jzdprintf(("--delta-> r[%2d] = %.2X -> ", prm, iv->filt.r[prm]));
+
+                    iv->filt.r[prm] += value;
+
+                    //jzdprintf(("%.2X\n", iv->filt.r[prm]));
+                    continue;
+                }
+
+                /* ------------------------------------------------------------ */
+                /*  Otherwise, just write the new value.                        */
+                /* ------------------------------------------------------------ */
+                iv->filt.r[prm] = value;
+                //jzdprintf(("--value-> r[%2d] = %.2X\n", prm, iv->filt.r[prm]));
             }
-
-            /* ------------------------------------------------------------ */
-            /*  Sign extend if this is a delta update.                      */
-            /* ------------------------------------------------------------ */
-            if (delta)  /* Sign extend */
-            {
-                if (value & (1u << (len - 1))) value |= -(1u << len);
-            }
-
-            /* ------------------------------------------------------------ */
-            /*  Shift the value to the appropriate precision.               */
-            /* ------------------------------------------------------------ */
-            if (shf)
-                value = value < 0 ? -(-value << shf) : (value << shf);
-
-            //jzdprintf(("v=%.2X (%c%.2X)  ", value & 0xFF,
-            //         value & 0x80 ? '-' : '+',
-            //         0xFF & (value & 0x80 ? -value : value)));
-
-            iv->silent = 0;
-
-            /* ------------------------------------------------------------ */
-            /*  If this is a field-replace, insert the field.               */
-            /* ------------------------------------------------------------ */
-            if (field)
-            {
-                //jzdprintf(("--field-> r[%2d] = %.2X -> ", prm, iv->filt.r[prm]));
-
-                iv->filt.r[prm] &= ~(~0u << shf); /* Clear the old bits.    */
-                iv->filt.r[prm] |= value;         /* Merge in the new bits. */
-
-                //jzdprintf(("%.2X\n", iv->filt.r[prm]));
-
-                continue;
-            }
-
-            /* ------------------------------------------------------------ */
-            /*  If this is a delta update, add to the appropriate field.    */
-            /* ------------------------------------------------------------ */
-            if (delta)
-            {
-                //jzdprintf(("--delta-> r[%2d] = %.2X -> ", prm, iv->filt.r[prm]));
-
-                iv->filt.r[prm] += value;
-
-                //jzdprintf(("%.2X\n", iv->filt.r[prm]));
-
-                continue;
-            }
-
-            /* ------------------------------------------------------------ */
-            /*  Otherwise, just write the new value.                        */
-            /* ------------------------------------------------------------ */
-            iv->filt.r[prm] = value;
-            //jzdprintf(("--value-> r[%2d] = %.2X\n", prm, iv->filt.r[prm]));
         }
+#ifdef MINTY_FW
+        }
+#endif
 
         /* ---------------------------------------------------------------- */
         /*  Most opcodes clear IA, IP.                                      */

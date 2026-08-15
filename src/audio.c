@@ -44,7 +44,7 @@ bool audio_callback(repeating_timer_t *rt) {
    static int32_t ivoice_raw = 0;
    static uint8_t audio_cycle = 0;
 
-
+   //gpio_put(LED, false);
 
    /* first action is to output sample from previous cycle, this way processing speed doesn't affect sample timing */
 #ifndef NDEBUG
@@ -70,15 +70,15 @@ bool audio_callback(repeating_timer_t *rt) {
 
    if (cart.IntellivoiceSupport && audio_cycle == 3) {
       // Intellivoice output is generated at 1/4 the ECS sample rate, so only generate every 4th callback
-      //gpio_put(LED, false);
       // Intellivoice output is signed, ranging from -32768 to 32767.
       ivoice_raw = (int32_t)ivoice_minty_next_sample();
       // scale to match ECS output level
       ivoice_raw = ((ivoice_raw + 32768) >> 2);
-      //gpio_put(LED, true);
    }
 
    audio_cycle = (audio_cycle + 1) & 0x03;
+
+   //gpio_put(LED, true);
 
    return true;
 }
