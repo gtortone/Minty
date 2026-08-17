@@ -39,7 +39,7 @@ const uint8_t ECS_LUT[16] = {
 
 #define GPIO_TO_SLICE(g) ((g) < 32 ? (((g) >> 1) & 7) : (8 + (((g) >> 1) & 3)))
 
-bool audio_callback(repeating_timer_t *rt) {   
+bool  __not_in_flash_func(audio_callback)(repeating_timer_t *rt) {   
    static int32_t ecs_raw = 0;
    static int32_t ivoice_raw = 0;
    static uint8_t audio_cycle = 0;
