@@ -176,7 +176,6 @@ if(CONFIG_ECS_AUDIO OR CONFIG_INTELLIVOICE)
       ${CMAKE_CURRENT_LIST_DIR}/src/audio.c
       ${CMAKE_CURRENT_LIST_DIR}/src/emu2149.c
       ${CMAKE_CURRENT_LIST_DIR}/src/ivoice.c
-      ${CMAKE_CURRENT_LIST_DIR}/src/intellivoice_minty.c
    )
    target_link_libraries(${PROJECT} hardware_pwm)
 endif()
@@ -191,6 +190,7 @@ if(PICO_RP2350)
    target_link_libraries(${PROJECT} pico_sha256)
 endif()
 
+
 set(OUTPUT_SUFFIX "" CACHE STRING "Suffix for output name")
 
 target_compile_definitions(${PROJECT} PRIVATE "PICO_FLASH_SIZE_BYTES=${PICO_FLASH_SIZE_BYTES}")
@@ -203,6 +203,7 @@ target_compile_definitions(${PROJECT} PRIVATE CONFIG_JLP=$<BOOL:${CONFIG_JLP}>)
 target_compile_definitions(${PROJECT} PRIVATE CONFIG_ECS_AUDIO=$<BOOL:${CONFIG_ECS_AUDIO}>)
 target_compile_definitions(${PROJECT} PRIVATE CONFIG_INTELLIVOICE=$<BOOL:${CONFIG_INTELLIVOICE}>)
 target_compile_definitions(${PROJECT} PRIVATE "MAX_ROM_SIZE=${MAX_ROM_SIZE}")
+target_compile_definitions(${PROJECT} PRIVATE "MINTY_FW=1")
 
 # options to enable FatFS SD debug
 #target_compile_definitions(${PROJECT} PRIVATE "USE_PRINTF=1")
