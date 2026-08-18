@@ -1,6 +1,7 @@
 #include "fujibus_usb.h"
 #include "tusb.h"
 #include "pico/time.h"
+#include "utils.h"
 
 static fujibus_inbound_fn s_inbound_handler = NULL;
 
@@ -17,6 +18,7 @@ fb_status_t fujibus_transact(uint8_t device, uint8_t command,
 {
 
     printf("fujibus_transact: device: 0x%X, command: 0x%X\n", device, command);
+    hexdump(payload, payload_len);
 
     if (!tud_cdc_connected())
         return FB_ENOLINK;

@@ -4,6 +4,7 @@
 #include "fujibus.h"
 #include <string.h>
 #include <stdio.h>      // printf
+#include <utils.h>      // hexdump
 
 enum {
     SLIP_END     = 0xC0,
@@ -38,6 +39,7 @@ size_t fujibus_build_request(uint8_t device, uint8_t command,
                               uint8_t *out, size_t out_cap)
 {
     printf("fujibus_build_request: device: 0x%X, command: 0x%X\n", device, command);
+    hexdump(payload, payload_len);
 
     // Decoded (unescaped) packet is assembled here first, then SLIP-encoded
     // into `out` below -- encoding can grow the data, so it can't be done
