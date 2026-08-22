@@ -19,7 +19,7 @@ Multi-cart based on Raspberry Pi Pico hardware and PiRTOII firmware (https://git
 * 🧩 Intellicart ROM support (.rom files)
 * ⚡ New page decoding data structure with O(1) lookup performance
 * 🗂️ VFS (Virtual File System) library included for storage access via FatFs and LittleFS
-* 💡 Full JLP support: hardware acceleration, expanded memory, and flash save/load support (for boards with microSD storage)
+* 💡 Full JLP support: hardware acceleration, expanded memory, and flash save/load support
 * 🔊 ECS audio emulation with AY-3-8910 soft-core
 * 📢 Intellivoice emulation
 * 🧱 Support for an arbitrary number of patches defined in ROM configuration files
