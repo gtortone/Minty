@@ -44,7 +44,7 @@ Multi-cart based on Raspberry Pi Pico hardware and PiRTOII firmware (https://git
 | [PintyCard](https://oshwlab.com/yannick.erb/intv-pirto-hb) | RP2354A | 512 kB | ~470kB | ✅ | ✅ | ✅ |flash | `pintycard` |
 
 Note 1
-* route GP28 to EXT-AUDIO cartridge pin and add some passive [components](images/ecs-audio-mod.png)
+* route GP28 to EXT-AUDIO cartridge pin through a simple resistor [components](images/ecs-audio-mod.png)
 * [photo](images/pirto_ii_duo_audio_mod.jpg) of neat wiring
 * to enable ECS audio: add option ```-DCONFIG_ECS_AUDIO=ON``` to CMake command
 * to enable Intellivoice: add option ```-DCONFIG_INTELLIVOICE=ON``` to CMake command
