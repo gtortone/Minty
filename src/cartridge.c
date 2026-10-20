@@ -540,6 +540,9 @@ void __time_critical_func(RunGame)() {
    uint64_t resetTimeout = 0;
 
    resetCart();              // start game !
+   while (!gpio_get(MSYNC)) {
+      // wait for MSYNC to go high
+   }
 
    while (1) {
 
@@ -547,8 +550,8 @@ void __time_critical_func(RunGame)() {
          resetTimeout = make_timeout_time_ms(2000);
          //printf("Card Reset request 1/2\n");
       }
-      if ((spyData == 0x55) && (get_absolute_time() < resetTimeout)) {
-            //printf("Card Reset request 2/2\n");
+      if (((spyData == 0x55) && (get_absolute_time() < resetTimeout)) || (!gpio_get(MSYNC))) {
+            //printf("Card Reset request 2/2 or INTY Reset\n");
             watchdog_enable(1, 1);
             while(1);
       }

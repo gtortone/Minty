@@ -313,8 +313,10 @@ int load_cfg(char *filename) {
          if (voice_present == 0) { 
             int intellivoice_value = 0;
             if ( sscanf(tmp_buffer, "voice = %d", &intellivoice_value) == 1 ) {
-               cart.IntellivoiceSupport = true;
-               printf("Intellivoice emulation enabled\n");
+               if (intellivoice_value == 1) {
+                  cart.IntellivoiceSupport = true;
+                  printf("Intellivoice emulation enabled\n");
+               }
             }
          }
 #endif

@@ -51,7 +51,7 @@ void writeFlash(int row, uint16_t addr) {
 void eraseFlash(int row) {
    int bw;
    int total_bw;
-   uint16_t sector = row % JLP_FLASH_ROWS_PER_SECTOR;
+   uint16_t sector = row / JLP_FLASH_ROWS_PER_SECTOR;
    uint32_t offset = sector * JLP_FLASH_SECTOR_BYTES;
    uint8_t erase_pattern[JLP_FLASH_ROW_BYTES];
 
