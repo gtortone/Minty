@@ -550,7 +550,11 @@ void __time_critical_func(RunGame)() {
          resetTimeout = make_timeout_time_ms(2000);
          //printf("Card Reset request 1/2\n");
       }
+#ifdef PINTYCARD
       if (((spyData == 0x55) && (get_absolute_time() < resetTimeout)) || (!gpio_get(MSYNC))) {
+#else
+      if (((spyData == 0x55) && (get_absolute_time() < resetTimeout))) {
+#endif
             //printf("Card Reset request 2/2 or INTY Reset\n");
             watchdog_enable(1, 1);
             while(1);
