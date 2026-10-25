@@ -73,6 +73,10 @@ volatile uint8_t spyData = 0xFF;
 
 extern mm_map_t m;
 
+// set page data as global to properly reset JLP ROMs
+volatile uint8_t curPageArr[16];        
+volatile uint8_t seg = 0;
+
 __attribute__((optimize("O3")))
 void __time_critical_func(core1_main()) {
    volatile unsigned int gpio_snapshot, busState;
@@ -80,8 +84,6 @@ void __time_critical_func(core1_main()) {
    volatile uint16_t dataOut = 0;
    volatile uint32_t dataIn = 0;
    volatile bool deviceAddress = false;
-   volatile uint8_t curPageArr[16];        
-   volatile uint8_t seg = 0;
    volatile uint32_t romaddr;
 
    multicore_lockout_victim_init();
@@ -550,14 +552,22 @@ void __time_critical_func(RunGame)() {
          resetTimeout = make_timeout_time_ms(2000);
          //printf("Card Reset request 1/2\n");
       }
-#ifdef PINTYCARD
-      if (((spyData == 0x55) && (get_absolute_time() < resetTimeout)) || (!gpio_get(MSYNC))) {
-#else
+
       if (((spyData == 0x55) && (get_absolute_time() < resetTimeout))) {
-#endif
             //printf("Card Reset request 2/2 or INTY Reset\n");
             watchdog_enable(1, 1);
             while(1);
+      }
+
+      if (!gpio_get(MSYNC)) {
+#ifdef PINTYCARD
+         //printf("Card Reset request 2/2 or INTY Reset\n");
+         watchdog_enable(1, 1);
+         while(1);
+#else
+         seg = 0;
+         memset((uint8_t *) curPageArr, 0, sizeof(curPageArr));
+#endif
       }
 
 #if CONFIG_ECS_AUDIO
