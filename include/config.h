@@ -7,7 +7,7 @@
 #define CONFIG_VERSION        2
 #define CONFIG_MAGIC_NUMBER   (uint16_t) 0xCAFE
 
-#if defined(PIRTO_II_DEFAULT)
+#if defined(PIRTO_II_DEFAULT) || defined(PINTYCARD)
    #define CONFIG_FILENAME       "/fl/.Minty.cfg"
 #else
    #define CONFIG_FILENAME       "/sd/.Minty.cfg"

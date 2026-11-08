@@ -25,7 +25,7 @@
 	DIM I,J
     DIM #MEM
     DIM #FROM, #F_FROM, #F_TO, #F_TOTAL
-    DIM Input, Debounce
+    DIM Input, Debounce, Volume, ACTION, WaveFrame
     DIM Selected_Entry, Max_Entry
     DIM #Disp_Color
 
@@ -160,18 +160,27 @@
         #BACKTAB(182 +  I) = $0987 +  I * 8
     NEXT I
 
+    Input = 0
+
     PlaySnd(WelcomeSound)
-    FOR I = 1 TO 120:WAIT:NEXT I
+    FOR I = 1 TO 60
+        IF CONT.KEY = 11 THEN Input = 1
+        WAIT
+    NEXT I
     ' Next 10 animation frames for text
     FOR I=1 TO 10 
         DEFINE 48,16,VARPTR text_bitmaps_0(64 * I)
-        FOR J=0 TO 7:WAIT:NEXT J
+        FOR J=0 TO 7
+            IF CONT.KEY = 11 THEN Input = 1
+            WAIT
+        NEXT J
     NEXT I
 
     ' Wait for card to be ready and minimum delay
-    I = 30
+    I = 20
     WHILE (PI_STATUS<>PI_STAT_READY) OR (I>0)
         IF I>0 THEN I = I - 1
+        IF CONT.KEY = 11 THEN Input = 1
         WAIT
     WEND
 
@@ -179,8 +188,12 @@
     PI_SET_TVMODE(NTSC)
     PI_SET_ECS_PRES(ECS.AVAILABLE)
     IF VOICE.AVAILABLE = $8001 THEN PI_SET_VOICE_PRES(1) ELSE PI_SET_VOICE_PRES(0)
-    PI_SET_AUDIO_VOL(180)
+    Volume = PI_GET_AUDIO_VOL
+    IF Volume = 0 THEN Volume = 180 ' If no volume set start at 180 
     
+    IF Input = 1 THEN GOSUB SETTINGS_SCREEN
+
+    PI_SET_AUDIO_VOL(Volume)
     CLS
     WAIT
 
@@ -200,9 +213,172 @@
     ASM InfiniteLoop:
     ASM    B InfiniteLoop
 
+SETTINGS_SCREEN: PROCEDURE
+    PlaySnd(InputSound)
+    GOSUB DISPLAY_HEADER
+    PRINT AT SCREENPOS(9, 0) COLOR CS_YELLOW, "Information"
+
+    PRINT AT SCREENPOS( 1,2) COLOR CS_TAN, "Firmware"
+    PRINT AT SCREENPOS(15,2) COLOR CS_DARKGREEN,"v",<1>PI_GET_MAJOR,".",<1>PI_GET_MINOR
+  
+    PRINT AT SCREENPOS( 1,3)  COLOR CS_TAN, "Tv Standard"
+    IF NTSC THEN 
+        PRINT AT SCREENPOS(15, 3) COLOR CS_DARKGREEN,"NTSC"
+    ELSE
+        PRINT AT SCREENPOS(16, 3) COLOR CS_DARKGREEN,"PAL"
+    END IF
+
+    PRINT AT SCREENPOS( 1, 4) COLOR CS_TAN, "JLP emulation"
+    IF PI_GET_JLP_EMU THEN
+        PRINT AT SCREENPOS(16, 4) COLOR CS_DARKGREEN,"YES"
+    ELSE
+        PRINT AT SCREENPOS(17, 4) COLOR CS_DARKGREEN,"NO"
+    END IF
+
+    PRINT AT SCREENPOS( 1, 5) COLOR CS_TAN, "Max ROM size"
+    PRINT AT SCREENPOS(14, 5) COLOR CS_DARKGREEN, <3>PI_GET_MAXSIZE,"kB"
+
+    PRINT AT SCREENPOS( 1, 7) COLOR CS_TAN, "         PRES  EMU"
+    PRINT AT SCREENPOS( 1, 8) COLOR CS_TAN, "ECS"
+    PRINT AT SCREENPOS( 1, 9) COLOR CS_TAN, "iVoice"
+    IF ECS.AVAILABLE THEN 
+        PRINT AT SCREENPOS(11, 8) COLOR CS_DARKGREEN,"YES"
+    ELSE
+        PRINT AT SCREENPOS(12, 8) COLOR CS_DARKGREEN,"NO"
+    END IF
+    IF PI_GET_ECS_EMU THEN
+        PRINT AT SCREENPOS(16, 8) COLOR CS_DARKGREEN,"YES"   
+    ELSE
+        PRINT AT SCREENPOS(17, 8) COLOR CS_DARKGREEN,"NO"   
+    END IF
+    IF (VOICE.AVAILABLE = $8001) THEN 
+        PRINT AT SCREENPOS(11, 9) COLOR CS_DARKGREEN,"YES"
+    ELSE
+        PRINT AT SCREENPOS(12, 9) COLOR CS_DARKGREEN,"NO"
+    END IF
+    IF PI_GET_VOICE_EMU THEN
+        PRINT AT SCREENPOS(16, 9) COLOR CS_DARKGREEN,"YES"   
+    ELSE
+        PRINT AT SCREENPOS(17, 9) COLOR CS_DARKGREEN,"NO"   
+    END IF    
+    Volume = PI_GET_AUDIO_VOL
+    PRINT AT SCREENPOS( 1, 10)  COLOR CS_TAN, "Volume  UP/DN"
+    PRINT AT SCREENPOS(16, 10) COLOR CS_GREEN,<3>Volume
+
+
+    PRINT AT SCREENPOS( 2,11) COLOR CS_YELLOW, "<CLEAR>  to exit"
+    WHILE (CONT <> $88)  'CLEAR
+        IF PI_GET_ECS_EMU THEN
+            IF Debounce > 0 THEN
+                Debounce = Debounce - 1
+            ELSE
+                GOSUB GetAction
+
+                IF ((ACTION = ACTION_DOWN) AND (Volume > 0)) THEN Volume = Volume - 1
+                IF (ACTION = ACTION_PAGEUP) THEN IF (Volume > 10) THEN Volume = Volume-10 ELSE Volume = 0
+                IF ((ACTION = ACTION_UP) AND (Volume < 255)) THEN Volume = Volume + 1
+                IF (ACTION = ACTION_PAGEDOWN) THEN IF (Volume < 245) THEN Volume = Volume+10 ELSE Volume = 255
+                PRINT AT SCREENPOS(16, 10) COLOR CS_GREEN,<3>Volume
+            END IF
+        END IF
+        IF FRAME%8 = 0 THEN
+            WaveFrame = (WaveFrame+1)%4
+            DEFINE 6,1,VARPTR Title_wave(WaveFrame * 4)
+        END IF
+        WAIT
+    WEND
+    PI_SET_AUDIO_VOL(Volume)
+    Debounce = DEBOUNCE_DELAY
+    END
+
+DISPLAY_HEADER: PROCEDURE
+     CLS
+    MODE 0,6,0,7,0
+    ' load title wave
+    DEFINE 6,1,Title_wave
+    WAIT
+    ' load title text graphics
+    DEFINE 7,7,Title_text
+    WAIT
+    ResetSprite(1)
+    ResetSprite(2)
+    ResetSprite(3)
+    SCREEN Title_cards,0,0,8,1,8
+    SPRITE 4,  8 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
+    SPRITE 5, 24 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
+    SPRITE 6, 40 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
+    SPRITE 7, 56 + VISIBLE + ZOOMX2, 11 , SPR06 + BEHIND + SPR_ORANGE
+    WaveFrame = 0
+    END
+
+GetAction: PROCEDURE
+    ' Get user input and return it in CONT variable
+    Input = CONT
+    Action = ACTION_NONE
+    IF Input <> 0 THEN
+        FOR I = 0 TO 30
+            IF Input = ContCode(I) THEN Action = MainAction(I):Debounce = DEBOUNCE_DELAY:RETURN
+        NEXT I
+    END IF
+    END
+
 '
 ' DATA
 '
+Title_text:
+	DATA $183C,$2400,$3C3C,$FF3C
+	DATA $9193,$90F0,$9392,$FF93
+	DATA $9090,$1C9C,$1C1C,$FF9C
+	DATA $2327,$F8F0,$FCFC,$FFFC
+	DATA $1E9E,$7E3E,$FEFE,$FFFE
+	DATA $0909,$3C79,$7E3C,$FF7E
+	DATA $F3F3,$A7F3,$0FA7,$FF4F
+
+Title_Wave:
+    DATA $F3C0,$FFFF,$FFFF,$FFFF
+    DATA $FC30,$FFFF,$FFFF,$FFFF
+    DATA $3F0C,$FFFF,$FFFF,$FFFF
+    DATA $CF03,$FFFF,$FFFF,$FFFF
+
+Title_cards:
+	DATA $0838,$0840,$0848,$0850,$0858,$0860,$0868,$22F8
+
+ContCode:
+    DATA 129,65,33,130,66,34,132,68,36,136,72,40,160,96,192,4,20,22,6,2,18,19,3,1,17,25,9,8,24,28,12
+
+MainAction:
+    DATA ACTION_DISPHELP        ' 1
+    DATA ACTION_DISPINFO        ' 2
+    DATA ACTION_DISPSETTINGS    ' 3
+    DATA ACTION_NONE            ' 4
+    DATA ACTION_NONE            ' 5
+    DATA ACTION_NONE            ' 6
+    DATA ACTION_PAGEDOWN        ' 7
+    DATA ACTION_UP              ' 8
+    DATA ACTION_PAGEUP          ' 9
+    DATA ACTION_EXIT            ' CLR
+    DATA ACTION_DOWN            ' 0
+    DATA ACTION_SELECT          ' ENT
+    DATA ACTION_PAGEUP          ' BUT_UP
+    DATA ACTION_PAGEDOWN        ' BUT_LEFT
+    DATA ACTION_PAGEDOWN        ' BUT_RIGHT
+    DATA ACTION_UP              ' N
+    DATA ACTION_UP              ' NNE
+    DATA ACTION_NONE            ' NE
+    DATA ACTION_NONE            ' NEE
+    DATA ACTION_PAGEDOWN        ' E
+    DATA ACTION_NONE            ' SEE
+    DATA ACTION_NONE            ' SE
+    DATA ACTION_DOWN            ' SSE
+    DATA ACTION_DOWN            ' S
+    DATA ACTION_DOWN            ' SSW
+    DATA ACTION_NONE            ' SW
+    DATA ACTION_NONE            ' SWW
+    DATA ACTION_PAGEUP          ' W
+    DATA ACTION_NONE            ' NWW
+    DATA ACTION_NONE            ' NW
+    DATA ACTION_UP              ' NNW
+
     INCLUDE "Pinty_logo.bas"
     INCLUDE "text.bas"
     INCLUDE "Sounds.bas"
