@@ -39,7 +39,7 @@ extern Cartridge cart;     // main data structure for cart emulation
 
 extern mm_map_t m;
 
-// concole configuration
+// console configuration
 uint8_t tv_mode;      // 0: PAL, 1: NTSC
 uint8_t ecs_present;  // 0: ECS absent, 1: ECS present
 uint8_t voice_present; // 0: iVoice absent, 1: iVoice Absent
